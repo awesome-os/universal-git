@@ -1,6 +1,6 @@
 /* eslint-env browser */
-import { collect } from '../../utils/collect.js'
-import { fromStream } from '../../utils/fromStream'
+import { collect } from '../utils/collect.js'
+import { fromStream } from '../utils/fromStream'
 
 /**
  * HttpClient
