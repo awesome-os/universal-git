@@ -1,5 +1,4 @@
-import { basename } from '../utils/basename.js'
-import { dirname } from '../utils/dirname.js'
+import { basename, dirname } from '../utils/index.js'
 
 /*::
 type Node = {
