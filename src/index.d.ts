@@ -1,4 +1,4 @@
-export type * from './typedefs-http';
+export type * from './http/typedefs-http';
 export type * from './internal-apis';
 export type * from './http/node/index';
 export type * from './managers/index';
