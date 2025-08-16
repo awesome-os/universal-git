@@ -1,5 +1,3 @@
-import './typedefs-http.js'
-
 /**
  * A git commit object.
  *
@@ -288,3 +286,5 @@ import './typedefs-http.js'
  * @param {PostCheckoutParams} args
  * @returns {void | Promise<void>}
  */
+
+export {};
