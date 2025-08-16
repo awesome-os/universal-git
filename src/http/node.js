@@ -1,15 +1,14 @@
 import get from 'simple-get'
 
-import '../../typedefs-http.js'
-import { asyncIteratorToStream } from '../../utils/asyncIteratorToStream.js'
-import { collect } from '../../utils/collect.js'
-import { fromNodeStream } from '../../utils/fromNodeStream.js'
+import { asyncIteratorToStream } from '../utils/asyncIteratorToStream.js'
+import { collect } from '../utils/collect.js'
+import { fromNodeStream } from '../utils/fromNodeStream.js'
 
 /**
  * HttpClient
  *
- * @param {GitHttpRequest} request
- * @returns {Promise<GitHttpResponse>}
+ * @param {import('./typedefs-http').GitHttpRequest} request
+ * @returns {Promise<import('./typedefs-http').GitHttpResponse>}
  */
 export async function request({
   onProgress,
