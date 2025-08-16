@@ -42,3 +42,5 @@
  * @typedef {Object} HttpClient
  * @property {HttpFetch} request
  */
+
+export {};
