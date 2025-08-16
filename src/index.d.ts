@@ -1,4 +1,4 @@
-export type * from './http'
+export type * from './typedefs-http.js'
       "isomorphic-git": ["./index.d.ts"],
       "isomorphic-git/internal-apis": ["./src/internal-apis.d.ts"],
       "isomorphic-git/http": ["./http/node/index.d.ts"],
