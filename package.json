@@ -1,6 +1,7 @@
 {
-  "name": "isomorphic-git",
+  "name": "isomorphic-git-repo",
   "version": "0.0.0-development",
+  "private": true,
   "description": "A pure JavaScript implementation of git",
   "type": "module",
   "typings": "./src/index.d.cts",
