@@ -1,6 +1,5 @@
 /* eslint-env browser */
-import { collect } from '../utils/collect.js'
-import { fromStream } from '../utils/fromStream'
+import { collect } from './utils/collect.js'
 
 /**
  * @typedef {Object} GitProgressEvent
@@ -62,6 +61,7 @@ export async function request({
   headers = {},
   body,
 }) {
+  // TODO: Findout where this is used and why i guess it is not needed
   // streaming uploads aren't possible yet in the browser
   if (body) {
     body = await collect(body);
