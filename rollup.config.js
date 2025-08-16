@@ -26,32 +26,34 @@ const ecmaConfig = (input, output) => ({
   ],
 })
 
-// Legacy CommonJS2 modules
-const nodeConfig = (input, output) => ({
-  input: `src/${input}`,
-  external: [...external],
-  output: [
-    {
-      format: 'cjs',
-      file: `${output}`,
-      exports: 'named',
-    },
-  ],
-})
+// // Legacy CommonJS2 modules
+// TODO: Deprecate that in the docs and all over in favor of module-sync standard
+// const nodeConfig = (input, output) => ({
+//   input: `src/${input}`,
+//   external: [...external],
+//   output: [
+//     {
+//       format: 'cjs',
+//       file: `${output}`,
+//       exports: 'named',
+//     },
+//   ],
+// })
 
+// TODO: Deprecate that in the docs and all over in favor of module-sync standard
 // Script tags that "export" a global var for those browser environments that
 // still don't support `import` (Workers and ServiceWorkers)
-const umdConfig = (input, output, name) => ({
-  input: `src/${input}`,
-  output: [
-    {
-      format: 'umd',
-      file: `${output}`,
-      name,
-      exports: 'named',
-    },
-  ],
-})
+// const umdConfig = (input, output, name) => ({
+//   input: `src/${input}`,
+//   output: [
+//     {
+//       format: 'umd',
+//       file: `${output}`,
+//       name,
+//       exports: 'named',
+//     },
+//   ],
+// })
 
 const template = umd =>
   JSON.stringify(
