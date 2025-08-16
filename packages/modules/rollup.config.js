@@ -79,13 +79,13 @@ const ecmaConfig = (input, output) => ({
 
 export default {
   input: {
-    'index': 'isomorphic-git/src/index.js', 
-    'FileSystem: 'isomorphic-git/src/models/FileSystem',
+    index: 'isomorphic-git/src/index.js', 
+    //FileSystem: 'isomorphic-git/src/models/FileSystem',
     'internal-apis': 'isomorphic-git/src/internal-apis.js',
-    'managers': 'isomorphic-git/src/managers/index.js', 
-    'models': 'isomorphic-git/src/models/index.js', 
-    'http-node': 'isomorphic-git/src/http/web/index.js',
-    'http-web': 'isomorphic-git/src/http/web/index.js',
+    managers: 'isomorphic-git/src/managers/index.js', 
+    FileSystem: 'isomorphic-git/src/models/index.js', 
+    'http/node': 'isomorphic-git/src/http/web/index.js',
+    'http/web': 'isomorphic-git/src/http/web/index.js',
   },
   external(id) {
     // All modules that do not come from us are external by definition.
