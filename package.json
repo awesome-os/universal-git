@@ -78,7 +78,8 @@
     "size_report.html",
     "managers/*",
     "models/*",
-    "src/*"
+    "src/*",
+    "packages/*"
   ],
   "dependencies": {
     "async-lock": "^1.4.1",
