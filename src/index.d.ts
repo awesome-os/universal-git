@@ -3,4 +3,4 @@ export type * from './internal-apis';
 export type * from './http/node/index';
 export type * from './managers/index';
 export type * from './models/index';
-export type * from './typedef';
+export type * from './typedefs';
