@@ -1,13 +1,12 @@
 /* eslint-env browser */
-import '../../typedefs-http.js'
 import { collect } from '../../utils/collect.js'
 import { fromStream } from '../../utils/fromStream'
 
 /**
  * HttpClient
  *
- * @param {GitHttpRequest} request
- * @returns {Promise<GitHttpResponse>}
+ * @param {import('../typedefs-http').GitHttpRequest} request
+ * @returns {Promise<import('../typedefs-http').GitHttpResponse>}
  */
 export async function request({
   onProgress,
