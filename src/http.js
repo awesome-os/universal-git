@@ -1,5 +1,4 @@
 /* eslint-env browser */
-import { collect } from './utils/collect.js'
 
 /**
  * @typedef {Object} GitProgressEvent
@@ -60,13 +59,7 @@ export async function request({
   method = 'GET',
   headers = {},
   body,
-}) {
-  // TODO: Findout where this is used and why i guess it is not needed
-  // streaming uploads aren't possible yet in the browser
-  if (body) {
-    body = await collect(body);
-  }
-  
+}) { 
   const res = await fetch(url, { method, headers, body });
   
   return {
