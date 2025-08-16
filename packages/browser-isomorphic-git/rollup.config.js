@@ -1,7 +1,7 @@
-import fs from 'fs'
-import path from 'path'
-
-import pkg from './package.json'
+import fs from 'fs';
+import path from 'path';
+import { defineConfig } from 'rollup';
+import pkg from './package.json' with { type: 'json' };
 
 const external = [
   'fs',
@@ -12,7 +12,7 @@ const external = [
   'sha.js/sha1',
   'sha.js/sha1.js',
   ...Object.keys(pkg.dependencies),
-]
+];
 
 // Modern modules
 const ecmaConfig = (input, output) => ({
@@ -24,7 +24,7 @@ const ecmaConfig = (input, output) => ({
       file: `${output}`,
     },
   ],
-})
+});
 
 // // Legacy CommonJS2 modules
 // TODO: Deprecate that in the docs and all over in favor of module-sync standard
@@ -55,43 +55,32 @@ const ecmaConfig = (input, output) => ({
 //   ],
 // })
 
-const template = umd =>
-  JSON.stringify(
-    {
-      type: 'module',
-      main: 'index.cjs',
-      module: 'index.js',
-      typings: 'index.d.ts',
-      unpkg: umd ? 'index.umd.js' : undefined,
-    },
-    null,
-    2
-  )
 
-const pkgify = (input, output, name) => {
-  fs.mkdirSync(path.join(__dirname, output), { recursive: true })
+
+// TODO: handle the name GitHttp Correct make own module or something see _name usage
+const pkgify = (input, output, _name) => {
+  fs.mkdirSync(path.join(import.meta.dirname, output), { recursive: true })
   fs.writeFileSync(
-    path.join(__dirname, output, 'package.json'),
-    template(!!name)
+    path.join(import.meta.dirname, output, 'package.json'),
+    JSON.stringify(
+      {
+        type: 'module',
+        main: 'index.js'
+      },
+      null,
+      2
+    )
   )
   return [
     ecmaConfig(`${input}/index.js`, `${output}/index.js`),
-    nodeConfig(`${input}/index.js`, `${output}/index.cjs`),
-    ...(name
-      ? [umdConfig(`${input}/index.js`, `${output}/index.umd.js`, name)]
-      : []),
   ]
 }
 
 export default [
   ecmaConfig('index.js', 'index.js'),
-  nodeConfig('index.js', 'index.cjs'),
   ecmaConfig('internal-apis.js', 'internal-apis.js'),
-  nodeConfig('internal-apis.js', 'internal-apis.cjs'),
   ecmaConfig('managers/index.js', 'managers/index.js'),
-  nodeConfig('managers/index.js', 'managers/index.cjs'),
   ecmaConfig('models/index.js', 'models/index.js'),
-  nodeConfig('models/index.js', 'models/index.cjs'),
   ...pkgify('http/node', 'http/node'),
   ...pkgify('http/web', 'http/web', 'GitHttp'),
 ]
