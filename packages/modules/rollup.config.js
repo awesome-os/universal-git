@@ -1,14 +1,15 @@
 import fs from 'node:fs/promises';
 import path from 'path';
-import { defineConfig } from 'rollup';
+//import { defineConfig } from 'rollup';
 import pkg from './package.json' with { type: 'json' };
-
-const external = [
+import url from 'node:url';
+const externals = [
   'fs',
   'path',
   'crypto',
   'stream',
   'crc/lib/crc32.js',
+  'async-lock',
   'sha.js/sha1',
   'sha.js/sha1.js',
   ...Object.keys(pkg.dependencies),
@@ -78,28 +79,41 @@ const ecmaConfig = (input, output) => ({
 
 export default {
   input: {
-    'index': 'src/index.js', 
-    'internal-apis': 'src/internal-apis.js', 
-    'managers': 'src/managers/index.js', 
-    'models': 'src/models/index.js', 
-    'http-node': 'src/http/web/index.js',
-    'http-web': 'src/http/web/index.js',
+    'index': 'isomorphic-git/src/index.js', 
+    'internal-apis': 'isomorphic-git/src/internal-apis.js', 
+    'managers': 'isomorphic-git/src/managers/index.js', 
+    'models': 'isomorphic-git/src/models/index.js', 
+    'http-node': 'isomorphic-git/src/http/web/index.js',
+    'http-web': 'isomorphic-git/src/http/web/index.js',
   },
   external(id) {
     // All modules that do not come from us are external by definition.
-    return id.includes('node_modules') && !id.includes('@isomorphic-git');
+    const external =  externals.includes(id) || id.includes('node_modules') && !id.includes('isomorphic-git')
+    const resolution = import.meta.resolve(id);
+    console.log({external, resolution, id})
+    return external;
   }, //[...external],
   plugins: [
+    // TODO: rollup does not work well with urls?
     {
       "name": "node-resolve",
       "description": "uses node module resolve to link types correct and add extensions as needed and so on.",
       async resolveId(source,importer,options) {
+            // || import.meta.resolve(source,importer);
+        console.log({ resolution: import.meta.resolve(source,importer) });
         // This should resolve existing files with extension as also extension less imports via the package.json mappings.		
-        const resolution = await this.resolve(source, importer, options) || import.meta.resolve(source,importer);
-        const exists = await fs.stat()
+        const resolution = await this.resolve(source, importer, options) //|| { external: true }
+         || import.meta.resolve(source,importer);
+        // console.log({ resolution})
         // If it cannot be resolved or is external, just return it
         // so that Rollup can display an error
-        if (resolution.external) return resolution;
+        if (resolution.external || resolution.id) return resolution;
+        console.log({ resolution, source, importer })
+        const filePath = url.fileURLToPath(resolution);
+        console.log({ filePath })
+        const exists = await fs.stat(filePath);
+        console.log({ source, resolution })
+        return filePath;
       }
     }
   ],
@@ -107,6 +121,8 @@ export default {
     {
       format: 'es',
       dir: import.meta.dirname,
+      chunkFileNames: "internal/[name].js",
+      minifyInternalExports: false
     },
   ],
 }
