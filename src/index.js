@@ -1,4 +1,5 @@
 import './typedefs.js'
+import './typedefs-http.js'
 
 import { STAGE } from './api/STAGE.js'
 import { TREE } from './api/TREE.js'
