@@ -1,1 +1,3 @@
-{ "name": "@isomorphic-git/types" } 
+{ "name": "@isomorphic-git/types", "scripts": {
+  "bundle:types": "tsc -p ./tsconfig.json"
+} } 
