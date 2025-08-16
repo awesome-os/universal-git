@@ -3,7 +3,7 @@
 // import './typedefs-http.js';
 
 import * as api from './api.js';
-import * as Errors from './errors/index.js';
+import { Errors } from './internal-apis.js';
 
 // named exports
 export * from './api.js';
