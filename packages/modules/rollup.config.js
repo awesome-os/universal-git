@@ -80,7 +80,8 @@ const ecmaConfig = (input, output) => ({
 export default {
   input: {
     'index': 'isomorphic-git/src/index.js', 
-    'internal-apis': 'isomorphic-git/src/internal-apis.js', 
+    'FileSystem: 'isomorphic-git/src/models/FileSystem',
+    'internal-apis': 'isomorphic-git/src/internal-apis.js',
     'managers': 'isomorphic-git/src/managers/index.js', 
     'models': 'isomorphic-git/src/models/index.js', 
     'http-node': 'isomorphic-git/src/http/web/index.js',
