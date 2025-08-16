@@ -2,7 +2,6 @@ import get from 'simple-get'
 
 import { asyncIteratorToStream } from '../utils/asyncIteratorToStream.js'
 import { collect } from '../utils/collect.js'
-import { fromNodeStream } from '../utils/fromNodeStream.js'
 
 /**
  * HttpClient
@@ -18,12 +17,12 @@ export async function request({
   agent,
   body,
 }) {
-  // If we can, we should send it as a single buffer so it sets a Content-Length header.
-  if (body && Array.isArray(body)) {
-    body = Buffer.from(await collect(body))
-  } else if (body) {
-    body = asyncIteratorToStream(body)
-  }
+  // // If we can, we should send it as a single buffer so it sets a Content-Length header.
+  // if (body && Array.isArray(body)) {
+  //   body = Buffer.from(await collect(body))
+  // } else if (body) {
+  //   body = asyncIteratorToStream(body)
+  // }
   return new Promise((resolve, reject) => {
     get(
       {
@@ -31,7 +30,9 @@ export async function request({
         method,
         headers,
         agent,
-        body,
+        body: body && Array.isArray(body) 
+          ? Buffer.from(await collect(body)) 
+          : asyncIteratorToStream(body),
       },
       (err, res) => {
         if (err) return reject(err)
