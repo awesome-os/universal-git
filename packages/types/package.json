@@ -1,1 +1,5 @@
-{ "name": "@isomorphic-git/types", "type": "module" }
+{ "name": "@isomorphic-git/types", "type": "module", "files": [
+    "index.js", "index.d.ts",
+    "http.js", "http.d.ts",
+    "typedef.d.ts"
+] }

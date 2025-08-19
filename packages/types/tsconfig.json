@@ -1,11 +1,7 @@
 {
-  "include": ["__tests__","src"],
-  "references": [
-    { "path": "./packages/isomorphic-git/jsconfig.json" },
-    { "path": "./packages/types/tsconfig.json" }
-  ],
   "exclude": ["node_modules"],
   "compilerOptions": {
+    "composite": true,
     "noEmit": true,
     "allowJs": true,
     "checkJs": true,
