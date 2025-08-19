@@ -1,4 +1,7 @@
-const { encode, decode } = require("isomorphic-textencoder");
+const utf8Encoder = new TextEncoder();
+const utf8Decoder = new TextDecoder();
+const encode = utf8Encoder.encode;
+const decode = utf8Decoder.decode;
 const debounce = require("just-debounce-it");
 
 const CacheFS = require("./CacheFS.js");
