@@ -3,56 +3,8 @@
   "version": "0.0.0-development",
   "description": "A pure JavaScript reimplementation of git for node and browsers",
   "type": "module",
-  "typings": "./index.d.cts",
-  "main": "./index.cjs",
-  "module": "./index.js",
-  "exports": {
-    "./http/node": {
-      "import": {
-        "types": "./http/node/index.d.ts",
-        "default": "./http/node/index.js"
-      },
-      "require": {
-        "types": "./http/node/index.d.cts",
-        "default": "./http/node/index.cjs"
-      }
-    },
-    "./http/web": {
-      "import": {
-        "types": "./http/web/index.d.ts",
-        "default": "./http/web/index.js"
-      },
-      "require": {
-        "types": "./http/web/index.d.cts",
-        "default": "./http/web/index.cjs"
-      }
-    },
-    "./managers": {
-      "import": {
-        "types": "./managers/index.d.ts",
-        "default": "./managers/index.js"
-      },
-      "require": {
-        "types": "./managers/index.d.cts",
-        "default": "./managers/index.cjs"
-      }
-    },
-    "./models": {
-      "import": {
-        "types": "./models/index.d.ts",
-        "default": "./models/index.js"
-      },
-      "require": {
-        "types": "./models/index.d.cts",
-        "default": "./models/index.cjs"
-      }
-    },
-    "./*": "./*",
-    ".": {
-      "types": "./index.d.cts",
-      "default": "./index.cjs"
-    }
-  },
+  "typings": "./index.d.ts",
+  "main": "./index.js",
   "unpkg": "./index.umd.min.js",
   "bin": {
     "isogit": "./cli.cjs"
