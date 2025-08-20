@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-
+import { defineConfig } from 'rollup';
 import pkg from './package.json'
 
 const external = [
@@ -66,14 +66,60 @@ const pkgify = (input, output, name) => {
   ]
 }
 
+
+const virtualModules = {
+  "internal-api": `export * from './index.js';`,
+  "managers": `export { GitManager } from './index.js';`,
+  "models": `export { FileSystem } from './index.js'`,
+}
+
+const hotFixFiles = {
+  ...virtualModules,
+  "internal-api.d.ts": `export * from './index';`,
+  "managers.d.ts": `export { GitManager } from './index';`,
+  "models.d.ts": `export { FileSystem } from './index'`,
+};
+
 export default [
   // TODO: Fix Types normal this should be  a single input object that uses preserveModuleRoot then we can generate the matching types
   // TODO: At present when this packages would get individual used this would lead to all kinds of failures as they all eg: export own 
   // TODO: versions of eg GitManager and so on so new GitManager from index is not the same as from managers/index.js
   ecmaConfig('index.js', 'index.js'),
-  ecmaConfig('internal-apis.js', 'internal-apis.js'),
-  ecmaConfig('managers/index.js', 'managers/index.js'),
-  ecmaConfig('models/index.js', 'models/index.js'),
+  // ecmaConfig('internal-apis.js', 'internal-apis.js'),
+  // ecmaConfig('managers/index.js', 'managers/index.js'),
+  // ecmaConfig('models/index.js', 'models/index.js'),
   ...pkgify('http/node', 'http/node'),
   ...pkgify('http/web', 'http/web', 'GitHttp'),
-]
+  defineConfig({
+    input: ['./index.js',
+    // TODO: Enable when virtual gets enabled and hotFixRemoved 'managers','internal-api'
+    ],
+    external: (id) => id.includes('node_modules'),
+    plugins: [    
+      // TODO: hotfix would be to build a single file ESM Bundle and reexport from that.
+      // This emits wrappers as we did expose files without types and fixing takes weeks
+      // TODO: see below remove this hotfix.
+      {
+        name: 'virtual-asset',
+        buildStart() {
+          Object.entries(hotFixFiles).forEach((moduleName,source)=>{
+            const fileName = moduleName + moduleName.includes('.') ? "" : '.js';
+            this.emitFile({ type: 'asset', fileName, source });
+          });
+        }
+      }
+    // TODO: make type emit compatible to this structure then enable virtual module till all works
+    // This is for dev only at present npm install @rollup/plugin-virtual --save-dev
+    // import virtual from '@rollup/plugin-virtual';
+    // virtual(virtualModules)
+    ],
+    output: {
+      format: 'es',
+      dir: `packages/isomorphic-git/dist`,
+      chunkFileNames: "[name].js",
+      minifyInternalExports: false,
+      preserveModules: false,
+			preserveModulesRoot: 'src'
+    },
+  })
+];
