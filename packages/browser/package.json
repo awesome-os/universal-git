@@ -1,3 +1,5 @@
-{ "dependencies": {
+{ 
+  "name": "universal-git-browser",
+  "dependencies": {
   "rollup-plugin-node-polyfills": "npm:rollup-plugin-node-polyfills@latest",
 }}
