@@ -89,20 +89,13 @@ module.exports = {
     build: {
       default: series.nps(
         'build.rollup',
-        'build.typings',
-        'build.webpack',
         'build.indexjson',
-        'build.treeshake',
         'build.docs',
         'build.size',
         'build.pack'
       ),
       rollup: 'rollup -c --no-treeshake',
-      typings:
-        'tsc -p declaration.tsconfig.json && cp index.d.ts index.umd.min.d.ts',
-      webpack: 'webpack --config webpack.config.cjs',
       indexjson: `node __tests__/__helpers__/make_http_index.cjs`,
-      treeshake: 'agadoo',
       docs: 'node ./__tests__/__helpers__/generate-docs.cjs',
       size: process.env.CI
         ? optional(`cross-env ${bundlewatchEnvironmentVariables()} bundlewatch`)
