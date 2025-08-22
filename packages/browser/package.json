@@ -1,0 +1,3 @@
+{ "dependencies": {
+  "rollup-plugin-node-polyfills": "npm:rollup-plugin-node-polyfills@latest",
+}}
