@@ -2,7 +2,9 @@
   "name": "universal-git-monorepo",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/universal-git",
+    "packages/universal-git/**/",
+    "packages/browser",
   ],
   "scripts": {
     "test:comment": "// Run all tests across workspaces",
