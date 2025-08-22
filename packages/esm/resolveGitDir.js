@@ -24,27 +24,20 @@ import { assertParameter } from './assertParameter.js'
 export const resolveGitDir = async ({ fsp, dotgit }) => {
   assertParameter('fsp', fsp)
   assertParameter('dotgit', dotgit)
-
+  // This code path is executed when the path `${gitdir}/.git` does not exist as a file or
+  // This scenario is typical of a newly created, empty repository before `git init` has been run.
+  // For a standard repository, this is normal. For a submodule, this would be an unusual state,
+  // but we proceed by returning the expected `.git` path for initialization.
   return await fsp
     ._stat(dotgit)
-    .catch(() => ( // gracefulyHandleErrors
-      { isFile: () => false, isDirectory: () => false })
+    .then(
+      (stat) => !stat.isFile() 
+        ? stat 
+        : fsp._readFile(dotgit, 'utf8').then(
+          text => join(path.dirname(dotgit), text.trimRight().substr(8))
+        ), 
+      () => ( // gracefulyHandleErrors
+        { isFile: () => false, isDirectory: () => false }
+      )
     );
-  
-  if (dotgitStat.isDirectory() || !dotgitStat.isFile()) {
-    // if !dotgitStat.isDirectory() && !dotgitStat.isFile() 
-    // This code path is executed when the path `${gitdir}/.git` does not exist as a file or a directory.
-    // This scenario is typical of a newly created, empty repository before `git init` has been run.
-    // For a standard repository, this is normal. For a submodule, this would be an unusual state,
-    // but we proceed by returning the expected `.git` path for initialization.
-    return dotgit;
-  } 
-  
-  return fsp._readFile(dotgit, 'utf8').then(
-    text => join(
-      path.dirname(dotgit), 
-      text.trimRight().substr(8)
-    )
-  );
-  
-}
+};
