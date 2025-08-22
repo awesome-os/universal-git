@@ -5,19 +5,19 @@
     "packages/*"
   ],
   "scripts": {
-    // Run all tests across workspaces
+    "test:comment": "// Run all tests across workspaces",
     "test": "npm run test --workspaces --if-present",
 
-    // Build all packages that have a build script
+    "build:comment": "// Build all packages that have a build script",
     "build": "npm run build --workspaces --if-present",
 
-    // Lint all (if using eslint)
+    "lint:comment": "// Lint all (if using eslint)",
     "lint": "npm run lint --workspaces --if-present",
 
-    // Publish only changed package(s)
-    "publish:ws": "npm publish --workspaces",
+    "publish:comment": "// Publish only changed package(s)",
+    "publish": "npm publish --workspaces",
 
-    // Bump versions for all or single workspace
+    "version:comment": "// Bump versions for all or single workspace",
     "version:all": "npm version patch --workspaces",
     "version:pkg": "npm version patch --workspace"
   }
