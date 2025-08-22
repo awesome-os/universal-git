@@ -1,1 +1,1 @@
-export { join } from 'path-browserify'
+export { join } from 'universal-git-browser/polyfills/path.js';
