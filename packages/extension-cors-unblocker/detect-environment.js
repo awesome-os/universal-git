@@ -2,3 +2,4 @@
 export const isExtension = globalThis.chrome && globalThis.chrome.runtime && globalThis.chrome.runtime.id;
 export const isFirefox = globalThis.browser && globalThis.browser.runtime && globalThis.browser.runtime.id;
 export const isChrome = isExtension && !isFirefox;
+export const browser = isChrome ? import('./mozilla-browser-polyfill.js') : Promise.resolve(globalThis.browser);
