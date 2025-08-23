@@ -1,3 +1,3 @@
 document.getElementById('options-btn').addEventListener('click', () => {
-  chrome.runtime.openOptionsPage();
+  browser.runtime.openOptionsPage();
 });
