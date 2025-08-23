@@ -4,18 +4,33 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'node:child_process';
 // TODO: Upgrade CI pipeline as this is Node22 syntax but it is needed!
-import pkg from './package.json' with { type: 'json' }
+import pkg from './package.json' with { type: 'json' };
+import { execSync } from 'node:child_process';
+import { builtinModules } from 'module'; // ESM syntax
+
+// A Set's .has() method is very fast (O(1) complexity)
+const builtInSet = new Set(builtinModules);
+const isBuiltin = (moduleName) => builtInSet.has(moduleName);
 
 const { dependencies } = pkg;
 const dir = import.meta.dirname;
+const outDir = path.join('../isomorphic-git', dir);
 
-// TODO: Replace that with a function that works better when we do v2
-const external = [
-  'fs','path','crypto','stream','crc/lib/crc32.js','sha.js/sha1','sha.js/sha1.js', 
-  ...Object.keys(dependencies),
-];
+const isomorphicGitExternals = new Set(
+  ['crc/lib/crc32.js','sha.js/sha1','sha.js/sha1.js',]
+);
+
+const isomorphicGitPkgDeps = new Set(
+  Object.keys(dependencies)
+);
+
+const externalIdsSet = [
+  isomorphicGitExternals,isomorphicGitPkgDeps
+].reduce(
+  (allBundleExternalsSet, currentSet) => allBundleExternalsSet.union(currentSet),
+  builtInSet // The initial value for the accumulator
+);
 
 const v2DefaultOutputOptions = {
   minifyInternalExports: false,
@@ -67,7 +82,7 @@ const outputPluginIsomorphicGitESM = {
         // {"include":["index.js","http/web/index.js","http/web/index.cjs","http/node/index.js",
         // "http/node/index.cjs"],"exclude":["node_modules"],"compilerOptions": 
         // {"types":[],"strictNullChecks":true,"allowJs":true,"declaration":true,"noEmit":false,"emitDeclarationOnly":true}}
-        execSync('tsc index.js --strictNullChecks --allowJs --declaration --emitDeclarationOnly');
+        execSync(`tsc ${outDir}/index.js --strictNullChecks --allowJs --declaration --emitDeclarationOnly`);
         // NOTE: The other Types get emited in other outputConfigs
         
         // ReExport the types so that type mappings work even without package.json
@@ -127,6 +142,8 @@ const outputPluginIsomorphicGitCJS = {
     }
   },
 };
+// A Set's .has() method is very fast (O(1) complexity)
+export const external = externalIdsSet.has; 
 
 export default [
   // Build isomorphic-git ESM & CJS as also emit type declarations for ESM
@@ -134,9 +151,18 @@ export default [
   // we made sure before that that src/index.js has no default export anymore
   // so both CJS and ESM will export indentical shaped Objects.
   { 
+    input: `{dir}/src/index.js`, 
+    external, 
+    plugins: [ 
+      // TODO: make type emit compatible to this structure then enable virtual module till all works
+      // // This is for dev only at present 
+      // // npm install @rollup/plugin-virtual --save-dev
+      // // import virtual from '@rollup/plugin-virtual';
+      // // virtual(virtualModules)
+    ],
     output: [
       { 
-        dir, format: 'es', 
+        dir: outDir, format: 'es', 
         exports: "named", // <-- disables synthetic default export
         preferConst: true, // optional, makes top-level vars `const`
         plugins: [
@@ -144,29 +170,24 @@ export default [
         ],
       },
       { 
-        dir, format: 'cjs', entryFileNames: "[name].cjs", 
+        dir: outDir, format: 'cjs', 
+        entryFileNames: "[name].cjs", 
         exports: 'named', 
         preferConst: true, // optional, makes top-level vars `const`
         plugins: [
           outputPluginIsomorphicGitCJS
         ] 
       },
-    ], 
-    input: `src/index.js`, 
-    external, plugins: [ 
-      // TODO: make type emit compatible to this structure then enable virtual module till all works
-      // // This is for dev only at present 
-      // // npm install @rollup/plugin-virtual --save-dev
-      // // import virtual from '@rollup/plugin-virtual';
-      // // virtual(virtualModules)
-    ],
+    ]
   },
  
-  // Build isomorphic-git/http/node ESM & CJS and create package.json 
+  // Build ESM & CJS and create package.json 
   { 
+    input: `${dir}/src/http/node/index.js`,
+    external, 
     output: [
       { 
-        dir: `${dir}/http/node`, format: 'es', exports: 'named', 
+        dir: `${outDir}/http/node`, format: 'es', exports: 'named', 
         preferConst: true, // optional, makes top-level vars `const`
         plugins: [
           // {
@@ -186,12 +207,12 @@ export default [
           { 
           "name": "tsc create types-isomorphic-git/http/node ESM",
           writeBundle(options, bundle) {
-            execSync(`tsc ${dir}/http/node/index.js --strictNullChecks --allowJs --declaration --emitDeclarationOnly`);
+            execSync(`tsc ${outDir}/http/node/index.js --strictNullChecks --allowJs --declaration --emitDeclarationOnly`);
           }
         }], 
       },
       { 
-        dir: `${dir}/http/node`, format: 'cjs', 
+        dir: `${outDir}/http/node`, format: 'cjs', 
         entryFileNames: "[name].cjs", exports: 'named', 
         plugins: [{ 
           "name": "wrapper create types-isomorphic-git/http/node CJS",
@@ -200,15 +221,15 @@ export default [
           }
         }], 
       },
-    ], 
-    input: `${dir}/src/http/node/index.js`, external, 
-    plugins: [],
+    ]
   },
-  // Build isomorphic-git/http/web ESM & CJS & UMD and create package.json referencing all including types from ESM
+  // Build ESM & CJS & UMD and create package.json referencing all including types from ESM
   {
+    input: `${dir}/src/http/web/index.js`, 
+    external,
     output: [
       { 
-        dir: dir + '/http/web', format: 'es', exports: 'named',
+        dir: `${outDir}/http/web`, format: 'es', exports: 'named',
         preferConst: true, // optional, makes top-level vars `const`
         plugins: [
           //     // TODO: node12 we do not need this package.json files the main files covers the correct resolution
@@ -228,14 +249,15 @@ export default [
           { 
             "name": "tsc create types-isomorphic-git/http/web ESM",
             writeBundle(options, bundle) {
-              execSync('tsc http/web/index.js --strictNullChecks --allowJs --declaration --emitDeclarationOnly');
+              execSync(`tsc ${outDir}/http/web/index.js --strictNullChecks --allowJs --declaration --emitDeclarationOnly`);
             }
           },
         ], 
       },
       { 
-        dir: dir + '/http/web', format: 'cjs', 
-        entryFileNames: "[name].cjs", exports: 'named', 
+        dir: `${outDir}/http/web`, format: 'cjs', 
+        entryFileNames: "[name].cjs", 
+        exports: 'named', 
         plugins: [{ 
           "name": "wrapper create types-isomorphic-git/http/web CJS",
           writeBundle(options, bundle) {
@@ -248,9 +270,10 @@ export default [
       // Create UMD Build of HTTP the UMD Build of isomorphic-git gets done via webpack...... 
       // Note this is the only build without external dependency the webpack build also has no external dependencys.
       { 
-        dir: dir + '/http/web', format: 'umd', 
+        dir: `${outDir}/http/web`, format: 'umd', 
         entryFileNames: "[name].umd.js", 
-        exports: 'named', name: 'GitHttp', 
+        name: 'GitHttp',
+        exports: 'named',
         plugins: [{ 
           "name": "wrapper create types-isomorphic-git/http/web UMD",
           writeBundle(options, bundle) {
@@ -261,7 +284,6 @@ export default [
         }], 
       },
       // TODO: Imaginated webpack umd build from the webpack.config.js
-    ],
-    input: `src/http/web/index.js`, external
+    ]
   },
 ];
