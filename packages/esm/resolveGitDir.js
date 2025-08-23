@@ -1,4 +1,4 @@
-import { join } as path from 'universal-git-browser/polyfills/path.js';
+import { join } from 'universal-git-browser/polyfills/path.js';
 import { assertParameter } from './assertParameter.js'
 
 /**
