@@ -1,27 +1,20 @@
-// drived from ~ v1.5 https://raw.githubusercontent.com/mozilla/webextension-polyfill/refs/heads/master/src/browser-polyfill.js
+/**
+ * drived from ~ v1.5 https://raw.githubusercontent.com/mozilla/webextension-polyfill/refs/heads/master/src/browser-polyfill.js
+ */
+
+// https://raw.githubusercontent.com/mozilla/webextension-polyfill/refs/heads/master/api-metadata.json
 import apiMetadataJson from './api-metadata.json' with { type: "json" };
+
+if (Object.keys(apiMetadataJson).length === 0) {
+  throw new Error("api-metadata.json has not been included in browser-polyfill");
+}
+
 if (!(globalThis.chrome && globalThis.chrome.runtime && globalThis.chrome.runtime.id)) {
   throw new Error("This script should only be loaded in a browser extension.");
 }
 
 const CHROME_SEND_MESSAGE_CALLBACK_NO_RESPONSE_MESSAGE = "The message port closed before a response was received.";
 const extensionAPIs = chrome;
-
-// NOTE: apiMetadata is associated to the content of the api-metadata.json file
-// at build time by replacing the following "include" with the content of the
-// JSON file. https://raw.githubusercontent.com/mozilla/webextension-polyfill/refs/heads/master/api-metadata.json
-const apiMetadata = {
-  ...apiMetadataJson,
-  privacy: {
-    network: {"*": settingMetadata},
-    services: {"*": settingMetadata},
-    websites: {"*": settingMetadata},
-  }
-};
-
-if (Object.keys(apiMetadataJson).length === 0) {
-  throw new Error("api-metadata.json has not been included in browser-polyfill");
-}
 
 /**
  * A WeakMap subclass which creates and stores a value for any key which does
@@ -508,6 +501,17 @@ const settingMetadata = {
   set: {minArgs: 1, maxArgs: 1},
 };
 
+// NOTE: apiMetadata is associated to the content of the api-metadata.json file
+// at build time by replacing the following "include" with the content of the
+// JSON file. 
+const apiMetadata = {
+  ...apiMetadataJson,
+  privacy: {
+    network: {"*": settingMetadata},
+    services: {"*": settingMetadata},
+    websites: {"*": settingMetadata},
+  }
+};
 
 export const browser = wrapObject(extensionAPIs, {
   devtools: {
