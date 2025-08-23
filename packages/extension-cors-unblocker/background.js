@@ -1,1 +1,3 @@
-import { isFirefox, isChrome, isExtensionHost } from './detect-environment.js'
+import { isFirefox, isChrome, isExtension } from './detect-environment.js';
+
+const browser = isChrome ? import('./')
