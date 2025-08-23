@@ -1,3 +1,5 @@
-import { isFirefox, isChrome, isExtension } from './detect-environment.js';
+import { browserPromise } from './api/browser/browser.js';
+
+
 
 
