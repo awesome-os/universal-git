@@ -1,3 +1,7 @@
+/**
+ * We temp keep this around to produce isomorphic-git compatible packages
+ * for some time
+ */
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'node:child_process';
