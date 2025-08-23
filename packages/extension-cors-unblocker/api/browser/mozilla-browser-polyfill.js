@@ -3,6 +3,7 @@
 if (!(globalThis.chrome && globalThis.chrome.runtime && globalThis.chrome.runtime.id)) {
   throw new Error("This script should only be loaded in a browser extension.");
 }
+
 const CHROME_SEND_MESSAGE_CALLBACK_NO_RESPONSE_MESSAGE = "The message port closed before a response was received.";
 
 // Wrapping the bulk of this polyfill in a one-time-use function is a minor
