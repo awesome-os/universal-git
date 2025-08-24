@@ -6,10 +6,10 @@
   </a>
 </p>
 
-<h3 align="center">A modern, maintained, and universal JavaScript Git implementation.</h3>
+<h3 align="center">A modern, maintained, and universal JavaScript Git implementation. With batterys Included!</h3>
 
 <p align="center">
-  Runs in the browser, Node.js, Deno, and Web Workers. The actively maintained fork of `isomorphic-git`.
+  Runs in the browser, Node.js, Deno, bun, GraalVM/Native, v8:isolates/smol/just cloudflare and Web Workers. The actively maintained fork of `isomorphic-git` and many Community Projects that depend on it or interact with it. Also adds some extra features that mainly made me instantiate this repo as i needed it as dependency for that. I am mainly Compiler Engineer but i often need version and source code management and a Project like this allows me to faster iterate over thousends of code bases with millions of code lines SLOC. I work eg on a new Compiler Infrastructure and Component System for the Chromium Proeject that is where this kicks in the new GOMA Replacement should be p2p and git enabled also support sparse checkouts as we use at google always gigantic mono repos which got build by a gigantic build grid called GOMA.
 </p>
 
 <p align="center">
