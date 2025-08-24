@@ -1,4 +1,4 @@
-## Legacy stuff
+## Legacy stuff that keeps isomorphic-git compatible
 
 ## Install 
 This is WiP Work in Progress 
