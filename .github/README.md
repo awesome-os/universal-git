@@ -21,7 +21,7 @@
 
 ---
 
-`universal-git` is a pure JavaScript implementation of Git that works anywhere. Originally forked from the incredible `isomorphic-git`, this project was created to provide the community with a stable, actively maintained library that embraces modern JavaScript, fixes long-standing bugs, and offers a clear path forward.
+`universal-git` forked from `isomorphic-git`, was created to provide the community with a stable, actively maintained library that embraces modern JavaScript, fixes long-standing bugs, and offers a clear path forward.
 
 If you've been frustrated by the lack of updates or unresolved issues in `isomorphic-git`, you've come to the right place.
 
@@ -29,12 +29,12 @@ If you've been frustrated by the lack of updates or unresolved issues in `isomor
 
 | Feature | `isomorphic-git` (Legacy) | ✅ `universal-git` (Modern) |
 | :--- | :--- | :--- |
-| **Maintenance** | ⚠️ Stagnant, PRs ignored | 🚀 **Actively maintained** with weekly releases |
+| **Maintenance** | ⚠️ Stagnant, PRs ignored | 🚀 **Actively maintained** with weekly releases if needed! |
 | **Codebase** | Old JS, callbacks, mixed promises | ✨ **Modern ES Modules & `async/await`** |
 | **TypeScript** | External, often outdated types | 📦 **Ships with up-to-date types built-in** |
 | **Dependencies** | Outdated, some legacy cruft | 🛡️ **Lean, audited, and modern dependencies** |
-| **Bug Fixes** | Many long-standing issues remain | ✅ **Key bugs fixed** (e.g., packfile parsing, auth) |
-| **Community** | Unresponsive | 💬 **Active community** on GitHub Discussions |
+| **Bug Fixes** | Many long-standing issues remain | ✅ **Key bugs fixed** (e.g. packaging, sparse-checkout, stash push/pop,.....) |
+| **Community** | Unresponsive | 💬 **Active community** |
 | **Roadmap** | None | 🗺️ **Public roadmap** and clear feature pipeline |
 
 ## 🚀 Quick Start
@@ -80,7 +80,15 @@ const dir = './cloned-repo'
 })()
 ```
 
-## 🚚 Migrating from `isomorphic-git`
+## 🚚 Incremental Migrating from `isomorphic-git`
+
+```bash
+npm install isomorphic-git@npm:universal-git
+```
+
+That's it! The core API remains compatible, but you now benefit from all the underlying improvements and a modern `async/await`-first design.
+
+## 🚚 FULL Migrating from `isomorphic-git`
 
 Migrating is designed to be painless. For most projects, it's a simple 2-step process:
 
