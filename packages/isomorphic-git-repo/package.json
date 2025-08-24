@@ -8,27 +8,23 @@
   "module": "./index.js",
   "exports": {
     "./src/*": "./src/*",
-    ".": {
-      "types": "./src/index.d.ts",
-      "default": "./src/index.js"
-    },
     "./http/node": {
       "module-sync": {
         "types": "./src/http/node/index.d.ts",
         "default": "./src/http/node/index.js"
-      },
+      }
     },
     "./http/web": {
       "module-sync": {
         "types": "./src/http/web/index.d.ts",
         "default": "./src/http/web/index.js"
-      },
+      }
     },
     "./managers": {
       "module-sync": {
         "types": "./src/managers/index.d.ts",
         "default": "./src/managers/index.js"
-      },
+      }
     },
     "./models": {
       "module-sync": {

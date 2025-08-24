@@ -1,4 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Developer Tool Explanation:
+
+    This XML file is a "grammar definition" for a specialized binary data analysis tool,
+    most likely the Synalysis Hex Editor (identified by the .ufwb extension). It is not
+    part of the runtime code; it's a developer utility.
+
+    WHAT IT IS:
+    This file acts as a blueprint or a map for parsing the binary `.git/index` file. The
+    .git/index file (the staging area) is not human-readable. This grammar teaches the
+    hex editor how to read the raw hexadecimal data and break it down into meaningful,
+    labeled fields (e.g., "MAGIC", "version", "path", "sha").
+
+    WHY IT'S USEFUL:
+    For a developer implementing Git's functionality (like in isomorphic-git), this is an
+    invaluable debugging tool for:
+    1.  Visual Parsing: To see if the binary data their code generates is structured correctly.
+    2.  Verification: To quickly spot errors like misaligned fields, incorrect lengths, or
+        wrong data types.
+    3.  Learning: To visually explore and understand the complex internal structure of Git's
+        index format.
+
+    In short, this file allows a developer to visually dissect, debug, and verify the
+    binary `.git/index` files that their library creates or consumes.
+-->
 <ufwb version="1.17">
     <grammar name="git index" start="id:1" author="William Hilton" email="wmhilton@gmail.com">
         <description>Grammar for https://github.com/git/git/blob/master/Documentation/technical/index-format.txt</description>
