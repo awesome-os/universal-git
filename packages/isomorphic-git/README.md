@@ -21,7 +21,8 @@ v2.37.1+
 ```
 git clone --filter=blob:none --no-checkout --depth 1 --sparse <project-url>
 cd <project>
-git sparse-checkout add <folder1> <folder2>
+git sparse-checkout set apps/my_app libs/my_lib # overrides all existing
+git sparse-checkout add <folder1> <folder2> # adds
 git checkout # or switch
 ```
 
