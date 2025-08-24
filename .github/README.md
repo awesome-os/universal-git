@@ -60,24 +60,20 @@ import http from 'node:http' // Use a proper http client in production
 import { clone } from 'universal-git'
 
 // This is where we'll clone the repo
-const dir = './cloned-repo'
+const dir = './cloned-repo';
 
 // Let's go!
-;(async () => {
-  try {
-    await clone({
-      fs,
-      http,
-      dir,
-      url: 'https://github.com/awesome-os/universal-git',
-      onMessage: (message) => console.log(message), // Real-time progress updates
-      onProgress: (progress) => console.log(`${progress.phase}: ${progress.loaded}/${progress.total}`),
-    })
-    console.log('✅ Repository cloned successfully!')
-  } catch (error) {
-    console.error('❌ Cloning failed:', error)
-  }
-})()
+clone({
+  fs,
+  http,
+  dir,
+  url: 'https://github.com/awesome-os/universal-git',
+  onMessage: (message) => console.log(message), // Real-time progress updates
+  onProgress: (progress) => console.log(`${progress.phase}: ${progress.loaded}/${progress.total}`),
+}).then(
+  () => console.log('✅ Repository cloned successfully!'),
+  (error) => console.error('❌ Cloning failed:', error)
+);
 ```
 
 ## 🚚 Incremental Migrating from `isomorphic-git`
