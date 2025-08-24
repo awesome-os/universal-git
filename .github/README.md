@@ -1,10 +1,10 @@
-# universal-git
-
 <p align="center">
   <a href="https://github.com/awesome-os/universal-git">
-    <img src="https://raw.githubusercontent.com/user-attachments/assets/b839b23b-01dd-4448-ba3e-324d55b08e2f" alt="universal-git logo" width="150">
+    <img src="https://raw.githubusercontent.com/awesome-os/universal-git/refs/heads/main/packages/assets/readme-logo.svg" alt="universal-git logo" width="400">
   </a>
 </p>
+
+## universal-git
 
 <h3 align="center">A modern, maintained, and universal JavaScript Git implementation. With batterys Included!</h3>
 
