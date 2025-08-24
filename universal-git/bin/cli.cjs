@@ -1,10 +1,7 @@
-#!/usr/bin/env node
+// TODO: verfiy that it gets added by npm as desired. #!/usr/bin/env node
 const fs = require('fs')
-
 const minimisted = require('minimisted')
-
-const git = require('.')
-
+const git = require('../index.cjs')
 const http = require('./http/node')
 
 // This really isn't much of a CLI. It's mostly for testing.
