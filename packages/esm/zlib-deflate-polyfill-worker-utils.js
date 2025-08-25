@@ -1,31 +1,17 @@
-// worker-util.ts
-// This module isolates the logic for creating and managing web workers.
+// worker-streams.ts
+// This module provides utilities to run tasks and streams in a Web Worker
+// using the native Web Streams API.
 
-// The original code uses a custom worker spawner for Node.js compatibility.
-// We'll continue to use it as an abstraction.
 import wk from './node-worker';
-import { FlateError, FlateErrorCode } from './flate'; // Assume error types are in a separate file or the main file
+import { FlateError, FlateErrorCode } from './flate'; // Assume error types are in a separate file
 
-// Re-exporting types for consumers of this module
-export { FlateError, FlateErrorCode };
-
-// Type Definitions
+// --- Type Definitions ---
 export type FlateCallback = (err: FlateError | null, data: Uint8Array) => void;
-export type AsyncFlateStreamHandler = (err: FlateError | null, data: Uint8Array, final: boolean) => void;
-export type AsyncFlateDrainHandler = (size: number) => void;
-export interface AsyncTerminable {
-  (): void;
-}
 export interface AsyncOptions {
   consume?: boolean;
 }
-export interface AsyncStream {
-    ondata: AsyncFlateStreamHandler;
-    ondrain?: AsyncFlateDrainHandler;
-    queuedSize: number;
-    push(chunk: Uint8Array, final?: boolean): void;
-    flush?(): void;
-    terminate: AsyncTerminable;
+export interface AsyncTerminable {
+  (): void;
 }
 
 type DependencyProvider = () => unknown[];
@@ -36,19 +22,11 @@ type CachedWorker = {
 
 const workerCache: CachedWorker[] = [];
 
+// --- Core Worker Creation and Dependency Packaging (largely unchanged) ---
+
 /**
  * Serializes dependencies from the main thread's scope into a script string
- * and a data object for a Web Worker. This is the core of the "magic" that
- * allows this library to work as a single file, even after minification.
- * 
- * It works by parsing the string representation of the dependency-providing
- * function (e.g., `() => [varA, varB]`) to extract the variable names (`varA`, `varB`),
- * which will be correctly minified along with the function's code.
- *
- * @param provider A function returning an array of values from its closure.
- * @param script The current script string to append to.
- * @param data The data object to populate with non-function values.
- * @returns The updated script string.
+ * and a data object for a Web Worker.
  */
 function packageDependencies(
     provider: DependencyProvider,
@@ -62,39 +40,27 @@ function packageDependencies(
         .replace(/\s+/g, '')
         .split(',');
 
-    for (let i = 0; i < values.length; ++i) {
-        const value = values[i];
+    values.forEach((value, i) => {
         const key = keys[i];
-
         if (typeof value === 'function') {
             script += `var ${key} = ${value.toString()};\n`;
-            const proto = value.prototype;
-            if (proto) {
-                for (const prop in proto) {
-                    if (Object.prototype.hasOwnProperty.call(proto, prop)) {
-                        script += `${key}.prototype.${prop} = ${proto[prop].toString()};\n`;
-                    }
+            if (value.prototype) {
+                for (const prop in value.prototype) {
+                    script += `${key}.prototype.${prop} = ${value.prototype[prop].toString()};\n`;
                 }
             }
         } else {
             data[key] = value;
         }
-    }
+    });
     return script;
 }
 
-/**
- * Creates clones of TypedArrays and extracts their ArrayBuffers to be transferred to a worker,
- * which improves performance by avoiding copying. The original data object is mutated
- * to hold the clones.
- * @param data A record containing data to be sent to the worker.
- * @returns A list of transferable ArrayBuffer objects.
- */
 function getTransferables(data: Record<string, unknown>): Transferable[] {
     const transferables: Transferable[] = [];
     for (const key in data) {
         const value = data[key] as any;
-        if (value && value.buffer instanceof ArrayBuffer) {
+        if (value?.buffer instanceof ArrayBuffer) {
             const clone = new (value.constructor)(value);
             data[key] = clone;
             transferables.push(clone.buffer);
@@ -103,142 +69,185 @@ function getTransferables(data: Record<string, unknown>): Transferable[] {
     return transferables;
 }
 
-/**
- * Creates and initializes a worker. It builds the worker script from dependency providers,
- * handles caching, and sets up message handling.
- * @param dependencyProviders An array of functions that provide the worker's scope.
- * @param workerMessageHandler The primary onmessage handler to be run inside the worker.
- * @param cacheId A unique ID for caching the generated worker script.
- * @param onMainThreadMessage A callback to handle messages and errors from the worker on the main thread.
- * @returns A worker instance.
- */
-function createWorker<T, R>(
+function createWorker(
     dependencyProviders: DependencyProvider[],
-    workerMessageHandler: (ev: MessageEvent<T>) => void,
     cacheId: number,
-    onMainThreadMessage: (err: FlateError, msg: R) => void
-) {
+    onMessage: (ev: MessageEvent) => void,
+    onError: (ev: ErrorEvent) => void,
+): Worker {
     if (!workerCache[cacheId]) {
         let script = '';
         const data: Record<string, unknown> = {};
-        for (const provider of dependencyProviders) {
+        dependencyProviders.forEach(provider => {
             script = packageDependencies(provider, script, data);
-        }
+        });
         workerCache[cacheId] = { script, data };
     }
 
     const { script: baseScript, data: baseData } = workerCache[cacheId];
-    
     const data = { ...baseData };
-    const transferables = getTransferables(data);
 
-    // The worker's initial message handler injects data into its global scope,
-    // then replaces itself with the actual message handler for the task.
     const bootstrapScript = `
-        ${baseScript}
-        self.onmessage = function(e) {
-            for (var k in e.data) {
-                self[k] = e.data[k];
+        let isInitialized = false;
+        self.onmessage = (e) => {
+            if (!isInitialized) {
+                ${baseScript}
+                for (const k in e.data.env) self[k] = e.data.env[k];
+                isInitialized = true;
+
+                // The first message after initialization contains the streams
+                handleStreamSetup(e.data.streams);
             }
-            self.onmessage = ${workerMessageHandler.toString()};
         };
+
+        function handleStreamSetup({ readable, writable, streamClass, options }) {
+            try {
+                const transform = new self[streamClass](options);
+                readable.pipeThrough(transform).pipeTo(writable);
+            } catch (err) {
+                // Forward any errors from the worker's stream setup
+                self.postMessage({ error: err });
+            }
+        }
     `;
 
-    return wk(bootstrapScript, cacheId, data, transferables, onMainThreadMessage);
+    const worker = wk(bootstrapScript, cacheId, {}, [], (err, msg) => {
+      if (err) onError(new ErrorEvent('error', { error: err }));
+      else onMessage(new MessageEvent('message', { data: msg }));
+    });
+    
+    // Send initial environment data
+    const transferables = getTransferables(data);
+    worker.postMessage({ env: data }, transferables);
+
+    return worker;
 }
 
-/**
- * Runs a single, non-streaming task in a worker.
- * The worker is created, performs one task, sends back the result, and is terminated.
- * @returns A function to terminate the worker prematurely.
- */
-export function runTaskInWorker<T extends AsyncOptions>(
-    data: Uint8Array,
-    options: T,
-    dependencyProviders: DependencyProvider[],
-    task: (ev: MessageEvent<[Uint8Array, T]>) => void,
-    cacheId: number,
-    callback: FlateCallback
-): AsyncTerminable {
-    const worker = createWorker(
-        dependencyProviders,
-        task,
-        cacheId,
-        (err, result: Uint8Array) => {
-            worker.terminate();
-            callback(err, result);
-        }
-    );
-    worker.postMessage([data, options], options.consume ? [data.buffer] : []);
-    return () => worker.terminate();
-}
+// --- Modern, Stream-based API ---
 
 /**
- * Runs a streaming task in a worker, proxying the stream's methods.
- * The worker remains active to process multiple chunks of data.
+ * Creates a TransformStream that pipes data through a Web Worker for processing.
+ * @param dependencyProviders Functions that provide the worker's scope.
+ * @param streamClass The name of the class (as a string) to instantiate inside the worker.
+ * @param options The options to pass to the stream class constructor.
+ * @param cacheId A unique ID for caching the worker script.
+ * @returns A TransformStream and a function to terminate the underlying worker.
  */
-export function runStreamInWorker<T>(
-    stream: AsyncStream,
-    options: T,
+export function createTransformStreamInWorker(
     dependencyProviders: DependencyProvider[],
-    init: (ev: MessageEvent<T>) => void,
+    streamClass: string,
+    options: any,
     cacheId: number,
-    flushable: boolean,
-    onExtraMessage?: (msg: unknown) => void
-): void {
-    let terminated = false;
-    const err = (code: number, msg: string) => {
-        const e: Partial<FlateError> = new Error(msg);
-        e.code = code;
-        return e as FlateError;
-    }
-
-    const worker = createWorker<T, [number] | [Uint8Array, boolean]>(
-        dependencyProviders,
-        init,
-        cacheId,
-        (err, data) => {
-            if (err) {
-                worker.terminate();
-                stream.ondata.call(stream, err, null, false);
-            } else if (!Array.isArray(data)) {
-                if (onExtraMessage) onExtraMessage(data);
-            } else if (data.length === 1) { // Drain message
-                stream.queuedSize -= data[0];
-                if (stream.ondrain) stream.ondrain(data[0]);
-            } else { // Data message
-                if (data[1]) { // Final chunk
-                    worker.terminate();
-                    terminated = true;
+): { stream: TransformStream<Uint8Array, Uint8Array>, terminate: AsyncTerminable } {
+    
+    let worker: Worker | null = null;
+    
+    const stream = new TransformStream<Uint8Array, Uint8Array>({
+        start(controller) {
+            worker = createWorker(
+                dependencyProviders,
+                cacheId,
+                (msg) => {
+                    // Check for errors sent from the worker
+                    if (msg.data && msg.data.error) {
+                        controller.error(msg.data.error);
+                        if (worker) worker.terminate();
+                        worker = null;
+                    }
+                },
+                (err) => {
+                    controller.error(err.error || new Error('Unknown worker error'));
+                    if (worker) worker.terminate();
+                    worker = null;
                 }
-                stream.ondata.call(stream, null, data[0], data[1]);
+            );
+
+            const { readable, writable } = new TransformStream();
+            
+            worker.postMessage({
+                streams: {
+                    readable,
+                    writable: controller.writable, // Directly use the controller's writable
+                    streamClass,
+                    options,
+                }
+            }, [readable, controller.writable]);
+            
+            // This stream's writable is now the writable end of our new inner stream
+            // This is a bit of a mind-bender, but we are creating a proxy.
+            const proxyWritable = writable;
+            Object.defineProperty(this, 'writable', { value: proxyWritable, configurable: true });
+        },
+        flush() {
+             // The flush is handled by the streams closing.
+        },
+        cancel(reason) {
+            if (worker) {
+                worker.terminate();
+                worker = null;
             }
         }
-    );
+    });
 
-    worker.postMessage(options);
-    
-    stream.queuedSize = 0;
-
-    stream.push = (chunk, final) => {
-        if (!stream.ondata) throw err(FlateErrorCode.NoStreamHandler, 'No stream handler');
-        if (terminated) {
-            stream.ondata(err(FlateErrorCode.StreamFinished, 'Stream finished'), null, !!final);
-            return;
+    const terminate = () => {
+        if (worker) {
+            worker.terminate();
+            worker = null;
+            // Aborting the stream will signal cancellation to consumers
+            const writer = stream.writable.getWriter();
+            writer.abort('Terminated by user');
+            writer.releaseLock();
         }
-        stream.queuedSize += chunk.length;
-        worker.postMessage([chunk, !!final], [chunk.buffer]);
     };
 
-    stream.terminate = () => {
-        worker.terminate();
-        terminated = true;
-    };
+    // We must return the stream itself, but redefine its writable property.
+    // A bit of a hack to make the API clean.
+    const writable = (stream as any).writable;
+    const finalStream = new TransformStream();
+    Object.defineProperty(finalStream, 'writable', { value: writable });
 
-    if (flushable) {
-        stream.flush = () => {
-            if (terminated) return;
-            worker.postMessage([]);
-        };
+    return { stream: finalStream, terminate };
+}
+
+// The one-shot task function can be simplified as it's a specific case of a stream
+export async function runTaskInWorker(
+    data: Uint8Array,
+    dependencyProviders: DependencyProvider[],
+    streamClass: string,
+    options: any,
+    cacheId: number,
+): Promise<Uint8Array> {
+    const { stream, terminate } = createTransformStreamInWorker(
+      dependencyProviders,
+      streamClass,
+      options,
+      cacheId
+    );
+    
+    // Write the single chunk of data to the stream
+    const writer = stream.writable.getWriter();
+    writer.write(data);
+    writer.close();
+
+    // Read all chunks from the stream and concatenate them
+    const reader = stream.readable.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalLength = 0;
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        totalLength += value.length;
     }
+
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.length;
+    }
+
+    terminate();
+    return result;
 }
