@@ -83,11 +83,11 @@ const outputPluginIsomorphicGitESM = {
         // "http/node/index.cjs"],"exclude":["node_modules"],"compilerOptions": 
         // {"types":[],"strictNullChecks":true,"allowJs":true,"declaration":true,"noEmit":false,"emitDeclarationOnly":true}}
         execSync(`tsc ${outDir}/index.js --strictNullChecks --allowJs --declaration --emitDeclarationOnly`);
-        // NOTE: The other Types get emited in other outputConfigs
+        // NOTE: The other Types get emitted in other outputConfigs
         
         // ReExport the types so that type mappings work even without package.json
         Object.entries({
-          // this modules are keept indipendent as they are external at present
+          // this modules are kept independent as they are external at present
           // they will get used as input in v2+ so they get processed
           // ESM Files to fix the build
           ...virtualModules,
@@ -149,7 +149,7 @@ export default [
   // Build isomorphic-git ESM & CJS as also emit type declarations for ESM
   // For CJS we create wrappers for the types that reexport the ESM Types
   // we made sure before that that src/index.js has no default export anymore
-  // so both CJS and ESM will export indentical shaped Objects.
+  // so both CJS and ESM will export identical shaped Objects.
   { 
     input: `{dir}/src/index.js`, 
     external, 

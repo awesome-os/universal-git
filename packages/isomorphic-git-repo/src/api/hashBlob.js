@@ -56,3 +56,22 @@ export async function hashBlob({ object }) {
     throw err
   }
 }
+
+Check for spelling errors: packages/isomorphic-git/rollup.config.js#L90
+independent ==> independent
+Check for spelling errors: packages/isomorphic-git/rollup.config.js#L90
+kept ==> kept
+Check for spelling errors: packages/isomorphic-git/rollup.config.js#L86
+emitted ==> emitted
+Check for spelling errors: packages/tests/integration/node/README.md#L15
+usable ==> usable
+Check for spelling errors: packages/tests/integration/node/README.md#L8
+Smallest ==> Smallestt
+Check for spelling errors: packages/tests/integration/node/README.md#L1
+compatibility ==> compatibility
+Check for spelling errors: packages/tests/failing-isomorphic-tests/test-stash.js#L78
+default ==> default
+Check for spelling errors: packages/tests/failing-isomorphic-tests/test-stash.js#L58
+default ==> default
+Check for spelling errors: packages/universal-git/bin/cli.cjs#L1
+verify ==> verify

@@ -1,4 +1,4 @@
-// TODO: verfiy that it gets added by npm as desired. #!/usr/bin/env node
+// TODO: verify that it gets added by npm as desired. #!/usr/bin/env node
 const fs = require('fs')
 const minimisted = require('minimisted')
 const git = require('../index.cjs')
