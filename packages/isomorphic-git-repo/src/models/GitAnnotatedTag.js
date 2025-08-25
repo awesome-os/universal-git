@@ -5,6 +5,8 @@ import { parseAuthor } from '../utils/parseAuthor.js'
 
 export class GitAnnotatedTag {
   constructor(tag) {
+    this._tag = `${tag}` === '[object Object]' ? GitAnnotatedTag.render(tag) : `${tag}`;
+
     if (typeof tag === 'string') {
       this._tag = tag
     } else if (Buffer.isBuffer(tag)) {
@@ -23,13 +25,18 @@ export class GitAnnotatedTag {
   }
 
   static render(obj) {
-    return `object ${obj.object}
-type ${obj.type}
-tag ${obj.tag}
-tagger ${formatAuthor(obj.tagger)}
+    const trimTemplate = (tmp="") => tmp.split('\n').map(s=>s.trim()).join("\n");
+    // we need to use the trimTemplate helper else this would break format on lint or bundling.
+    // template string literals preserve indent.
+    return trimTemplate(
+        `object ${obj.object}
+        type ${obj.type}
+        tag ${obj.tag}
+        tagger ${formatAuthor(obj.tagger)}
 
-${obj.message}
-${obj.gpgsig ? obj.gpgsig : ''}`
+        ${obj.message}
+        ${obj.gpgsig ? obj.gpgsig : ''}`
+    );
   }
 
   justHeaders() {
