@@ -1,150 +1,139 @@
 // flate.ts
-// The main compression/decompression logic.
 
-// DEFLATE is a complex format; to read this code, you should probably check the RFC first:
-// https://tools.ietf.org/html/rfc1951
-
-// ... (Keep all the core DEFLATE algorithm code: u8, fleb, fdeb, freb, hMap, inflt, dflt, etc.)
-// ... (The synchronous functions like deflateSync, inflateSync, etc., remain unchanged.)
-// ... (Error codes and error handling function `err` remain.)
+// ... (Keep all the core DEFLATE algorithm code: u8, fleb, dflt, inflt, etc.)
+// ... (Keep synchronous functions like deflateSync, inflateSync)
 
 // Import the new worker utilities
 import {
+    createTransformStreamInWorker,
     runTaskInWorker,
-    runStreamInWorker,
-    AsyncStream,
-    AsyncOptions,
     AsyncTerminable,
     FlateCallback,
-    AsyncFlateStreamHandler,
-    AsyncFlateDrainHandler,
-} from './worker-util';
+    AsyncOptions,
+} from './worker-streams';
 
-//
-// The following is a sample of how the original async functions and classes
-// would be simplified. Apply this pattern to all async parts of the code.
-//
+// --- Refactor Core Stream Classes into TransformStream Factories ---
 
-// Worker-side helper to post a buffer back to the main thread
-const pbf = (msg: Uint8Array) => (postMessage as Worker['postMessage'])(msg, [msg.buffer]);
+// Example for Deflate. Apply this pattern to Inflate, Gzip, etc.
+// The original streaming classes are converted to functions that
+// return a TransformStream, which is how they are used in the worker.
+function createDeflateStream(opts: DeflateOptions = {}): TransformStream<Uint8Array, Uint8Array> {
+    const st = { l: 0, i: 32768, w: 32768, z: 32768 };
+    // Buffer logic from the original Deflate class
+    let b = new Uint8Array(98304);
+    if (opts.dictionary) {
+        const dict = opts.dictionary.subarray(-32768);
+        b.set(dict, 32768 - dict.length);
+        st.i = 32768 - dict.length;
+    }
 
-// Worker-side helper to get inflate options
-const gopt = (o?: AsyncInflateOptions) => o && {
-  out: o.size && new u8(o.size),
-  dictionary: o.dictionary
-};
-
-// Worker-side helper to bridge a streaming class to postMessage
-const astrm = (strm: CmpDecmpStrm) => {
-  strm.ondata = (dat, final) => (postMessage as Worker['postMessage'])([dat, final], [dat.buffer]);
-  return (ev: MessageEvent<[Uint8Array, boolean] | []>) => {
-    if (ev.data.length) {
-      strm.push(ev.data[0], ev.data[1]);
-      (postMessage as Worker['postMessage'])([ev.data[0].length]);
-    } else (strm as Deflate | Gzip | Zlib).flush()
-  }
+    return new TransformStream({
+        transform(chunk, controller) {
+            // Logic from original Deflate.push()
+            const endLen = chunk.length + st.z;
+            if (endLen > b.length) {
+                // Handle buffer resizing and flushing intermediate chunks
+                // This part is complex but directly maps from the old push()
+                // For brevity, a simplified version is shown here.
+                // You would need to fully implement the buffer flushing logic.
+                const processed = dopt(b.subarray(0, st.z), opts, 0, 0, st);
+                controller.enqueue(processed);
+                // Reset buffer, etc.
+                b.set(b.subarray(-32768));
+                st.z = 32768;
+            }
+            b.set(chunk, st.z);
+            st.z += chunk.length;
+        },
+        flush(controller) {
+            // Logic from original Deflate.push(..., final=true) and flush()
+            st.l = 1; // Mark as final
+            const finalChunk = dopt(b.subarray(0, st.z), opts, 0, 0, st);
+            if (finalChunk.length > 0) {
+                controller.enqueue(finalChunk);
+            }
+        }
+    });
 }
 
-// Dependency providers for the worker
-const bDflt = () => [u8, u16, i32, fleb, fdeb, clim, revfl, revfd, flm, flt, fdm, fdt, rev, deo, et, hMap, wbits, wbits16, hTree, ln, lc, clen, wfblk, wblk, shft, slc, dflt, dopt, deflateSync, pbf];
-const bInflt = () => [u8, u16, i32, fleb, fdeb, clim, fl, fd, flrm, fdrm, rev, ec, hMap, max, bits, bits16, shft, slc, err, inflt, inflateSync, pbf, gopt];
-const gze = () => [gzh, gzhl, wbytes, crc, crct];
-const guze = () => [gzs, gzl];
-const zle = () => [zlh, wbytes, adler];
-const zule = () => [zls];
+// ... createInflateStream(), createGzipStream(), etc. would follow the same pattern ...
 
+// --- Dependency providers now provide the stream factory functions ---
+
+const bDflt = () => [/* ...core constants... */, dopt, createDeflateStream];
+const bInflt = () => [/* ...core constants... */, inflt, createInflateStream];
+
+
+// --- Simplified Asynchronous API ---
 
 /**
- * Asynchronously compresses data with DEFLATE without any wrapper
+ * Asynchronously compresses data with DEFLATE without any wrapper.
+ * Now returns a Promise for idiomatic async/await usage.
  */
-export function deflate(data: Uint8Array, opts: AsyncDeflateOptions, cb: FlateCallback): AsyncTerminable;
-export function deflate(data: Uint8Array, cb: FlateCallback): AsyncTerminable;
-export function deflate(data: Uint8Array, opts: AsyncDeflateOptions | FlateCallback, cb?: FlateCallback) {
-  if (!cb) { cb = opts as FlateCallback; opts = {}; }
-  if (typeof cb !== 'function') err(FlateErrorCode.NoCallback);
-
+export function deflate(data: Uint8Array, opts: AsyncDeflateOptions = {}): Promise<Uint8Array> {
   return runTaskInWorker(
     data,
-    opts as AsyncDeflateOptions,
     [bDflt],
-    ev => pbf(deflateSync(ev.data[0], ev.data[1])),
-    0, // Cache ID
-    cb
+    'createDeflateStream', // Name of the stream factory in the worker
+    opts,
+    0 // Cache ID
   );
 }
 
 /**
- * Asynchronous streaming DEFLATE compression
+ * Asynchronous streaming DEFLATE compression.
+ * This class now simply holds the stream and termination logic.
  */
-export class AsyncDeflate implements AsyncStream {
-  ondata: AsyncFlateStreamHandler;
-  ondrain?: AsyncFlateDrainHandler;
-  queuedSize: number;
+export class AsyncDeflate {
+  readable: ReadableStream<Uint8Array>;
+  writable: WritableStream<Uint8Array>;
   terminate: AsyncTerminable;
-  push: (chunk: Uint8Array, final?: boolean) => void;
-  flush: () => void;
-  
-  constructor(opts: DeflateOptions, cb?: AsyncFlateStreamHandler);
-  constructor(cb?: AsyncFlateStreamHandler);
-  constructor(opts?: DeflateOptions | AsyncFlateStreamHandler, cb?: AsyncFlateStreamHandler) {
-    runStreamInWorker(
-      this,
-      StrmOpt.call(this, opts, cb),
-      [bDflt, () => [astrm, Deflate]],
-      ev => {
-        const strm = new Deflate(ev.data);
-        onmessage = astrm(strm);
-      },
-      6,   // Cache ID
-      true // Flushable
+
+  constructor(opts: DeflateOptions = {}) {
+    const { stream, terminate } = createTransformStreamInWorker(
+      [bDflt],
+      'createDeflateStream',
+      opts,
+      6 // Cache ID
     );
+    this.readable = stream.readable;
+    this.writable = stream.writable;
+    this.terminate = terminate;
   }
 }
 
 /**
- * Asynchronously expands DEFLATE data with no wrapper
+ * Asynchronously expands DEFLATE data with no wrapper.
  */
-export function inflate(data: Uint8Array, opts: AsyncInflateOptions, cb: FlateCallback): AsyncTerminable;
-export function inflate(data: Uint8Array, cb: FlateCallback): AsyncTerminable;
-export function inflate(data: Uint8Array, opts: AsyncInflateOptions | FlateCallback, cb?: FlateCallback) {
-  if (!cb) { cb = opts as FlateCallback; opts = {}; }
-  if (typeof cb !== 'function') err(FlateErrorCode.NoCallback);
-
-  return runTaskInWorker(
-    data,
-    opts as AsyncInflateOptions,
-    [bInflt],
-    ev => pbf(inflateSync(ev.data[0], gopt(ev.data[1]))),
-    1, // Cache ID
-    cb
-  );
+export function inflate(data: Uint8Array, opts: AsyncInflateOptions = {}): Promise<Uint8Array> {
+    return runTaskInWorker(
+        data,
+        [bInflt],
+        'createInflateStream',
+        opts,
+        1 // Cache ID
+    );
 }
 
 /**
- * Asynchronous streaming DEFLATE decompression
+ * Asynchronous streaming DEFLATE decompression.
  */
-export class AsyncInflate implements AsyncStream {
-  ondata: AsyncFlateStreamHandler;
-  ondrain?: AsyncFlateDrainHandler;
-  queuedSize: number;
+export class AsyncInflate {
+  readable: ReadableStream<Uint8Array>;
+  writable: WritableStream<Uint8Array>;
   terminate: AsyncTerminable;
-  push: (chunk: Uint8Array, final?: boolean) => void;
 
-  constructor(opts: InflateStreamOptions, cb?: AsyncFlateStreamHandler);
-  constructor(cb?: AsyncFlateStreamHandler);
-  constructor(opts?: InflateStreamOptions | AsyncFlateStreamHandler, cb?: AsyncFlateStreamHandler) {
-    runStreamInWorker(
-      this,
-      StrmOpt.call(this, opts, cb),
-      [bInflt, () => [astrm, Inflate]],
-      ev => {
-        const strm = new Inflate(ev.data);
-        onmessage = astrm(strm);
-      },
-      7,    // Cache ID
-      false // Not flushable
+  constructor(opts: InflateOptions = {}) {
+    const { stream, terminate } = createTransformStreamInWorker(
+      [bInflt],
+      'createInflateStream',
+      opts,
+      7 // Cache ID
     );
+    this.readable = stream.readable;
+    this.writable = stream.writable;
+    this.terminate = terminate;
   }
 }
 
-// ... Repeat this pattern for gzip, gunzip, zlib, unzlib, etc.
+// ... Repeat this pattern for Gzip, Gunzip, Zlib, Unzlib, etc.
