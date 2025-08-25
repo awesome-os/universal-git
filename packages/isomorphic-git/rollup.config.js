@@ -268,7 +268,7 @@ export default [
         }], 
       },
       // Create UMD Build of HTTP the UMD Build of isomorphic-git gets done via webpack...... 
-      // Note this is the only build without external dependency the webpack build also has no external dependencys.
+      // Note this is the only build without external dependency the webpack build also has no external dependencies.
       { 
         dir: `${outDir}/http/web`, format: 'umd', 
         entryFileNames: "[name].umd.js", 

@@ -6,7 +6,7 @@ You are very welcome here and any contribution is appreciated. :+1:
 
 # Tips
 
-The code is written in "plain" JavaScript and as a rule of thumb shouldn't require transpilation. (The glaring exception being browser's lack of support for bare imports.)
+The code is written in "plain" JavaScript and as a rule of thumb shouldn't require transpilation.
 
 ## New feature checklists :sparkles:️
 I'm honestly documenting these steps just so I don't forget them myself.
@@ -14,8 +14,8 @@ I'm honestly documenting these steps just so I don't forget them myself.
 To add a parameter to an existing command `X`:
 
 - [ ] add parameter to the function in `src/api/X.js` (and `src/commands/X.js` if necessary)
-- [ ] document the parameter in the JSDoc comment above the function
-- [ ] add a test case in `__tests__/test-X.js` if possible
+- [ ] document the parameter in the JSDoc comment above the function if you do not want or need expensiv documentation make a type only annotation of needed
+- [ ] add a test case in `test-X.js` if possible or useful
 - [ ] if this is your first time contributing, run `npm run add-contributor` and follow the prompts to add yourself to the README
 - [ ] squash merge the PR with commit message "feat(X): Added 'bar' parameter"
 

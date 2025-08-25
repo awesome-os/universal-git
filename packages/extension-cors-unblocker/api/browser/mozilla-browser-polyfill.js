@@ -1,5 +1,5 @@
 /**
- * drived from ~ v1.5 https://raw.githubusercontent.com/mozilla/webextension-polyfill/refs/heads/master/src/browser-polyfill.js
+ * driven from ~ v1.5 https://raw.githubusercontent.com/mozilla/webextension-polyfill/refs/heads/master/src/browser-polyfill.js
  */
 
 // https://raw.githubusercontent.com/mozilla/webextension-polyfill/refs/heads/master/api-metadata.json
