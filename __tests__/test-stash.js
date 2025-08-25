@@ -54,7 +54,7 @@ const stashChanges = async (
   fs,
   dir,
   gitdir,
-  defalt = true,
+  default = true,
   again = true,
   message = ''
 ) => {
@@ -74,7 +74,7 @@ const stashChanges = async (
   expect(bStatus).toBe('modified')
 
   let mStatus = await status({ fs, dir, gitdir, filepath: 'm.xml' })
-  if (defalt) {
+  if (default) {
     // include unstaged changes, different file first
     await fs.write(`${dir}/m.xml`, '<unstaged>m</unstaged>')
     mStatus = await status({ fs, dir, gitdir, filepath: 'm.xml' })
