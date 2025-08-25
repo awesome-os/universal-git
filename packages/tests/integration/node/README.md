@@ -10,3 +10,6 @@ Node 12 // known issues not ESM compatible without flags does not hornor * expor
 - for ESM go all in and publish the single file bundle types and the singleFile Bundle only.
   - Add wrapper exports for the new added functionality.
   - reship the umd crap but only document ESM
+
+
+we should make a static umd shim detect all used node modules and build a wrapper via webpack 4 so that we get a useable result
