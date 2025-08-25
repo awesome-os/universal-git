@@ -15,6 +15,11 @@ export async function shasum(buffer) {
 // This is modeled after @dominictarr's "shasum" module,
 // but without the 'json-stable-stringify' dependency and
 // extra type-casting features.
+/**
+ * 
+ * @param {*} buffer 
+ * @returns {string}
+ */
 function shasumSync(buffer) {
   return new Hash().update(buffer).digest('hex')
 }

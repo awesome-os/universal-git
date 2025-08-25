@@ -5,7 +5,7 @@ export async function hashObject({
   type,
   object,
   format = 'content',
-  oid = undefined,
+  oid = "",
 }) {
   if (format !== 'deflated') {
     if (format !== 'wrapped') {
