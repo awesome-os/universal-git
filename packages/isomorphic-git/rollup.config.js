@@ -8,10 +8,18 @@ import path from 'path';
 import pkg from './package.json' with { type: 'json' };
 import { execSync } from 'node:child_process';
 import { builtinModules } from 'module'; // ESM syntax
+//import inject from '@rollup/plugin-inject';
+// inject({ // Injects imports for globals
+//   Promise: ['readable-stream-polyfill', 'ReadableStream']
+// })
+
 
 // A Set's .has() method is very fast (O(1) complexity)
 const builtInSet = new Set(builtinModules);
-const isBuiltin = (moduleName) => builtInSet.has(moduleName);
+export const isBuiltin = (moduleName) => builtInSet.has(moduleName);
+
+// TODO: add polyfill logic.
+
 
 const { dependencies } = pkg;
 const dir = import.meta.dirname;
@@ -62,9 +70,12 @@ const virtualModules = {
 // TODO: Rename that to singleBundleEsmReExport
 const singleBundleTypes = `export * from './index';`
 const singleBundleEsmReExport = `export * from './index';`
+const umdSingleBundleEsmReExport = UMD_NAME => `import * as ${UMD_NAME} from '../esm/index';
+export = ${UMD_NAME};
+export as namespace ${UMD_NAME};`;
 
 // Emits all kind of hotFix files as asset to fix the current package state.
-const outputPluginIsomorphicGitESM = { 
+export const outputPluginIsomorphicGitESM = { 
   // TODO: remove v2 - hotfix builds a single file ESM Bundle and reexports from that.
   "name": "emit-types-for-isomorphic-git ESM & webpack build that depends on this build.",
   // options: OutputOptions, bundle:  { [fileName: string]: OutputAsset | OutputChunk }
@@ -112,7 +123,7 @@ const outputPluginIsomorphicGitESM = {
 };
 
 // Emits all kind of hotFix files as asset to fix the current CJS package state.
-const outputPluginIsomorphicGitCJS = { 
+export const outputPluginIsomorphicGitCJS = { 
   // TODO: remove v2 - hotfix builds a single file ESM Bundle and reexports from that.
   "name": "emit-wrappers-for-code-and-types-isomorphic-git CJS",
   // options: OutputOptions, bundle:  { [fileName: string]: OutputAsset | OutputChunk }
@@ -180,7 +191,29 @@ export default [
       },
     ]
   },
- 
+  { // UMD Webpack4 Like build
+    input: `{dir}/src/index.js`, 
+    external, 
+    plugins: [ 
+      // TODO: make type emit compatible to this structure then enable virtual module till all works
+      // // This is for dev only at present 
+      // // npm install @rollup/plugin-virtual --save-dev
+      // // import virtual from '@rollup/plugin-virtual';
+      // // virtual(virtualModules)
+      // nodePolyfill()
+    ],
+    output: (name='git') => ({ 
+      dir: `${outDir}`, format: 'umd', entryFileNames: "[name].umd.js", name, exports: 'named',
+      plugins: [{ 
+        "name": "wrapper create types-isomorphic-git UMD",
+        writeBundle(options, bundle) {
+          this.emitFile({ 
+            type: 'asset', fileName: "index.umd.d.ts", source: umdSingleBundleEsmReExport(name),
+          });
+        }
+      }], 
+    })(),
+  },
   // Build ESM & CJS and create package.json 
   { 
     input: `${dir}/src/http/node/index.js`,
@@ -282,8 +315,7 @@ export default [
             });
           }
         }], 
-      },
-      // TODO: Imaginated webpack umd build from the webpack.config.js
+      }
     ]
   },
 ];

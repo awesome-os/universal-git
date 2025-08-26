@@ -1,5 +1,5 @@
 {
-  "include": ["__tests__"],
+  "include": ["__tests__","packages/isomorphic-git-repo/src/*.js","packages/isomorphic-git-repo/src/typedefs.js"],
   "exclude": ["node_modules"],
   "compilerOptions": {
     "strictNullChecks": true,

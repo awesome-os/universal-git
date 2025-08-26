@@ -1,5 +1,11 @@
 import { join } from 'universal-git-browser/polyfills/path.js';
-import { assertParameter } from './assertParameter.js'
+import { MissingParameterError } from '../errors/MissingParameterError.js'
+
+export function assertParameter(name, value) {
+  if (value === undefined) {
+    throw new MissingParameterError(name)
+  }
+}
 
 /**
  * Resolves the true git directory path, correctly handling submodules.
