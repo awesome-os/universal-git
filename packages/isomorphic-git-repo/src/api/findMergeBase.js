@@ -4,7 +4,7 @@ import '../typedefs.js'
 import { _findMergeBase } from '../commands/findMergeBase.js'
 import { FileSystem } from '../models/FileSystem.js'
 import { assertParameter } from '../utils/assertParameter.js'
-import { join } from '../utils/join.js'
+import { join } from 'node:path/posix'
 
 /**
  * Find the merge base for a set of commits

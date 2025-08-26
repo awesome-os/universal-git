@@ -5,7 +5,7 @@ import { GitIndexManager } from '../managers/GitIndexManager.js'
 import { FileSystem } from '../models/FileSystem.js'
 import { _writeObject } from '../storage/writeObject.js'
 import { assertParameter } from '../utils/assertParameter.js'
-import { join } from '../utils/join.js'
+import { join } from 'node:path/posix'
 
 /**
  * Register file contents in the working tree or object database to the git index (aka staging area).
@@ -137,7 +137,7 @@ export async function updateIndex({
           gitdir,
           type: 'blob',
           format: 'content',
-          object,
+          object: new Blob([object]),
         })
       } else {
         // By default we use 0 for the stats of the index file

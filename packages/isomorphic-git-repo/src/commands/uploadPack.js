@@ -1,5 +1,5 @@
 import { GitRefManager } from '../managers/GitRefManager.js'
-import { join } from '../utils/join.js'
+import { join } from 'node:path/posix'
 import { writeRefsAdResponse } from '../wire/writeRefsAdResponse.js'
 
 export async function uploadPack({

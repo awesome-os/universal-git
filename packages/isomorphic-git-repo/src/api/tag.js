@@ -4,7 +4,7 @@ import { MissingParameterError } from '../errors/MissingParameterError.js'
 import { GitRefManager } from '../managers/GitRefManager'
 import { FileSystem } from '../models/FileSystem.js'
 import { assertParameter } from '../utils/assertParameter'
-import { join } from '../utils/join.js'
+import { join } from 'node:path/posix'
 
 /**
  * Create a lightweight tag

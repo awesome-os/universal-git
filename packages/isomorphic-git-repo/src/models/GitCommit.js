@@ -32,7 +32,8 @@ export class GitCommit {
   }
 
   toObject() {
-    return Buffer.from(this._commit, 'utf8')
+    return new TextEncoder().encode(this._commit);
+    //Buffer.from(this._commit, 'utf8')
   }
 
   // Todo: allow setting the headers and message

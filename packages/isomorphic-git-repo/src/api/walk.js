@@ -4,7 +4,7 @@ import '../typedefs.js'
 import { _walk } from '../commands/walk.js'
 import { FileSystem } from '../models/FileSystem.js'
 import { assertParameter } from '../utils/assertParameter.js'
-import { join } from '../utils/join.js'
+import { join } from 'node:path/posix'
 
 /**
  * @callback WalkerMap
@@ -124,9 +124,9 @@ import { join } from '../utils/join.js'
  *
  * ### WalkerEntry#content()
  *
- * Returns the file contents as a Buffer.
+ * Returns the file contents as a Blob.
  *
- * `TREE` and `WORKDIR` walkers return a Buffer for `blob` entries and `undefined` for `tree` entries.
+ * `TREE` and `WORKDIR` walkers return a `blob` for blob entries and `undefined` for `tree` entries.
  *
  * `STAGE` walkers always return `undefined` since the file contents are never stored in the stage.
  *

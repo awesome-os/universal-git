@@ -4,7 +4,7 @@ import '../typedefs.js'
 import { GitRefManager } from '../managers/GitRefManager.js'
 import { FileSystem } from '../models/FileSystem.js'
 import { assertParameter } from '../utils/assertParameter.js'
-import { join } from '../utils/join.js'
+import { join } from 'node:path/posix'
 
 /**
  * List branches

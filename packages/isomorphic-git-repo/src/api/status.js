@@ -11,7 +11,7 @@ import { _readObject } from '../storage/readObject.js'
 import { assertParameter } from '../utils/assertParameter.js'
 import { compareStats } from '../utils/compareStats.js'
 import { hashObject } from '../utils/hashObject.js'
-import { join } from '../utils/join.js'
+import { join } from 'node:path/posix'
 
 /**
  * Tell whether a file has been changed

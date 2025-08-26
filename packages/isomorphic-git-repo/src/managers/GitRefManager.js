@@ -9,7 +9,7 @@ import { NotFoundError } from '../errors/NotFoundError.js'
 import { GitPackedRefs } from '../models/GitPackedRefs.js'
 import { GitRefSpecSet } from '../models/GitRefSpecSet.js'
 import { compareRefNames } from '../utils/compareRefNames.js'
-import { join } from '../utils/join.js'
+import { join } from 'node:path/posix'
 
 import { GitConfigManager } from './GitConfigManager'
 

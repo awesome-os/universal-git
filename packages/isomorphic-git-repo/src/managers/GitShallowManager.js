@@ -1,7 +1,7 @@
 import '../typedefs.js'
 import AsyncLock from 'async-lock'
 
-import { join } from '../utils/join.js'
+import { join } from 'node:path/posix'
 
 let lock = null
 

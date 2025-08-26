@@ -1,5 +1,5 @@
 // @ts-check
-import { join } from '../utils/join.js'
+import { join } from 'node:path/posix'
 
 /**
  * Initialize a new repository

@@ -4,7 +4,7 @@ import { GitShallowManager } from '../managers/GitShallowManager.js'
 import { GitAnnotatedTag } from '../models/GitAnnotatedTag.js'
 import { GitCommit } from '../models/GitCommit.js'
 import { _readObject as readObject } from '../storage/readObject.js'
-import { join } from '../utils/join.js'
+import { join } from 'node:path/posix'
 
 /**
  * @param {object} args

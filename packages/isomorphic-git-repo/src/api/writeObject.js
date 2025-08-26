@@ -7,7 +7,7 @@ import { GitAnnotatedTag } from '../models/GitAnnotatedTag.js'
 import { GitCommit } from '../models/GitCommit.js'
 import { GitTree } from '../models/GitTree.js'
 import { _writeObject } from '../storage/writeObject.js'
-import { join } from '../utils/join.js'
+import { join } from 'node:path/posix'
 
 /**
  * Write a git object directly
@@ -99,7 +99,7 @@ export async function writeObject({
           object = Buffer.from(object, encoding)
           break
         case 'tag':
-          object = GitAnnotatedTag.from(object).toObject()
+          object = await GitAnnotatedTag.from(object).toObject()
           break
         default:
           throw new ObjectTypeError(oid || '', type, 'blob|commit|tag|tree')

@@ -4,7 +4,7 @@ import '../typedefs.js'
 import { _addRemote } from '../commands/addRemote.js'
 import { FileSystem } from '../models/FileSystem.js'
 import { assertParameter } from '../utils/assertParameter.js'
-import { join } from '../utils/join.js'
+import { join } from 'node:path/posix'
 
 /**
  * Add or update a remote

@@ -5,7 +5,7 @@ import { _writeCommit } from '../commands/writeCommit'
 import { InvalidRefNameError } from '../errors/InvalidRefNameError.js'
 import { MissingNameError } from '../errors/MissingNameError'
 import { GitRefStash } from '../models/GitRefStash'
-import { join } from '../utils/join'
+import { join } from 'node:path/posix'
 import { normalizeAuthorObject } from '../utils/normalizeAuthorObject'
 import { acquireLock } from '../utils/walkerToTreeEntryMap'
 

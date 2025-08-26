@@ -4,7 +4,7 @@ import '../typedefs.js'
 import { _writeTree } from '../commands/writeTree.js'
 import { FileSystem } from '../models/FileSystem.js'
 import { assertParameter } from '../utils/assertParameter.js'
-import { join } from '../utils/join.js'
+import { join } from 'node:path/posix'
 
 /**
  * Write a tree object directly

@@ -1,6 +1,6 @@
 import { InternalError } from '../errors/InternalError.js'
 import { readPackIndex } from '../storage/readPackIndex.js'
-import { join } from '../utils/join.js'
+import { join } from 'node:path/posix'
 
 export async function readObjectPacked({
   fs,

@@ -9,7 +9,7 @@ import { GitIndexManager } from '../managers/GitIndexManager.js'
 import { FileSystem } from '../models/FileSystem.js'
 import { _writeObject } from '../storage/writeObject.js'
 import { assertParameter } from '../utils/assertParameter.js'
-import { join } from '../utils/join.js'
+import { join } from 'node:path/posix'
 import { posixifyPathBuffer } from '../utils/posixifyPathBuffer.js'
 
 /**
@@ -128,7 +128,7 @@ async function addToIndex({
         ? await fs.readlink(join(dir, currentFilepath)).then(posixifyPathBuffer)
         : await fs.read(join(dir, currentFilepath), { autocrlf })
       if (object === null) throw new NotFoundError(currentFilepath)
-      const oid = await _writeObject({ fs, gitdir, type: 'blob', object })
+      const oid = await _writeObject({ fs, gitdir, type: 'blob', object: new Blob([object]) })
       index.insert({ filepath: currentFilepath, stats, oid })
     }
   })

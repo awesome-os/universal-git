@@ -4,7 +4,7 @@ import '../typedefs.js'
 import { _listNotes } from '../commands/listNotes.js'
 import { FileSystem } from '../models/FileSystem.js'
 import { assertParameter } from '../utils/assertParameter.js'
-import { join } from '../utils/join'
+import { join } from 'node:path/posix'
 
 /**
  * List all the object notes

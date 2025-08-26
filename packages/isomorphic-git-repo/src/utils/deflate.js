@@ -1,6 +1,5 @@
 /* eslint-env node, browser */
 /* global CompressionStream */
-import pako from 'pako'
 
 let supportsCompressionStream = null
 
@@ -10,7 +9,7 @@ export async function deflate(buffer) {
   }
   return supportsCompressionStream
     ? browserDeflate(buffer)
-    : pako.deflate(buffer)
+    : import('pako').deflate(buffer)
 }
 
 async function browserDeflate(buffer) {
