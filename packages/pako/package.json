@@ -1,0 +1,42 @@
+{
+  "name": "pako",
+  "description": "zlib port to javascript - fast, modularized, with browser support",
+  "version": "2.1.0",
+  "type": "module",
+  "keywords": [
+    "zlib",
+    "deflate",
+    "inflate",
+    "gzip"
+  ],
+  "contributors": [
+    "Andrei Tuputcyn (https://github.com/andr83)",
+    "Vitaly Puzrin (https://github.com/puzrin)",
+    "Friedel Ziegelmayer (https://github.com/dignifiedquire)",
+    "Kirill Efimov (https://github.com/Kirill89)",
+    "Jean-loup Gailly",
+    "Mark Adler"
+  ],
+  "files": [
+    "index.js",
+    "dist/",
+    "lib/"
+  ],
+  "license": "(MIT AND Zlib)",
+  "repository": "nodeca/pako",
+  "exports": {
+    ".": "./index.js",
+    "./*": "./*"
+  },
+  "scripts": {
+    "lint": "npx eslint .",
+    "test": "npm run lint && npx mocha",
+    "coverage": "npm run lint && npx -p nyc -p mocha -- nyc mocha && npx nyc report --reporter html",
+    "build": "npx rollup -c",
+    "build_fixtures": "node support/build_fixtures.js",
+    "doc": "node support/build_doc.js",
+    "gh-doc": "npm run doc && npx gh-pages -d doc -f",
+    "prepublishOnly": "npm run gh-doc"
+  },
+  "dependencies": {}
+}
