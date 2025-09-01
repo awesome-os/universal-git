@@ -1,4 +1,9 @@
 /**
+ * Deprecated at present we eat our dog food via the bundler and create there a new path Polyfill.
+ * At present we will reuse the save universal-git/packages\browser\polyfills\path.js it reexports maintained esm
+ */
+
+/**
  * A polyfill for path.join() using only the URL API.
  * Behaves like Node's path.join: relative in → relative out, absolute in → absolute out.
  *
