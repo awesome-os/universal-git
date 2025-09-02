@@ -37,6 +37,14 @@ If you've been frustrated by the lack of updates or unresolved issues in `isomor
 | **Community** | Unresponsive | 💬 **Active community** |
 | **Roadmap** | None | 🗺️ **Public roadmap** and clear feature pipeline |
 
+## Overview
+<p align="center">
+  <a href="https://github.com/awesome-os/universal-git">
+    <img src="https://raw.githubusercontent.com/awesome-os/universal-git/refs/heads/main/packages/assets/architecture.excalidraw.png" alt="universal-git logo" width="100%">
+  </a>
+</p>
+
+
 ## 🚀 Quick Start
 
 ### 1. Installation
