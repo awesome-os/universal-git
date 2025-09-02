@@ -8,26 +8,6 @@ import { parseUploadPackResponse } from 'isomorphic-git/src/wire/parseUploadPack
 import { Buffer } from 'buffer'
 window.Buffer = Buffer;
 
-export async function sparseCheckout(
-    repoUrl,
-    ref,
-    paths,
-) {
-    const refs = await lsRefs(repoUrl, ref);
-    const commitHash = refs[ref];
-    const treesIdx = await fetchWithoutBlobs(repoUrl, commitHash, paths);
-    const objects = await resolveObjects(treesIdx, commitHash, paths);
-
-    const blobsIdx = await fetchObjects(repoUrl, paths.map(path => objects[path].oid));
-
-    const fetchedPaths = {};
-    await Promise.all(paths.map(async path => {
-        fetchedPaths[path] = await extractGitObjectFromIdx(blobsIdx, objects[path].oid)
-    }));
-    return fetchedPaths;
-}
-
-
 async function lsRefs(repoUrl, refPrefix) {
     const packbuffer = Buffer.from(await collect([
         GitPktLine.encode(`command=ls-refs\n`),
@@ -246,4 +226,23 @@ function streamToIterator(stream) {
         return this
       },
     }
+}
+
+export async function sparseCheckout(
+    repoUrl,
+    ref,
+    paths,
+) {
+    const refs = await lsRefs(repoUrl, ref);
+    const commitHash = refs[ref];
+    const treesIdx = await fetchWithoutBlobs(repoUrl, commitHash, paths);
+    const objects = await resolveObjects(treesIdx, commitHash, paths);
+
+    const blobsIdx = await fetchObjects(repoUrl, paths.map(path => objects[path].oid));
+
+    const fetchedPaths = {};
+    await Promise.all(paths.map(async path => {
+        fetchedPaths[path] = await extractGitObjectFromIdx(blobsIdx, objects[path].oid)
+    }));
+    return fetchedPaths;
 }
