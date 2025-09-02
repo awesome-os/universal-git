@@ -40,7 +40,7 @@ If you've been frustrated by the lack of updates or unresolved issues in `isomor
 ## Overview
 <p align="center">
   <a href="https://github.com/awesome-os/universal-git">
-    <img src="https://raw.githubusercontent.com/awesome-os/universal-git/refs/heads/main/packages/assets/architecture.excalidraw.png" alt="universal-git logo" width="100%">
+    <img src="https://raw.githubusercontent.com/awesome-os/universal-git/refs/heads/main/packages/assets/architecture.excalidraw.svg" alt="universal-git logo" width="100%">
   </a>
 </p>
 
