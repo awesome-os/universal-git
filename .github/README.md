@@ -23,6 +23,19 @@
 
 `universal-git` forked from `isomorphic-git`, was created to provide the community with a stable, actively maintained library that embraces modern JavaScript, fixes long-standing bugs, and offers a clear path forward.
 
+---
+
+### 🧭 TL;DR — Publishing Philosophy
+
+We ship **TypeScript directly** — modern runtimes can run it.
+Production builds use **`universal-git-bundle`**, which includes only our code (no polyfills).
+**Polyfills are optional** and loaded dynamically by environment.
+Developers decide what to include — **we stay minimal and future-proof**.
+
+---
+
+## Comming from isomorphic-git?
+
 If you've been frustrated by the lack of updates or unresolved issues in `isomorphic-git`, you've come to the right place.
 
 ## ✨ Why Switch to `universal-git`?
