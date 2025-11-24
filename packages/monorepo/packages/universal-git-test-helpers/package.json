@@ -1,0 +1,17 @@
+{
+  "name": "@awesome-os/universal-git-test-helpers",
+  "version": "0.0.0-development",
+  "type": "module",
+  "description": "Shared test helpers for universal-git tests",
+  "scripts": {
+    "test": "echo \"No tests in helpers package\""
+  },
+  "dependencies": {
+    "@awesome-os/universal-git-src": "*",
+    "@awesome-os/universal-git-test-fixtures": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.16"
+  }
+}
+

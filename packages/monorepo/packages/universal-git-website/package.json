@@ -1,0 +1,20 @@
+{
+  "name": "@awesome-os/universal-git-website",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev ../docs",
+    "build": "vitepress build ../docs",
+    "preview": "vitepress preview ../docs",
+    "lint": "textlint ../docs/**/*.md",
+    "lint:fix": "textlint --fix ../docs/**/*.md"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.3",
+    "@vueuse/core": "^11.2.0",
+    "textlint": "^14.0.1",
+    "textlint-rule-preset-ja-technical-writing": "^7.0.0",
+    "textlint-rule-write-good": "^2.0.0",
+    "react-icons": "2.2.7"
+  }
+}

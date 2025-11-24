@@ -1,0 +1,36 @@
+{
+  "include": [
+    "packages/universal-git-src/**/*.ts",
+    "node_modules/@awesome-os/universal-git-src/**/*.ts"
+  ],
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/tests/**",
+    "**/node_modules/**",
+    "!node_modules/@awesome-os/**",
+    "**/coverage/**",
+    "**/*.d.ts",
+    "**/examples/**",
+    "**/website/**",
+    "**/file_dump*.ts",
+    "**/loca.*.ts",
+    "**/*.mjs",
+    "**/*.cjs",
+    "**/*.js"
+  ],
+  "reporter": [
+    "text",
+    "text-summary",
+    "html",
+    "lcov"
+  ],
+  "all": true,
+  "check-coverage": false,
+  "lines": 80,
+  "functions": 75,
+  "branches": 80,
+  "statements": 80
+}
+
+

@@ -1,0 +1,4 @@
+{ "type": "module", "main": "index.ts", "name": "@awesome-os/universal-git-src", "version": "0.0.0-development", 
+"private": true
+
+}

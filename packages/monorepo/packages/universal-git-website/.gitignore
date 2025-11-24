@@ -1,0 +1,9 @@
+# Website Stuff
+/build
+node_modules
+static/js/universal-git
+static/js/codemirrorify.js
+translated_docs
+yarn.lock
+i18n/*
+i18n/en.json

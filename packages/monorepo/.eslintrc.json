@@ -1,0 +1,28 @@
+{
+  "extends": [
+    "prettier-standard/prettier-file"
+  ],
+  "ignorePatterns": ["/dist/", "*.mjs"],
+  "rules": {
+    "import/order": ["error", {
+      "alphabetize": {
+        "order": "asc",
+        "caseInsensitive": false
+      },
+      "groups": [
+        "builtin",
+        "external",
+        "parent",
+        "index",
+        "sibling"
+      ],
+      "newlines-between": "always"
+    }],
+    "no-restricted-imports": ["error", {
+      "paths": [{
+        "name": "universal-git",
+        "message": "Must import from '@awesome-os/universal-git-src' instead of 'universal-git' to use source files directly."
+      }]
+    }]
+  }
+}

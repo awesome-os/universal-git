@@ -1,0 +1,31 @@
+{
+  "include": ["packages/**/*.ts"],
+  "exclude": ["node_modules","build"],
+  "compilerOptions": {
+    "incremental": false,
+    "strictNullChecks": true,
+    "noEmit": true,
+    "outDir": "packages/isomorphic-git",
+    "allowJs": true,
+    "checkJs": true,
+    "maxNodeModuleJsDepth": 0,
+    "moduleResolution": "nodenext",
+    "target": "es2023",
+    "module": "nodenext",
+    "isolatedModules": true,
+    "lib": ["es2023", "dom"],
+    "types": ["node"],
+    "resolveJsonModule": true,
+    "sourceMap": false,
+    "declaration": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@awesome-os/universal-git-src/*": ["packages/universal-git-src/*"]
+    },
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": false
+  }
+}

@@ -1,0 +1,8 @@
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = true
+	symlinks = false
+	ignorecase = true
+[remote "origin"]
+	url = C:\\Users\\FRANK_~1\\AppData\\Local\\Temp\\fixture-gen-1763110199076\\repo

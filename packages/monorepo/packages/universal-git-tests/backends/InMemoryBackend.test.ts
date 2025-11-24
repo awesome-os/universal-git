@@ -1,0 +1,539 @@
+import { test } from 'node:test'
+import assert from 'node:assert'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { InMemoryBackend } from '@awesome-os/universal-git-src/backends/InMemoryBackend.ts'
+
+test('InMemoryBackend', async (t) => {
+  await t.test('getType - returns in-memory', () => {
+    const backend = new InMemoryBackend()
+    assert.strictEqual(backend.getType(), 'in-memory')
+  })
+
+  await t.test('HEAD operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read default HEAD
+    const defaultHead = await backend.readHEAD()
+    assert.strictEqual(defaultHead, 'ref: refs/heads/master')
+    
+    // Write new HEAD
+    await backend.writeHEAD('ref: refs/heads/main')
+    const newHead = await backend.readHEAD()
+    assert.strictEqual(newHead, 'ref: refs/heads/main')
+    
+    // Write OID directly
+    await backend.writeHEAD('abc123def456')
+    const oidHead = await backend.readHEAD()
+    assert.strictEqual(oidHead, 'abc123def456')
+  })
+
+  await t.test('Config operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read default config (empty)
+    const defaultConfig = await backend.readConfig()
+    assert.strictEqual(defaultConfig.length, 0)
+    
+    // Write config
+    const configData = UniversalBuffer.from('[core]\n\trepositoryformatversion = 0\n')
+    await backend.writeConfig(configData)
+    const writtenConfig = await backend.readConfig()
+    assert.ok(UniversalBuffer.isBuffer(writtenConfig))
+    assert.strictEqual(writtenConfig.toString(), configData.toString())
+  })
+
+  await t.test('Index operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read default index (empty)
+    const defaultIndex = await backend.readIndex()
+    assert.strictEqual(defaultIndex.length, 0)
+    
+    // Write index
+    const indexData = UniversalBuffer.from('DIRC\x00\x00\x00\x02')
+    await backend.writeIndex(indexData)
+    const writtenIndex = await backend.readIndex()
+    assert.ok(UniversalBuffer.isBuffer(writtenIndex))
+    assert.strictEqual(writtenIndex.toString('hex'), indexData.toString('hex'))
+  })
+
+  await t.test('Description operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read default description (null)
+    const defaultDesc = await backend.readDescription()
+    assert.strictEqual(defaultDesc, null)
+    
+    // Write description
+    await backend.writeDescription('Test repository')
+    const desc = await backend.readDescription()
+    assert.strictEqual(desc, 'Test repository')
+  })
+
+  await t.test('State file operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read non-existent state file
+    const missing = await backend.readStateFile('FETCH_HEAD')
+    assert.strictEqual(missing, null)
+    
+    // Write state file
+    await backend.writeStateFile('FETCH_HEAD', 'abc123 HEAD')
+    const fetched = await backend.readStateFile('FETCH_HEAD')
+    assert.strictEqual(fetched, 'abc123 HEAD')
+    
+    // Delete state file
+    await backend.deleteStateFile('FETCH_HEAD')
+    const deleted = await backend.readStateFile('FETCH_HEAD')
+    assert.strictEqual(deleted, null)
+    
+    // List state files
+    await backend.writeStateFile('ORIG_HEAD', 'def456')
+    await backend.writeStateFile('MERGE_HEAD', 'ghi789')
+    const stateFiles = await backend.listStateFiles()
+    assert.ok(Array.isArray(stateFiles))
+    assert.ok(stateFiles.includes('ORIG_HEAD'))
+    assert.ok(stateFiles.includes('MERGE_HEAD'))
+  })
+
+  await t.test('Sequencer file operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read non-existent sequencer file
+    const missing = await backend.readSequencerFile('sequencer')
+    assert.strictEqual(missing, null)
+    
+    // Write sequencer file
+    await backend.writeSequencerFile('sequencer', 'pick abc123')
+    const seq = await backend.readSequencerFile('sequencer')
+    assert.strictEqual(seq, 'pick abc123')
+    
+    // Delete sequencer file
+    await backend.deleteSequencerFile('sequencer')
+    const deleted = await backend.readSequencerFile('sequencer')
+    assert.strictEqual(deleted, null)
+    
+    // List sequencer files
+    await backend.writeSequencerFile('sequencer', 'data1')
+    await backend.writeSequencerFile('abort-safety', 'data2')
+    const seqFiles = await backend.listSequencerFiles()
+    assert.ok(Array.isArray(seqFiles))
+    assert.ok(seqFiles.includes('sequencer'))
+    assert.ok(seqFiles.includes('abort-safety'))
+  })
+
+  await t.test('Loose object operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read non-existent object
+    const missing = await backend.readLooseObject('abc123')
+    assert.strictEqual(missing, null)
+    
+    // Write loose object
+    const objectData = UniversalBuffer.from('blob 5\0hello')
+    await backend.writeLooseObject('abc123', objectData)
+    const obj = await backend.readLooseObject('abc123')
+    assert.ok(UniversalBuffer.isBuffer(obj))
+    assert.strictEqual(obj!.toString(), objectData.toString())
+    
+    // Check if object exists
+    assert.strictEqual(await backend.hasLooseObject('abc123'), true)
+    assert.strictEqual(await backend.hasLooseObject('nonexistent'), false)
+    
+    // List loose objects
+    await backend.writeLooseObject('def456', UniversalBuffer.from('tree 0\0'))
+    const objects = await backend.listLooseObjects()
+    assert.ok(Array.isArray(objects))
+    assert.ok(objects.includes('abc123'))
+    assert.ok(objects.includes('def456'))
+  })
+
+  await t.test('Packfile operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read non-existent packfile
+    const missing = await backend.readPackfile('pack-abc123.pack')
+    assert.strictEqual(missing, null)
+    
+    // Write packfile
+    const packData = UniversalBuffer.from('PACK\x00\x00\x00\x02')
+    await backend.writePackfile('pack-abc123.pack', packData)
+    const pack = await backend.readPackfile('pack-abc123.pack')
+    assert.ok(UniversalBuffer.isBuffer(pack))
+    assert.strictEqual(pack!.toString('hex'), packData.toString('hex'))
+    
+    // List packfiles
+    await backend.writePackfile('pack-def456.pack', UniversalBuffer.from('PACK'))
+    const packs = await backend.listPackfiles()
+    assert.ok(Array.isArray(packs))
+    assert.ok(packs.includes('pack-abc123.pack'))
+    assert.ok(packs.includes('pack-def456.pack'))
+  })
+
+  await t.test('Pack index operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read non-existent pack index
+    const missing = await backend.readPackIndex('pack-abc123.idx')
+    assert.strictEqual(missing, null)
+    
+    // Write pack index
+    const idxData = UniversalBuffer.from('\xfftOc\x00\x00\x00\x02')
+    await backend.writePackIndex('pack-abc123.idx', idxData)
+    const idx = await backend.readPackIndex('pack-abc123.idx')
+    assert.ok(UniversalBuffer.isBuffer(idx))
+    assert.strictEqual(idx!.toString('hex'), idxData.toString('hex'))
+  })
+
+  await t.test('Pack bitmap operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read non-existent bitmap
+    const missing = await backend.readPackBitmap('pack-abc123.bitmap')
+    assert.strictEqual(missing, null)
+    
+    // Write bitmap
+    const bitmapData = UniversalBuffer.from('BITM')
+    await backend.writePackBitmap('pack-abc123.bitmap', bitmapData)
+    const bitmap = await backend.readPackBitmap('pack-abc123.bitmap')
+    assert.ok(UniversalBuffer.isBuffer(bitmap))
+    assert.strictEqual(bitmap!.toString('hex'), bitmapData.toString('hex'))
+  })
+
+  await t.test('ODB info file operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read non-existent info file
+    const missing = await backend.readODBInfoFile('alternates')
+    assert.strictEqual(missing, null)
+    
+    // Write info file
+    await backend.writeODBInfoFile('alternates', '/path/to/alternate')
+    const info = await backend.readODBInfoFile('alternates')
+    assert.strictEqual(info, '/path/to/alternate')
+    
+    // Delete info file
+    await backend.deleteODBInfoFile('alternates')
+    const deleted = await backend.readODBInfoFile('alternates')
+    assert.strictEqual(deleted, null)
+  })
+
+  await t.test('Multi-pack index operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read non-existent multi-pack index
+    const missing = await backend.readMultiPackIndex()
+    assert.strictEqual(missing, null)
+    assert.strictEqual(await backend.hasMultiPackIndex(), false)
+    
+    // Write multi-pack index
+    const midxData = UniversalBuffer.from('MIDX')
+    await backend.writeMultiPackIndex(midxData)
+    const midx = await backend.readMultiPackIndex()
+    assert.ok(UniversalBuffer.isBuffer(midx))
+    assert.strictEqual(midx!.toString('hex'), midxData.toString('hex'))
+    
+    // Check if exists
+    assert.strictEqual(await backend.hasMultiPackIndex(), true)
+  })
+
+  await t.test('Ref operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // NOTE: Backend ref operations have been removed. All ref operations must go through
+    // centralized functions in src/git/refs/ to ensure reflog, locking, and validation.
+    // This test now verifies that backend ref methods throw appropriate errors.
+    
+    // Verify that backend.readRef throws
+    try {
+      await backend.readRef('refs/heads/main')
+      assert.fail('Should have thrown')
+    } catch (e) {
+      assert.ok((e as Error).message.includes('has been removed'))
+      assert.ok((e as Error).message.includes('src/git/refs/readRef.ts'))
+    }
+    
+    // Verify that backend.writeRef throws
+    try {
+      await backend.writeRef('refs/heads/main', 'abc123')
+      assert.fail('Should have thrown')
+    } catch (e) {
+      assert.ok((e as Error).message.includes('has been removed'))
+      assert.ok((e as Error).message.includes('src/git/refs/writeRef.ts'))
+    }
+    
+    // Verify that backend.deleteRef throws
+    try {
+      await backend.deleteRef('refs/heads/main')
+      assert.fail('Should have thrown')
+    } catch (e) {
+      assert.ok((e as Error).message.includes('has been removed'))
+      assert.ok((e as Error).message.includes('src/git/refs/deleteRef.ts'))
+    }
+    
+    // Verify that backend.listRefs throws
+    try {
+      await backend.listRefs('refs/')
+      assert.fail('Should have thrown')
+    } catch (e) {
+      assert.ok((e as Error).message.includes('has been removed'))
+      assert.ok((e as Error).message.includes('src/git/refs/listRefs.ts'))
+    }
+    
+    // Verify that backend.hasRef throws
+    try {
+      await backend.hasRef('refs/heads/main')
+      assert.fail('Should have thrown')
+    } catch (e) {
+      assert.ok((e as Error).message.includes('has been removed'))
+      assert.ok((e as Error).message.includes('src/git/refs/readRef.ts'))
+    }
+  })
+
+  await t.test('Packed refs operations', async () => {
+    // NOTE: Backend packed-refs operations have been removed. All ref operations must go through
+    // centralized functions in src/git/refs/ which handle packed-refs automatically.
+    // This test now verifies that backend packed-refs methods throw appropriate errors.
+    const backend = new InMemoryBackend()
+    
+    // Verify that backend.readPackedRefs throws
+    try {
+      await backend.readPackedRefs()
+      assert.fail('Should have thrown')
+    } catch (e) {
+      assert.ok((e as Error).message.includes('has been removed'))
+      assert.ok((e as Error).message.includes('src/git/refs/readRef.ts'))
+    }
+    
+    // Verify that backend.writePackedRefs throws
+    try {
+      await backend.writePackedRefs('abc123 refs/heads/main\n')
+      assert.fail('Should have thrown')
+    } catch (e) {
+      assert.ok((e as Error).message.includes('has been removed'))
+      assert.ok((e as Error).message.includes('src/git/refs/writeRef.ts'))
+    }
+  })
+
+  await t.test('Reflog operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read non-existent reflog
+    const missing = await backend.readReflog('refs/heads/main')
+    assert.strictEqual(missing, null)
+    
+    // Write reflog
+    const reflog = 'abc123 def456 author <email> 1234567890 +0000\tcommit: message\n'
+    await backend.writeReflog('refs/heads/main', reflog)
+    const written = await backend.readReflog('refs/heads/main')
+    assert.strictEqual(written, reflog)
+    
+    // Append to reflog
+    const newEntry = 'def456 ghi789 author <email> 1234567900 +0000\tcommit: another\n'
+    await backend.appendReflog('refs/heads/main', newEntry)
+    const appended = await backend.readReflog('refs/heads/main')
+    assert.ok(appended!.includes(reflog))
+    assert.ok(appended!.includes(newEntry))
+    
+    // Delete reflog
+    await backend.deleteReflog('refs/heads/main')
+    const deleted = await backend.readReflog('refs/heads/main')
+    assert.strictEqual(deleted, null)
+    
+    // List reflogs
+    await backend.writeReflog('refs/heads/feature', 'data1')
+    await backend.writeReflog('refs/heads/develop', 'data2')
+    const reflogs = await backend.listReflogs()
+    assert.ok(Array.isArray(reflogs))
+    assert.ok(reflogs.includes('refs/heads/feature'))
+    assert.ok(reflogs.includes('refs/heads/develop'))
+  })
+
+  await t.test('Info file operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read non-existent info file
+    const missing = await backend.readInfoFile('exclude')
+    assert.strictEqual(missing, null)
+    
+    // Write info file
+    await backend.writeInfoFile('exclude', '*.log\n*.tmp\n')
+    const info = await backend.readInfoFile('exclude')
+    assert.strictEqual(info, '*.log\n*.tmp\n')
+    
+    // Delete info file
+    await backend.deleteInfoFile('exclude')
+    const deleted = await backend.readInfoFile('exclude')
+    assert.strictEqual(deleted, null)
+  })
+
+  await t.test('Hook operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read non-existent hook
+    const missing = await backend.readHook('pre-commit')
+    assert.strictEqual(missing, null)
+    
+    // Write hook
+    const hookData = UniversalBuffer.from('#!/bin/sh\necho "pre-commit"\n')
+    await backend.writeHook('pre-commit', hookData)
+    const hook = await backend.readHook('pre-commit')
+    assert.ok(UniversalBuffer.isBuffer(hook))
+    assert.strictEqual(hook!.toString(), hookData.toString())
+    
+    // Delete hook
+    await backend.deleteHook('pre-commit')
+    const deleted = await backend.readHook('pre-commit')
+    assert.strictEqual(deleted, null)
+    
+    // List hooks
+    await backend.writeHook('post-commit', UniversalBuffer.from('#!/bin/sh\n'))
+    await backend.writeHook('pre-push', UniversalBuffer.from('#!/bin/sh\n'))
+    const hooks = await backend.listHooks()
+    assert.ok(Array.isArray(hooks))
+    assert.ok(hooks.includes('post-commit'))
+    assert.ok(hooks.includes('pre-push'))
+    
+    // Check if hook exists
+    assert.strictEqual(await backend.hasHook('post-commit'), true)
+    assert.strictEqual(await backend.hasHook('nonexistent'), false)
+  })
+
+  await t.test('Submodule config operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read non-existent submodule config
+    const missing = await backend.readSubmoduleConfig('submodule1')
+    assert.strictEqual(missing, null)
+    
+    // Write submodule config
+    await backend.writeSubmoduleConfig('submodule1', '[submodule "submodule1"]\n\tpath = lib\n')
+    const config = await backend.readSubmoduleConfig('submodule1')
+    assert.strictEqual(config, '[submodule "submodule1"]\n\tpath = lib\n')
+  })
+
+  await t.test('Worktree config operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read non-existent worktree config
+    const missing = await backend.readWorktreeConfig('worktree1')
+    assert.strictEqual(missing, null)
+    
+    // Write worktree config
+    await backend.writeWorktreeConfig('worktree1', '[core]\n\tworktree = /path/to/worktree\n')
+    const config = await backend.readWorktreeConfig('worktree1')
+    assert.strictEqual(config, '[core]\n\tworktree = /path/to/worktree\n')
+    
+    // List worktrees (returns empty array by default, worktrees are separate from configs)
+    const worktrees = await backend.listWorktrees()
+    assert.ok(Array.isArray(worktrees))
+    // Worktrees are managed separately, so listWorktrees may be empty even with configs
+  })
+
+  await t.test('Shallow operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read default shallow (null)
+    const defaultShallow = await backend.readShallow()
+    assert.strictEqual(defaultShallow, null)
+    
+    // Write shallow
+    await backend.writeShallow('abc123\n')
+    const shallow = await backend.readShallow()
+    assert.strictEqual(shallow, 'abc123\n')
+    
+    // Delete shallow
+    await backend.deleteShallow()
+    const deleted = await backend.readShallow()
+    assert.strictEqual(deleted, null)
+  })
+
+  await t.test('LFS file operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read non-existent LFS file
+    const missing = await backend.readLFSFile('abc123')
+    assert.strictEqual(missing, null)
+    
+    // Write LFS file
+    const lfsData = UniversalBuffer.from('version https://git-lfs.github.com/spec/v1\n')
+    await backend.writeLFSFile('abc123', lfsData)
+    const lfs = await backend.readLFSFile('abc123')
+    assert.ok(UniversalBuffer.isBuffer(lfs))
+    assert.strictEqual(lfs!.toString(), lfsData.toString())
+    
+    // List LFS files
+    await backend.writeLFSFile('def456', UniversalBuffer.from('data'))
+    const lfsFiles = await backend.listLFSFiles()
+    assert.ok(Array.isArray(lfsFiles))
+    assert.ok(lfsFiles.includes('abc123'))
+    assert.ok(lfsFiles.includes('def456'))
+  })
+
+  await t.test('Git daemon export operations', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Read default (false)
+    const defaultExport = await backend.readGitDaemonExportOk()
+    assert.strictEqual(defaultExport, false)
+    
+    // Write (sets to true, no parameter)
+    await backend.writeGitDaemonExportOk()
+    const exported = await backend.readGitDaemonExportOk()
+    assert.strictEqual(exported, true)
+    
+    // Delete
+    await backend.deleteGitDaemonExportOk()
+    const deleted = await backend.readGitDaemonExportOk()
+    assert.strictEqual(deleted, false)
+  })
+
+  await t.test('Initialize and close', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Check initialization status
+    assert.strictEqual(await backend.isInitialized(), false)
+    
+    // Initialize
+    await backend.initialize()
+    assert.strictEqual(await backend.isInitialized(), true)
+    
+    // Close
+    await backend.close()
+    // After close, initialization status may vary depending on implementation
+  })
+
+  await t.test('Clear - clears all data', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Add some data
+    await backend.writeHEAD('ref: refs/heads/main')
+    // NOTE: backend.writeRef() has been removed - skip ref writing for this test
+    await backend.writeLooseObject('abc123', UniversalBuffer.from('data'))
+    
+    // Clear
+    await backend.clear()
+    
+    // Verify data is cleared
+    const head = await backend.readHEAD()
+    assert.strictEqual(head, 'ref: refs/heads/master') // Back to default
+    // NOTE: backend.readRef() has been removed - skip ref reading for this test
+    const obj = await backend.readLooseObject('abc123')
+    assert.strictEqual(obj, null)
+  })
+
+  await t.test('getStats - returns statistics', async () => {
+    const backend = new InMemoryBackend()
+    
+    // Add some data
+    // NOTE: backend.writeRef() has been removed - skip ref writing for this test
+    await backend.writeLooseObject('abc123', UniversalBuffer.from('data'))
+    await backend.writePackfile('pack-1.pack', UniversalBuffer.from('PACK'))
+    
+    const stats = await backend.getStats()
+    assert.ok(typeof stats === 'object')
+    // Stats structure may vary, but should exist
+    assert.ok(stats !== null)
+  })
+})
+

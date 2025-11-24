@@ -1,0 +1,26 @@
+# pack-refs with: peeled fully-peeled sorted 
+5d0e531843e3a07be3b7966dcde2e938d8dcd452 refs/heads/a
+62c8891bbc84bcd2d6957ca8429d4655789d33d1 refs/heads/a-file
+321cbee22c1c3aa5cf254d58313c7dfff1495410 refs/heads/a-folder
+2d0950ccc80d9ca3d696d217bb042e9cae3d256e refs/heads/a-merge-b
+316a28661138586e6854aa74fbbe17af52d00a27 refs/heads/a-merge-c-recursive-ours
+1b882ab2f050b8d67d938d5d1778ca08cba0421d refs/heads/a-merge-d
+4940fde955290411e322d572a9f9623e40da49e4 refs/heads/add-files
+a3e0a05d6258228f36b58d4b59920e047ac357c4 refs/heads/add-files-merge-remove-files
+f3330940a89c409ef48296452aced357eed030c1 refs/heads/b
+4f9197c06f4b92528ecc6ba106e6a991f27188d7 refs/heads/c
+8d30c5c5b7f96da12afc77062f792d60a51aaa34 refs/heads/d
+f5537a08bcc91fe39ca2d18ed1a60813ce2e323d refs/heads/delete-first-half
+4e80a7147790dfe288976d0d9152deb73902092c refs/heads/delete-first-half-merge-delete-second-half
+d811979895be8d9b6df0c54f2aefaf546d5516da refs/heads/delete-second-half
+7f9ac48c312d3932917fd273cbd20820da1cf285 refs/heads/g
+a6b05e1fc8c97bdb4e58a25318ba24be91d6b3cb refs/heads/g-delete-file
+2700de332dc969e400228255ebcdce9aaf7470e8 refs/heads/h
+1b061888a49d3b0aebb2a51f92bb1f0769f92543 refs/heads/i
+f2874a0720472294c0903f83ebe630740448f9ab refs/heads/i-delete-both
+e195b793ff4e17a5409ed36c9196ee7f46329990 refs/heads/main
+e195b793ff4e17a5409ed36c9196ee7f46329990 refs/heads/medium
+e383745da3a5c0dacc505ebcddd2774c76b82802 refs/heads/newest
+e195b793ff4e17a5409ed36c9196ee7f46329990 refs/heads/oldest
+d082de3d49fcc8412ca1792ca93f69287d977a9e refs/heads/remove-files
+b63e3e43aacc09f089febce93d1f4bffd3e8f446 refs/heads/remove-files-merge-add-files

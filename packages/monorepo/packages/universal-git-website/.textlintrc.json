@@ -1,0 +1,17 @@
+{
+  "filters": {},
+  "rules": {
+    "preset-ja-technical-writing": {
+      "ja-no-weak-phrase": false,
+      "ja-no-mixed-period": false
+    },
+    "write-good": {
+      "passive": false,
+      "weasel": true,
+      "adverb": false,
+      "tooWordy": true,
+      "cliches": true
+    }
+  }
+}
+

@@ -1,0 +1,11 @@
+{"name": "@awesome-os/universal-git-tests",
+  "version": "0.0.0-development",
+  "type": "module",
+  "description": "Tests for universal-git",
+  "scripts": {
+    "tests:ts": "node --experimental-strip-types --test",
+    "tests": "npm test -- ./**/*.test.ts",
+    "tests:coverage": "node --experimental-strip-types --test ./**/*.test.ts",
+    "test": "npm run tests:ts -- --test-timeout=120000 --test-concurrency=0"
+  }
+}

@@ -1,0 +1,12 @@
+/* Custom styles for universal-git website */
+:root {
+  --vp-c-brand: #000000;
+  --vp-c-brand-light: #333333;
+  --vp-c-brand-lighter: #666666;
+  --vp-c-brand-dark: #000000;
+  --vp-c-brand-darker: #000000;
+}
+
+/* Preserve existing custom styles from old site */
+/* Add any custom CSS from website/static/css/ here */
+

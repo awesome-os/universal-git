@@ -1,0 +1,18 @@
+{
+  "name": "@awesome-os/universal-git-mock-server-tests",
+  "version": "0.0.0-development",
+  "type": "module",
+  "description": "Mock server tests (HTTP and Git daemon) for universal-git",
+  "scripts": {
+    "tests": "npm test -- tests/**/*.test.ts",
+    "test": "node --experimental-strip-types --test --test-timeout=60000 --test-concurrency=0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.16"
+  },
+  "exports": {
+    "./helpers/mockHttpServer": "./helpers/mockHttpServer.ts",
+    "./helpers/mockGitDaemon": "./helpers/mockGitDaemon.ts"
+  }
+}
+
