@@ -163,7 +163,7 @@ Personal thanks to:
 
 - Vyacheslav Egorov ([@mraleph](https://github.com/mraleph)) for his awesome
   tutorials about optimising JS code for v8, [IRHydra](http://mrale.ph/irhydra/)
-  tool and his advices.
+  tool and his advice.
 - David Duponchel ([@dduponchel](https://github.com/dduponchel)) for help with
   testing.
 

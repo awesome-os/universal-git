@@ -1867,7 +1867,7 @@ const fill_window = (s) => {
  *
  * deflate_stored() is written to minimize the number of times an input byte is
  * copied. It is most efficient with large input and output UInt8Array, which
- * maximizes the opportunites to have a single copy from next_in to next_out.
+ * maximizes the opportunities to have a single copy from next_in to next_out.
  */
 const deflate_stored = (s, flush) => {
   /* Smallest worthy block size when not flushing or finishing. By default
@@ -6482,7 +6482,7 @@ class Inflate {
         }
       }
 
-      // Skip snyc markers if more data follows and not raw mode
+      // Skip sync markers if more data follows and not raw mode
       while (strm.avail_in > 0 &&
              status === Z_STREAM_END &&
              strm.state.wrap > 0 &&
