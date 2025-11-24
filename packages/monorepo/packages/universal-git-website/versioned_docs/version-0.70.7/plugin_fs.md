@@ -45,7 +45,7 @@ A "callback" `fs` plugin must implement the following subset of node's `fs` modu
 
 Internally, `isomorphic-git` wraps the provided "callback" API functions using [`pify`](https://www.npmjs.com/package/pify).
 
-As of node v12 the `fs.promises` API has been stabilized. (`lightning-fs` also provides a `fs.promises` API!) Nowadays, wrapping the callback functions
+As of node v12 the `fs.promises` API has been stabilized. (Most filesystem implementations provide a `fs.promises` API!) Nowadays, wrapping the callback functions
 with `pify` is redundant and potentially less performant than using the native promisified versions. Plus, if you're writing your own `fs` plugin,
 the `fs.promises` API lets you write straightforward implementations using `async / await` without the messy optional argument handling the callback API needs.
 Therefore a second API is now supported...

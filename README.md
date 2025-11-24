@@ -73,20 +73,20 @@ const http = require('isomorphic-git/http/node')
 const fs = require('fs')
 
 const dir = path.join(process.cwd(), 'test-clone')
-git.clone({ fs, http, dir, url: 'https://github.com/isomorphic-git/lightning-fs' }).then(console.log)
+git.clone({ fs, http, dir, url: 'https://github.com/isomorphic-git/isomorphic-git' }).then(console.log)
 ```
 
 If you're using `isomorphic-git` in the browser, you'll need something that emulates the `fs` API.
-The easiest to setup and most performant library is [LightningFS](https://github.com/isomorphic-git/lightning-fs) which is written and maintained by the same author and is part of the `isomorphic-git` suite.
-If LightningFS doesn't meet your requirements, isomorphic-git should also work with [BrowserFS](https://github.com/jvilk/BrowserFS) and [Filer](https://github.com/filerjs/filer).
+Universal-git now uses `WorktreeBackend` as its internal abstraction for working directory operations.
+You can use [BrowserFS](https://github.com/jvilk/BrowserFS) or [Filer](https://github.com/filerjs/filer) to provide the filesystem API.
 Instead of `isomorphic-git/http/node` this time import `isomorphic-git/http/web`:
 
 ```html
-<script src="https://unpkg.com/@isomorphic-git/lightning-fs"></script>
 <script src="https://unpkg.com/isomorphic-git"></script>
 <script type="module">
 import http from 'https://unpkg.com/isomorphic-git@beta/http/web/index.js'
-const fs = new LightningFS('fs')
+// Use BrowserFS or another filesystem implementation
+// WorktreeBackend will be created automatically from the fs you provide
 
 const dir = '/test-clone'
 git.clone({ fs, http, dir, url: 'https://github.com/isomorphic-git/lightning-fs', corsProxy: 'https://cors.isomorphic-git.org' }).then(console.log)

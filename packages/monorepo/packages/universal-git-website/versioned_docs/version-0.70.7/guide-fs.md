@@ -24,15 +24,15 @@ console.log(files)
 ## LightningFS
 
 If you are writing code for the browser, you will need something that emulates the `fs` API.
-While BrowserFS (see next section) has more features, [LightningFS](https://github.com/isomorphic-git/lightning-fs) might very well fit your needs.
-It was designed from scratch for `isomorphic-git` (by the same author) to eek out more performance
-for fewer bytes. As an added bonus it's dead simple to configure.
+Universal-git now uses `WorktreeBackend` as its internal abstraction for working directory operations.
+You can use [BrowserFS](https://github.com/jvilk/BrowserFS), [ZenFS](https://github.com/zen-fs/core), or any other filesystem implementation.
+WorktreeBackend will be created automatically from the fs you provide.
 
 ```html
-<script src="https://unpkg.com/@isomorphic-git/lightning-fs"></script>
 <script src="https://unpkg.com/isomorphic-git"></script>
 <script>
-const fs = new LightningFS('my-app')
+// Use your preferred filesystem implementation
+const fs = new BrowserFS() // or ZenFS, Filer, etc.
 git.plugins.set('fs', fs)
 const files = git.listFiles({ dir: '/' });
 console.log(files);

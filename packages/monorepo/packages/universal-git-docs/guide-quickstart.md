@@ -6,15 +6,17 @@ sidebar_label: Quick Start
 
 Here's a whirlwind tour of the main features of `universal-git`.
 
-First, let's set up LightningFS and universal-git. *Note: I've already done this for you, which is why there is no RUN button for this code block.*
+First, let's set up a filesystem and universal-git. *Note: I've already done this for you, which is why there is no RUN button for this code block.*
 
 ```html
-<script src="https://unpkg.com/@universal-git/lightning-fs"></script>
 <script src="https://unpkg.com/universal-git"></script>
 <script type="module">
 import http from 'https://unpkg.com/universal-git/http/web/index.js'
 // Initialize universal-git with a file system
-window.fs = new LightningFS('fs')
+// Note: LightningFS has been replaced with WorktreeBackend internally
+// You can use ZenFS, BrowserFS, or any other filesystem implementation
+// WorktreeBackend will be created automatically from the fs you provide
+window.fs = new ZenFS() // or your preferred filesystem
 // I prefer using the Promisified version honestly
 window.pfs = window.fs.promises
 </script>
@@ -163,7 +165,9 @@ There are a lot more functions. You can see them all in the [Alphabetical Index]
 <summary><i>Tip: If you need a clean slate, expand and run this snippet to clean up the file system.</i></summary>
 
 ```js live
-window.fs = new LightningFS('fs', { wipe: true })
+// Note: LightningFS has been replaced with WorktreeBackend
+// Use your preferred filesystem implementation (ZenFS, BrowserFS, etc.)
+window.fs = new ZenFS() // or your preferred filesystem
 window.pfs = window.fs.promises
 console.log('done')
 ```

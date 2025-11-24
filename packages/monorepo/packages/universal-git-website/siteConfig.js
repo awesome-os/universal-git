@@ -64,7 +64,7 @@ const siteConfig = {
     // Used to transform the code blocks into editable examples
     '/js/codemirrorify.js',
     // isomorphic-git itself
-    'https://unpkg.com/@isomorphic-git/lightning-fs',
+    // Removed: @isomorphic-git/lightning-fs - replaced with WorktreeBackend
     '/js/isomorphic-git/index.umd.min.js',
     // the tutorial
     { type: 'module', src: '/js/tutorial.js' },

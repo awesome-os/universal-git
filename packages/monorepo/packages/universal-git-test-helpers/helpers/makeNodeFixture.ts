@@ -5,7 +5,7 @@ import { join, resolve } from 'path'
 import findUp from 'find-up'
 // FileSystem is not exported as subpath, use relative path
 import { FileSystem } from '@awesome-os/universal-git-src/models/FileSystem.ts'
-import onExit from 'signal-exit'
+import { onExit } from 'signal-exit'
 
 const TEMP_PATH = join(os.tmpdir(), 'ugit-test-fixture-')
 const TEMP_DIRS_CREATED = new Set<string>()

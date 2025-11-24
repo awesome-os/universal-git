@@ -89,7 +89,6 @@
   },
   "devDependencies": {
     "@isomorphic-git/cors-proxy": "^3.0.0",
-    "@isomorphic-git/lightning-fs": "^4.6.2",
     "@isomorphic-git/pgp-plugin": "^0.0.7",
     "@types/node": "^24.10.1",
     "@types/ws": "^8.18.1",

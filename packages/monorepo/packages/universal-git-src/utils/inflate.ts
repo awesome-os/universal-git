@@ -47,20 +47,12 @@ export const inflate = async (buffer: UniversalBuffer | Uint8Array): Promise<Uin
     return result
   }
   
-  // Fallback to pako only if DecompressionStream is not available
+  // Fallback to pako-stream only if DecompressionStream is not available
   // This should rarely happen in modern environments
-  debugLog('Falling back to pako')
-  const pako = await import('pako')
-  let concreteBuffer: Uint8Array
-  if (buffer instanceof UniversalBuffer) {
-    concreteBuffer = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength)
-  } else if (buffer instanceof Uint8Array) {
-    concreteBuffer = buffer
-  } else {
-    concreteBuffer = new Uint8Array(buffer)
-  }
-  const result = pako.default.inflate(concreteBuffer)
-  debugLog('Inflate complete (pako)', { 
+  debugLog('Falling back to pako-stream')
+  const { inflate: pakoInflate } = await import('./pako-stream.ts')
+  const result = await pakoInflate(buffer)
+  debugLog('Inflate complete (pako-stream)', { 
     inputSize: bufferSize, 
     outputSize: result.length,
     compressionRatio: bufferSize > 0 ? (result.length / bufferSize).toFixed(2) : 'N/A'

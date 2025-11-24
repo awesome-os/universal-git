@@ -7,15 +7,18 @@ original_id: quickstart-with-bundlers
 
 Run the following command to add Isomorphic-git to your project:
 ```bash
-npm install @isomorphic-git/lightning-fs isomorphic-git buffer
+npm install isomorphic-git buffer
+# Note: @isomorphic-git/lightning-fs has been replaced with WorktreeBackend
+# You can use BrowserFS, ZenFS, or any other filesystem implementation
 ```
 
 Here's a whirlwind tour of the main features of `isomorphic-git`.
 
-First, let's set up LightningFS and isomorphic-git. *Note: I've already done this for you, which is why there is no RUN button for this code block.*
+First, let's set up a filesystem and isomorphic-git. *Note: I've already done this for you, which is why there is no RUN button for this code block.*
 
 ```js live
-import LightningFS from '@isomorphic-git/lightning-fs';
+// Note: LightningFS has been replaced with WorktreeBackend internally
+// Import your preferred filesystem implementation (BrowserFS, ZenFS, etc.)
 import http from 'isomorphic-git/http/web';
 import git from 'isomorphic-git';
 import { Buffer } from 'buffer'
@@ -23,7 +26,8 @@ import { Buffer } from 'buffer'
 // Bundlers require Buffer to be defined on window
 window.Buffer = Buffer;
 // Initialize isomorphic-git with a file system
-window.fs = new LightningFS('fs')
+// WorktreeBackend will be created automatically from the fs you provide
+window.fs = new BrowserFS() // or your preferred filesystem
 // I prefer using the Promisified version honestly
 window.pfs = window.fs.promises
 ```

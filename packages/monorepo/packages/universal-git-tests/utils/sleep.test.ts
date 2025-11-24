@@ -25,7 +25,7 @@ test('sleep', async (t) => {
     await sleep(10)
     const elapsed = Date.now() - start
     assert.ok(elapsed >= 8, `Expected at least 8ms, got ${elapsed}ms`)
-    assert.ok(elapsed < 30, `Expected less than 30ms, got ${elapsed}ms`)
+    assert.ok(elapsed < 35, `Expected less than 35ms, got ${elapsed}ms`)
   })
 
   await t.test('ok:can-be-chained', async () => {

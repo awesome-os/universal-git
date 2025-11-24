@@ -18,14 +18,15 @@ window.pfs = window.fs.promises
 
 Here's a whirlwind tour of the main features of `isomorphic-git`.
 
-First, let's set up LightningFS and isomorphic-git. *Note: I've already done this for you, which is why there is no RUN button for this code block.*
+First, let's set up a filesystem and isomorphic-git. *Note: I've already done this for you, which is why there is no RUN button for this code block.*
 
 ```html
-<script src="https://unpkg.com/@isomorphic-git/lightning-fs"></script>
 <script src="https://unpkg.com/isomorphic-git"></script>
 <script>
 // Initialize isomorphic-git with a file system
-window.fs = new LightningFS('fs')
+// Note: LightningFS has been replaced with WorktreeBackend internally
+// Use your preferred filesystem implementation (BrowserFS, ZenFS, etc.)
+window.fs = new BrowserFS() // or your preferred filesystem
 git.plugins.set('fs', window.fs)
 // I prefer using the Promisified version honestly
 window.pfs = window.fs.promises

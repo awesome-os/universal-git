@@ -1,7 +1,11 @@
 # stuff that gets generated during test setup
 /__tests__/__fixtures__/.superblock.txt
 /__tests__/__fixtures__/index.json
-
+.ungit
+.ungit-*
+.dump
+.dumb
+**/performance/results
 # Dist
 /http
 /managers
@@ -42,8 +46,8 @@ private.key
 !website/i18n/en.json
 
 # Logs
-logs
 *.log
+# never ignore  logs because there is a universal-git-src/git/logs/ directory
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

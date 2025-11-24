@@ -4,7 +4,7 @@ import { join, resolve } from 'path'
 
 import findUp from 'find-up'
 import { FileSystem } from '@awesome-os/universal-git-src/models/FileSystem.ts'
-import onExit from 'signal-exit'
+import { onExit } from 'signal-exit'
 
 const TEMP_PATH = join(os.tmpdir(), 'isogit-test-fixture-')
 const TEMP_DIRS_CREATED = new Set<string>()

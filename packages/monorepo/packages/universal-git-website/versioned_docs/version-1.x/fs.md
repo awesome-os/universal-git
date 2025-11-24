@@ -23,18 +23,18 @@ const files = await git.listFiles({ fs, dir: __dirname });
 console.log(files)
 ```
 
-## LightningFS
+## Filesystem Options
 
 If you are writing code for the browser, you will need something that emulates the `fs` API.
-While BrowserFS (see next section) has more features, [LightningFS](https://github.com/isomorphic-git/lightning-fs) might very well fit your needs.
-It was designed from scratch for `isomorphic-git` (by the same author) to eek out more performance
-for fewer bytes. As an added bonus it's dead simple to configure.
+Universal-git now uses `WorktreeBackend` as its internal abstraction for working directory operations.
+You can use [BrowserFS](https://github.com/jvilk/BrowserFS), [ZenFS](https://github.com/zen-fs/core), or any other filesystem implementation.
+WorktreeBackend will be created automatically from the fs you provide.
 
 ```html
-<script src="https://unpkg.com/@isomorphic-git/lightning-fs"></script>
 <script src="https://unpkg.com/isomorphic-git"></script>
 <script>
-const fs = new LightningFS('my-app')
+// Use your preferred filesystem implementation
+const fs = new BrowserFS() // or ZenFS, Filer, etc.
 const files = git.listFiles({ fs, dir: '/' });
 console.log(files);
 </script>
@@ -92,7 +92,7 @@ A "callback" `fs` object must implement the following subset of node's `fs` modu
 
 Internally, `isomorphic-git` wraps the provided "callback" API functions using [`pify`](https://www.npmjs.com/package/pify).
 
-As of node v12 the `fs.promises` API has been stabilized. (`lightning-fs` also provides a `fs.promises` API!) Nowadays, wrapping the callback functions
+As of node v12 the `fs.promises` API has been stabilized. (Most filesystem implementations provide a `fs.promises` API!) Nowadays, wrapping the callback functions
 with `pify` is redundant and potentially less performant than using the native promisified versions. Plus, if you're writing your own `fs` implementation,
 the `fs.promises` API lets you write straightforward implementations using `async / await` without the messy optional argument handling the callback API needs.
 Therefore a second API is now supported...

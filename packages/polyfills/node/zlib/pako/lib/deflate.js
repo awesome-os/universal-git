@@ -1,8 +1,8 @@
 import * as zlib_deflate from './zlib/deflate.js';
 import {flattenChunks,assign} from './utils/common.js';
-import {string2buf} from './utils/strings';
+import {string2buf} from './utils/strings.js';
 import {ZLIB_MESSAGES as msg} from './zlib/messages.js';
-import ZStream from './zlib/zstream';
+import ZStream from './zlib/zstream.js';
 
 const toString = Object.prototype.toString;
 

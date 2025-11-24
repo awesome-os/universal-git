@@ -83,23 +83,24 @@ const http = require('universal-git/http/node')
 const fs = require('fs')
 
 const dir = path.join(process.cwd(), 'test-clone')
-git.clone({ fs, http, dir, url: 'https://github.com/universal-git/lightning-fs' }).then(console.log)
+git.clone({ fs, http, dir, url: 'https://github.com/awesome-os/universal-git' }).then(console.log)
 ```
 
 If you're using `universal-git` in the browser, you'll need something that emulates the `fs` API.
-The easiest to setup and most performant library is [LightningFS](https://github.com/universal-git/lightning-fs) which is written and maintained by the same author and is part of the `universal-git` suite.
-If LightningFS doesn't meet your requirements, universal-git should also work with [ZenFS](https://github.com/zen-fs/core) and [Filer](https://github.com/filerjs/filer).
+Universal-git now uses `WorktreeBackend` as its internal abstraction for working directory operations.
+You can use [ZenFS](https://github.com/zen-fs/core) or [Filer](https://github.com/filerjs/filer) to provide the filesystem API.
 Instead of `universal-git/http/node` this time import `universal-git/http/web`:
 
 ```html
-<script src="https://unpkg.com/@universal-git/lightning-fs"></script>
 <script src="https://unpkg.com/universal-git"></script>
 <script type="module">
 import http from 'https://unpkg.com/universal-git@beta/http/web/index.js'
-const fs = new LightningFS('fs')
+// Use ZenFS or another filesystem implementation
+// WorktreeBackend will be created automatically from the fs you provide
+const fs = new ZenFS() // or your preferred filesystem
 
 const dir = '/test-clone'
-git.clone({ fs, http, dir, url: 'https://github.com/universal-git/lightning-fs', corsProxy: 'https://cors.universal-git.org' }).then(console.log)
+git.clone({ fs, http, dir, url: 'https://github.com/awesome-os/universal-git', corsProxy: 'https://cors.universal-git.org' }).then(console.log)
 </script>
 ```
 
