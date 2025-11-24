@@ -7,7 +7,13 @@
   ],
   "scripts": {
     "test:comment": "// Run all tests across workspaces",
-    "test": "npm run test --workspaces --if-present",
+    "//test": "npm run test --workspaces --if-present",
+    "test": "node --experimental-strip-types --test --test-timeout=13000 --test-concurrency=12",
+    "perf:heatmap": "node performance/profile-heatmap.mjs",
+    "perf:analyze": "node performance/analyze-hot-path.mjs",
+    "tests": "npm run -w @awesome-os/universal-git-tests tests",
+    "test:mock-server": "npm test -- packages/mock-server-tests/tests/**/*.test.ts",
+    "tests:coverage": "c8 npm run -w @awesome-os/universal-git-tests tests",
 
     "build:comment": "// Build all packages that have a build script",
     "build": "npm run build --workspaces --if-present",

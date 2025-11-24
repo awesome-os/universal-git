@@ -2,6 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import { findMergeBase } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
+import { join } from '@awesome-os/universal-git-src/utils/join.ts'
 
 // These have been checked with
 // GIT_DIR=tests/__fixtures__/test-findMergeBase.git git merge-base -a --octopus COMMITS
@@ -265,6 +266,148 @@ describe('findMergeBase', () => {
       ],
     })
     assert.strictEqual(base, '2316ae441d2c72d8d15673beb81390272671c526')
+  })
+
+  it('octopus merge scenarios', async () => {
+    // Setup - create a test repository with an octopus merge
+    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { commit, writeCommit, readCommit, add, resolveRef, branch, checkout, init } = await import('@awesome-os/universal-git-src/index.ts')
+    const cache: Record<string, unknown> = {}
+    
+    // Initialize repository
+    await init({ fs, dir, defaultBranch: 'main' })
+    
+    // Create initial commit
+    await fs.write(join(dir, 'file1.txt'), 'initial content\n')
+    await add({ fs, dir, gitdir, filepath: 'file1.txt', cache })
+    const initialCommit = await commit({
+      fs,
+      dir,
+      gitdir,
+      message: 'Initial commit',
+      author: { name: 'Test', email: 'test@example.com' },
+      cache,
+    })
+    
+    // Create branch A and commit
+    await branch({ fs, dir, gitdir, ref: 'branch-a', checkout: true, cache })
+    await fs.write(join(dir, 'file-a.txt'), 'content from branch A\n')
+    await add({ fs, dir, gitdir, filepath: 'file-a.txt', cache })
+    const commitA = await commit({
+      fs,
+      dir,
+      gitdir,
+      message: 'Commit on branch A',
+      author: { name: 'Test', email: 'test@example.com' },
+      cache,
+    })
+    
+    // Create branch B from initial and commit
+    await branch({ fs, dir, gitdir, ref: 'branch-b', object: initialCommit, checkout: true, cache })
+    await fs.write(join(dir, 'file-b.txt'), 'content from branch B\n')
+    await add({ fs, dir, gitdir, filepath: 'file-b.txt', cache })
+    const commitB = await commit({
+      fs,
+      dir,
+      gitdir,
+      message: 'Commit on branch B',
+      author: { name: 'Test', email: 'test@example.com' },
+      cache,
+    })
+    
+    // Create branch C from initial and commit
+    await branch({ fs, dir, gitdir, ref: 'branch-c', object: initialCommit, checkout: true, cache })
+    await fs.write(join(dir, 'file-c.txt'), 'content from branch C\n')
+    await add({ fs, dir, gitdir, filepath: 'file-c.txt', cache })
+    const commitC = await commit({
+      fs,
+      dir,
+      gitdir,
+      message: 'Commit on branch C',
+      author: { name: 'Test', email: 'test@example.com' },
+      cache,
+    })
+    
+    // Create an octopus merge commit with 3 parents (A, B, C)
+    // We need to manually create this commit since the commit() function typically only handles 2 parents
+    // Read the tree from one of the commits (they should all have the same base tree structure)
+    const commitAObj = await readCommit({ fs, dir, gitdir, oid: commitA, cache })
+    const treeOid = commitAObj.commit.tree
+    
+    // Create octopus merge commit manually
+    const octopusCommit = {
+      tree: treeOid,
+      parent: [commitA, commitB, commitC], // 3 parents = octopus merge
+      author: { name: 'Test', email: 'test@example.com', timestamp: Math.floor(Date.now() / 1000), timezoneOffset: 0 },
+      committer: { name: 'Test', email: 'test@example.com', timestamp: Math.floor(Date.now() / 1000), timezoneOffset: 0 },
+      message: 'Octopus merge of branches A, B, and C',
+    }
+    
+    const octopusCommitOid = await writeCommit({
+      fs,
+      dir,
+      gitdir,
+      commit: octopusCommit,
+      cache,
+    })
+    
+    // Test 1: Find merge base between octopus merge and one of its parents
+    // Should return the parent commit itself
+    let base = await findMergeBase({
+      fs,
+      gitdir,
+      oids: [octopusCommitOid, commitA],
+    })
+    assert.strictEqual(base, commitA, 'Octopus merge and its parent A should have parent A as merge base')
+    
+    base = await findMergeBase({
+      fs,
+      gitdir,
+      oids: [octopusCommitOid, commitB],
+    })
+    assert.strictEqual(base, commitB, 'Octopus merge and its parent B should have parent B as merge base')
+    
+    base = await findMergeBase({
+      fs,
+      gitdir,
+      oids: [octopusCommitOid, commitC],
+    })
+    assert.strictEqual(base, commitC, 'Octopus merge and its parent C should have parent C as merge base')
+    
+    // Test 2: Find merge base between octopus merge and initial commit
+    // Should return initial commit (common ancestor of all branches)
+    base = await findMergeBase({
+      fs,
+      gitdir,
+      oids: [octopusCommitOid, initialCommit],
+    })
+    assert.strictEqual(base, initialCommit, 'Octopus merge and initial commit should have initial commit as merge base')
+    
+    // Test 3: Find merge base between all three parent branches
+    // Should return initial commit (their common ancestor)
+    base = await findMergeBase({
+      fs,
+      gitdir,
+      oids: [commitA, commitB, commitC],
+    })
+    assert.strictEqual(base, initialCommit, 'All three parent branches should have initial commit as merge base')
+    
+    // Test 4: Find merge base between octopus merge and two of its parents
+    // Should return initial commit (common ancestor of the two parents)
+    base = await findMergeBase({
+      fs,
+      gitdir,
+      oids: [octopusCommitOid, commitA, commitB],
+    })
+    assert.strictEqual(base, initialCommit, 'Octopus merge with two of its parents should have initial commit as merge base')
+    
+    // Test 5: Octopus merge with itself should return itself
+    base = await findMergeBase({
+      fs,
+      gitdir,
+      oids: [octopusCommitOid, octopusCommitOid],
+    })
+    assert.strictEqual(base, octopusCommitOid, 'Octopus merge with itself should return itself')
   })
 })
 
