@@ -57,6 +57,7 @@ export async function currentBranch({
     })
 
     const result = await _currentBranch({
+      repo,
       fs: fs as any,
       gitdir: effectiveGitdir,
       fullname,
@@ -71,32 +72,48 @@ export async function currentBranch({
 
 /**
  * Get the current branch name
+ * @internal - Exported for use by other commands
  */
 export async function _currentBranch({
-  fs,
-  gitdir,
+  repo,
+  fs: _fs,
+  gitdir: _gitdir,
   fullname = false,
   test = false,
 }: {
-  fs: FileSystemProvider
-  gitdir: string
+  repo?: Repository
+  fs?: FileSystemProvider
+  gitdir?: string
   fullname?: boolean
   test?: boolean
 }): Promise<string | undefined> {
+  // Extract fs and gitdir from repo if available, otherwise use provided parameters
+  const fs = repo?.fs || _fs
+  const gitdir = _gitdir || (repo ? await repo.getGitdir() : undefined)
+
   // Guard against undefined fs
   if (!fs) {
     throw new Error('_currentBranch: fs parameter is required but was undefined')
   }
 
+  if (!gitdir) {
+    throw new MissingParameterError('gitdir')
+  }
+
   // First, try to read HEAD as a symbolic ref
   // This will return the target (e.g., 'refs/heads/master') if HEAD is symbolic
+  // Use direct readSymbolicRef function (Repository doesn't have a readSymbolicRef method)
+  // but get gitdir from repo if available to ensure worktree context is handled
   let ref: string | null = await readSymbolicRef({ fs, gitdir, ref: 'HEAD' })
   
   // If HEAD is not symbolic (detached HEAD), try to resolve it to an OID
   // If it resolves to an OID, we're in detached HEAD state
   if (!ref) {
     try {
-      const oid = await resolveRef({ fs, gitdir, ref: 'HEAD', depth: 1 })
+      // Use repo.resolveRef() if available, otherwise use direct resolveRef()
+      const oid = repo
+        ? await repo.resolveRef('HEAD', 1)
+        : await resolveRef({ fs, gitdir, ref: 'HEAD', depth: 1 })
       // If we got an OID, HEAD is detached - return undefined
       if (oid && /^[0-9a-f]{40}$/.test(oid)) {
         return undefined
@@ -111,7 +128,12 @@ export async function _currentBranch({
   // If test is true, verify the ref actually exists
   if (test) {
     try {
-      await resolveRef({ fs, gitdir, ref })
+      // Use repo.resolveRef() if available, otherwise use direct resolveRef()
+      if (repo) {
+        await repo.resolveRef(ref)
+      } else {
+        await resolveRef({ fs, gitdir, ref })
+      }
     } catch (_) {
       return undefined
     }
