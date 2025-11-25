@@ -8,7 +8,7 @@ import {
   stash,
 } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { analyzeCheckout } from '@awesome-os/universal-git-src/core-utils/filesystem/WorkdirManager.ts'
+import { analyzeCheckout } from '@awesome-os/universal-git-src/git/worktree/WorkdirManager.ts'
 import { createFileSystem } from '@awesome-os/universal-git-src/utils/createFileSystem.ts'
 
 describe('stash checkout integration', () => {

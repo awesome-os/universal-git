@@ -125,6 +125,33 @@ const repo = await Repository.open({
   - If dir itself has `config` file → treated as bare repository
   - Otherwise → finds `.git` subdirectory and uses parent as workingDir
 
+### Initializing a New Repository
+
+You can initialize a new repository directly when opening it:
+
+```typescript
+// Initialize a new repository
+const repo = await Repository.open({
+  fs,
+  dir: '/path/to/repo',
+  init: true,              // Initialize repository
+  bare: false,             // Non-bare repository (default)
+  defaultBranch: 'main',   // Default branch name (default: 'master')
+  objectFormat: 'sha1'     // Object format: 'sha1' or 'sha256' (default: 'sha1')
+})
+
+// Repository is now initialized and ready to use
+await add({ repo, filepath: 'README.md' })
+```
+
+**Initialization Options:**
+- `init: true` - Initialize the repository if it doesn't exist
+- `bare: false` - Create a non-bare repository (default). Set to `true` for bare repositories
+- `defaultBranch: 'main'` - Default branch name (default: `'master'`)
+- `objectFormat: 'sha1'` - Object format: `'sha1'` or `'sha256'` (default: `'sha1'`)
+
+**Note**: Initialization is handled by the backend. If a `gitBackend` is provided, it will be used for initialization. Otherwise, a `FilesystemBackend` will be created automatically.
+
 ### Configuration Options
 
 `Repository.open()` supports several configuration options:

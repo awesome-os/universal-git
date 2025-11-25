@@ -18,6 +18,34 @@ The `init` command:
 
 ## Basic Usage
 
+### Using Repository.open() (Recommended)
+
+The recommended way to initialize a repository is using `Repository.open()` with the `init` option:
+
+```typescript
+import { Repository } from 'universal-git'
+
+// Initialize and open a new repository
+const repo = await Repository.open({
+  fs,
+  dir: '/path/to/repo',
+  init: true
+})
+
+// Repository is ready to use
+await add({ repo, filepath: 'README.md' })
+```
+
+**Benefits:**
+- Single call to both initialize and open the repository
+- Backend-agnostic (works with any backend type)
+- Returns a `Repository` instance ready for use
+- Handles initialization automatically through the backend
+
+### Using init() Command (Legacy)
+
+You can also use the `init()` command directly:
+
 ```typescript
 import { init } from 'universal-git'
 
@@ -28,12 +56,28 @@ await init({
 })
 ```
 
+**Note**: The `init()` command is now a convenience wrapper that delegates to backend initialization. For new code, prefer using `Repository.open({ init: true })`.
+
 ## Examples
 
-### Example 1: Basic Init
+### Example 1: Basic Init with Repository.open()
 
 ```typescript
-// Initialize a new repository
+// Initialize and open a new repository (recommended)
+const repo = await Repository.open({
+  fs,
+  dir: '/path/to/repo',
+  init: true
+})
+
+// Repository is ready to use immediately
+await add({ repo, filepath: 'README.md' })
+```
+
+### Example 1b: Basic Init with init() Command
+
+```typescript
+// Initialize a new repository using init() command
 await init({
   fs,
   dir: '/path/to/repo'
@@ -45,7 +89,15 @@ await init({
 ### Example 2: Init with Custom Default Branch
 
 ```typescript
-// Initialize with custom default branch name
+// Using Repository.open() (recommended)
+const repo = await Repository.open({
+  fs,
+  dir: '/path/to/repo',
+  init: true,
+  defaultBranch: 'main'  // Instead of 'master'
+})
+
+// Or using init() command
 await init({
   fs,
   dir: '/path/to/repo',
@@ -56,7 +108,15 @@ await init({
 ### Example 3: Init SHA-256 Repository
 
 ```typescript
-// Initialize repository with SHA-256 object format
+// Using Repository.open() (recommended)
+const repo = await Repository.open({
+  fs,
+  dir: '/path/to/repo',
+  init: true,
+  objectFormat: 'sha256'
+})
+
+// Or using init() command
 await init({
   fs,
   dir: '/path/to/repo',
@@ -67,7 +127,15 @@ await init({
 ### Example 4: Bare Repository
 
 ```typescript
-// Initialize a bare repository (no working directory)
+// Using Repository.open() (recommended)
+const repo = await Repository.open({
+  fs,
+  gitdir: '/path/to/bare-repo',
+  init: true,
+  bare: true
+})
+
+// Or using init() command
 await init({
   fs,
   dir: '/path/to/bare-repo',
@@ -80,14 +148,28 @@ await init({
 ### Example 5: Init with Custom Backend
 
 ```typescript
-import { SQLiteBackend } from 'universal-git/backends'
+import { Repository } from 'universal-git'
+import { createBackend } from 'universal-git/backends'
 
-// Initialize with custom backend
-const backend = new SQLiteBackend('/path/to/database.db')
+// Using Repository.open() with custom backend (recommended)
+const gitBackend = createBackend({
+  type: 'sqlite',
+  dbPath: '/path/to/repo.db'
+})
+
+const repo = await Repository.open({
+  gitBackend,
+  init: true,
+  defaultBranch: 'main',
+  objectFormat: 'sha1'
+})
+
+// Or using init() command with custom backend
+import { init } from 'universal-git'
 await init({
   fs,
   gitdir: '/path/to/repo',
-  backend
+  backend: gitBackend
 })
 ```
 
@@ -230,10 +312,19 @@ await init({
 ### 3. Initialize Before Other Operations
 
 ```typescript
-// ✅ Good: Initialize first
+// ✅ Good: Initialize and open repository in one call
+const repo = await Repository.open({
+  fs,
+  dir: '/path/to/repo',
+  init: true
+})
+await add({ repo, filepath: 'README.md' })
+await commit({ repo, message: 'Initial commit' })
+
+// ✅ Also good: Initialize separately
 await init({ fs, dir: '/path/to/repo' })
-await add({ fs, dir: '/path/to/repo', filepath: 'README.md' })
-await commit({ fs, dir: '/path/to/repo', message: 'Initial commit' })
+const repo = await Repository.open({ fs, dir: '/path/to/repo' })
+await add({ repo, filepath: 'README.md' })
 
 // ❌ Bad: Operations fail without init
 await add({ fs, dir: '/path/to/repo', filepath: 'README.md' })

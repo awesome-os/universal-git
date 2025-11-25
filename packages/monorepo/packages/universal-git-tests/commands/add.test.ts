@@ -26,50 +26,45 @@ const writeSymlink = async (fs, dir) =>
 describe('add', () => {
   it('ok:single-file', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-add')
+    const { repo } = await makeFixture('test-add', { init: true })
     // Test
-    await init({ fs, dir })
-    await add({ fs, dir, filepath: 'a.txt' })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 1)
-    await add({ fs, dir, filepath: 'a.txt' })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 1)
-    await add({ fs, dir, filepath: 'a-copy.txt' })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 2)
-    await add({ fs, dir, filepath: 'b.txt' })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 3)
+    await add({ repo, filepath: 'a.txt' })
+    assert.strictEqual((await listFiles({ repo })).length, 1)
+    await add({ repo, filepath: 'a.txt' })
+    assert.strictEqual((await listFiles({ repo })).length, 1)
+    await add({ repo, filepath: 'a-copy.txt' })
+    assert.strictEqual((await listFiles({ repo })).length, 2)
+    await add({ repo, filepath: 'b.txt' })
+    assert.strictEqual((await listFiles({ repo })).length, 3)
   })
   
   it('ok:multiple-files', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-add')
+    const { repo } = await makeFixture('test-add', { init: true })
     // Test
-    await init({ fs, dir })
-    await add({ fs, dir, filepath: ['a.txt', 'a-copy.txt', 'b.txt'] })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 3)
+    await add({ repo, filepath: ['a.txt', 'a-copy.txt', 'b.txt'] })
+    assert.strictEqual((await listFiles({ repo })).length, 3)
   })
   
   it('param:parallel-false', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-add')
+    const { repo } = await makeFixture('test-add', { init: true })
     // Test
-    await init({ fs, dir })
     await add({
-      fs,
-      dir,
+      repo,
       filepath: ['a.txt', 'a-copy.txt', 'b.txt'],
       parallel: false,
     })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 3)
+    assert.strictEqual((await listFiles({ repo })).length, 3)
   })
   
   it('error:single-failure', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-add')
+    const { repo } = await makeFixture('test-add', { init: true })
     // Test
-    await init({ fs, dir })
     let err: any = null
     try {
-      await add({ fs, dir, filepath: ['a.txt', 'a-copy.txt', 'non-existent'] })
+      await add({ repo, filepath: ['a.txt', 'a-copy.txt', 'non-existent'] })
     } catch (e) {
       err = e
     }
@@ -80,16 +75,14 @@ describe('add', () => {
   
   it('error:multiple-failures', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-add')
+    const { fs, dir, repo } = await makeFixture('test-add', { init: true })
     await writeGitIgnore(fs, dir)
 
     // Test
-    await init({ fs, dir })
     let err: any = null
     try {
       await add({
-        fs,
-        dir,
+        repo,
         filepath: ['a.txt', 'i.txt', 'non-existent', 'also-non-existent'],
       })
     } catch (e) {
@@ -107,61 +100,55 @@ describe('add', () => {
   
   it('behavior:ignored-file', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-add')
+    const { fs, dir, repo } = await makeFixture('test-add', { init: true })
     await writeGitIgnore(fs, dir)
 
     // Test
-    await init({ fs, dir })
     await add({
-      fs,
-      dir,
+      repo,
       filepath: ['a.txt', 'i.txt'],
     })
   })
   
   it('param:force-ignored', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-add')
+    const { fs, dir, repo } = await makeFixture('test-add', { init: true })
     await writeGitIgnore(fs, dir)
 
     // Test
-    await init({ fs, dir })
     await add({
-      fs,
-      dir,
+      repo,
       filepath: ['a.txt', 'i.txt'],
       force: true,
     })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 2)
-    const files = await listFiles({ fs, dir })
+    assert.strictEqual((await listFiles({ repo })).length, 2)
+    const files = await listFiles({ repo })
     assert.ok(files.includes('a.txt'))
     assert.ok(files.includes('i.txt'))
   })
   
   it('ok:symlink', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-add')
+    const { fs, dir, repo } = await makeFixture('test-add', { init: true })
     // it's not currently possible to tests symlinks in the browser since there's no way to create them
     const symlinkCreated = await writeSymlink(fs, dir)
       .then(() => true)
       .catch(() => false)
     // Test
-    await init({ fs, dir })
-    await add({ fs, dir, filepath: 'c/e.txt' })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 1)
+    await add({ repo, filepath: 'c/e.txt' })
+    assert.strictEqual((await listFiles({ repo })).length, 1)
     if (!symlinkCreated) return
-    await add({ fs, dir, filepath: 'e-link.txt' })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 2)
+    await add({ repo, filepath: 'e-link.txt' })
+    assert.strictEqual((await listFiles({ repo })).length, 2)
     const walkResult = await walk({
-      fs,
-      dir,
+      repo,
       trees: [STAGE()],
       map: async (filepath, [stage]) =>
         filepath === 'e-link.txt' && stage ? stage.oid() : undefined,
     })
     assert.strictEqual(walkResult.length, 1)
     const oid = walkResult[0]
-    const { blob: symlinkTarget } = await readBlob({ fs, dir, oid })
+    const { blob: symlinkTarget } = await readBlob({ repo, oid })
     let symlinkTargetStr = Buffer.from(symlinkTarget).toString('utf8')
     if (symlinkTargetStr.startsWith('./')) {
       symlinkTargetStr = symlinkTargetStr.substring(2)
@@ -171,32 +158,29 @@ describe('add', () => {
 
   it('edge:ignored-file', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-add')
+    const { fs, dir, repo } = await makeFixture('test-add', { init: true })
     await writeGitIgnore(fs, dir)
     // Test
-    await init({ fs, dir })
-    await add({ fs, dir, filepath: 'i.txt' })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 0)
+    await add({ repo, filepath: 'i.txt' })
+    assert.strictEqual((await listFiles({ repo })).length, 0)
   })
-
+  
   it('param:force-ignored-file', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-add')
+    const { fs, dir, repo } = await makeFixture('test-add', { init: true })
     await writeGitIgnore(fs, dir)
     // Test
-    await init({ fs, dir })
-    await add({ fs, dir, filepath: 'i.txt', force: true })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 1)
+    await add({ repo, filepath: 'i.txt', force: true })
+    assert.strictEqual((await listFiles({ repo })).length, 1)
   })
-
+  
   it('error:non-existent-file', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-add')
+    const { repo } = await makeFixture('test-add', { init: true })
     // Test
-    await init({ fs, dir })
     let err: unknown = null
     try {
-      await add({ fs, dir, filepath: 'asdf.txt' })
+      await add({ repo, filepath: 'asdf.txt' })
     } catch (e) {
       err = e
     }
@@ -208,56 +192,51 @@ describe('add', () => {
 
   it('ok:folder', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-add')
+    const { repo } = await makeFixture('test-add', { init: true })
     // Test
-    await init({ fs, dir })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 0)
-    await add({ fs, dir, filepath: 'c' })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 4)
+    assert.strictEqual((await listFiles({ repo })).length, 0)
+    await add({ repo, filepath: 'c' })
+    assert.strictEqual((await listFiles({ repo })).length, 4)
   })
 
   it('behavior:folder-with-gitignore', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-add')
+    const { fs, dir, repo } = await makeFixture('test-add', { init: true })
     await writeGitIgnore(fs, dir)
     // Test
-    await init({ fs, dir })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 0)
-    await add({ fs, dir, filepath: 'c' })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 3)
+    assert.strictEqual((await listFiles({ repo })).length, 0)
+    await add({ repo, filepath: 'c' })
+    assert.strictEqual((await listFiles({ repo })).length, 3)
   })
 
   it('param:force-folder-gitignore', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-add')
+    const { fs, dir, repo } = await makeFixture('test-add', { init: true })
     await writeGitIgnore(fs, dir)
     // Test
-    await init({ fs, dir })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 0)
-    await add({ fs, dir, filepath: 'c', force: true })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 4)
+    assert.strictEqual((await listFiles({ repo })).length, 0)
+    await add({ repo, filepath: 'c', force: true })
+    assert.strictEqual((await listFiles({ repo })).length, 4)
   })
 
   it('ok:add-all', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-add')
+    const { fs, dir, repo } = await makeFixture('test-add', { init: true })
     await writeGitIgnore(fs, dir)
     // Test
-    await init({ fs, dir })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 0)
-    await add({ fs, dir, filepath: '.' })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 7)
+    assert.strictEqual((await listFiles({ repo })).length, 0)
+    await add({ repo, filepath: '.' })
+    assert.strictEqual((await listFiles({ repo })).length, 7)
   })
 
   it('param:add-all-parallel-false', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-add')
+    const { fs, dir, repo } = await makeFixture('test-add', { init: true })
     await writeGitIgnore(fs, dir)
     // Test
-    await init({ fs, dir })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 0)
-    await add({ fs, dir, filepath: '.', parallel: false })
-    assert.strictEqual((await listFiles({ fs, dir })).length, 7)
+    assert.strictEqual((await listFiles({ repo })).length, 0)
+    await add({ repo, filepath: '.', parallel: false })
+    assert.strictEqual((await listFiles({ repo })).length, 7)
   })
 
   it('behavior:autocrlf-binary-files', async () => {
@@ -288,12 +267,11 @@ describe('add', () => {
   })
 
   it('error:caller-property', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-add')
-    await init({ fs, dir, gitdir })
+    const { repo } = await makeFixture('test-add', { init: true })
     
     let error: any = null
     try {
-      await add({ fs, dir, gitdir, filepath: 'nonexistent.txt' })
+      await add({ repo, filepath: 'nonexistent.txt' })
     } catch (err) {
       error = err
     }
@@ -303,8 +281,7 @@ describe('add', () => {
   })
 
   it('behavior:directory-sequential', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-add')
-    await init({ fs, dir, gitdir })
+    const { fs, dir, repo } = await makeFixture('test-add', { init: true })
     
     // Create a directory with multiple files
     await fs.mkdir(`${dir}/subdir`)
@@ -313,58 +290,56 @@ describe('add', () => {
     await fs.write(`${dir}/subdir/file3.txt`, 'content3')
     
     // Add directory with parallel=false
-    await add({ fs, dir, gitdir, filepath: 'subdir', parallel: false })
+    await add({ repo, filepath: 'subdir', parallel: false })
     
-    const files = await listFiles({ fs, dir, gitdir })
+    const files = await listFiles({ repo })
     assert.ok(files.includes('subdir/file1.txt'))
     assert.ok(files.includes('subdir/file2.txt'))
     assert.ok(files.includes('subdir/file3.txt'))
   })
 
   it('edge:empty-directory', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-add')
-    await init({ fs, dir, gitdir })
+    const { fs, dir, repo } = await makeFixture('test-add', { init: true })
     
     // Create an empty directory
     await fs.mkdir(`${dir}/empty-dir`)
     
     // Add empty directory - should not fail but also not add anything
-    await add({ fs, dir, gitdir, filepath: 'empty-dir' })
+    await add({ repo, filepath: 'empty-dir' })
     
-    const files = await listFiles({ fs, dir, gitdir })
+    const files = await listFiles({ repo })
     assert.strictEqual(files.length, 0, 'Empty directory should not add any files')
   })
 
 
   it('error:LFS-filter-error', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-add')
-    await init({ fs, dir, gitdir })
+    const { fs, dir, repo } = await makeFixture('test-add', { init: true })
     
     // Create a file
     await fs.write(`${dir}/file.txt`, 'content')
     
     // The LFS filter might fail, but add should still work
     // This tests the catch block in the LFS filter application
-    await add({ fs, dir, gitdir, filepath: 'file.txt' })
+    await add({ repo, filepath: 'file.txt' })
     
-    const files = await listFiles({ fs, dir, gitdir })
+    const files = await listFiles({ repo })
     assert.ok(files.includes('file.txt'), 'File should be added even if LFS filter fails')
   })
 
   it('behavior:autocrlf-config', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-add')
-    await init({ fs, dir, gitdir })
+    const { fs, dir, repo } = await makeFixture('test-add', { init: true })
     
     // Set autocrlf to true
     const { setConfig } = await import('@awesome-os/universal-git-src/index.ts')
-    await setConfig({ fs, dir, gitdir, path: 'core.autocrlf', value: 'true' })
+    const config = await repo.getConfig()
+    await config.set('core.autocrlf', 'true', 'local')
     
     // Create a file with LF line endings
     await fs.write(`${dir}/file.txt`, 'line1\nline2\n')
     
-    await add({ fs, dir, gitdir, filepath: 'file.txt' })
+    await add({ repo, filepath: 'file.txt' })
     
-    const files = await listFiles({ fs, dir, gitdir })
+    const files = await listFiles({ repo })
     assert.ok(files.includes('file.txt'), 'File should be added with autocrlf enabled')
   })
 })

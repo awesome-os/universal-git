@@ -725,6 +725,60 @@ export class SQLiteBackend implements GitBackend {
     }
   }
 
+  async existsFile(path: string): Promise<boolean> {
+    const db = await this._getDB()
+    
+    // Check core metadata files (index, config, description)
+    if (path === 'index' || path === 'config' || path === 'description') {
+      const row = db.prepare('SELECT key FROM core_metadata WHERE key = ?').get(path)
+      return !!row
+    }
+    
+    // HEAD always exists (it's initialized)
+    if (path === 'HEAD') {
+      return true
+    }
+    
+    // Check state files
+    const stateFileRow = db.prepare('SELECT name FROM state_files WHERE name = ?').get(path)
+    if (stateFileRow) {
+      return true
+    }
+    
+    // Check sequencer files
+    const sequencerRow = db.prepare('SELECT name FROM sequencer_files WHERE name = ?').get(path)
+    if (sequencerRow) {
+      return true
+    }
+    
+    // Check info files
+    const infoRow = db.prepare('SELECT name FROM info_files WHERE name = ?').get(path)
+    if (infoRow) {
+      return true
+    }
+    
+    // Check hooks
+    const hookRow = db.prepare('SELECT name FROM hooks WHERE name = ?').get(path)
+    if (hookRow) {
+      return true
+    }
+    
+    // Check shallow file
+    if (path === 'shallow') {
+      const shallowRow = db.prepare('SELECT value FROM core_metadata WHERE key = ?').get('shallow')
+      return !!shallowRow
+    }
+    
+    // Check git-daemon-export-ok
+    if (path === 'git-daemon-export-ok') {
+      const row = db.prepare('SELECT enabled FROM git_daemon_export_ok WHERE id = 1').get()
+      return row ? (row.enabled === 1) : false
+    }
+    
+    // For other files, return false (not found)
+    return false
+  }
+
   async close(): Promise<void> {
     if (this.db) {
       this.db.close()

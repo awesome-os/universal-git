@@ -818,6 +818,11 @@ export class FilesystemBackend implements GitBackend {
     return this.fs.exists(configPath)
   }
 
+  async existsFile(path: string): Promise<boolean> {
+    const filePath = join(this.gitdir, path)
+    return this.fs.exists(filePath)
+  }
+
   async close(): Promise<void> {
     // No cleanup needed for filesystem backend
   }

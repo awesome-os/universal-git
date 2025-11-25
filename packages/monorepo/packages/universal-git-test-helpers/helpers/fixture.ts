@@ -18,10 +18,11 @@ export interface TestFixture {
 /**
  * Creates a test fixture for Node.js test runner
  * @param fixtureName - Name of the fixture directory
+ * @param options - Optional configuration (init: true to initialize repository)
  * @returns Promise resolving to fixture with fs, dir, and gitdir
  */
-export async function makeFixture(fixtureName: string): Promise<TestFixture> {
-  const fixture = await makeNodeFixture(fixtureName)
+export async function makeFixture(fixtureName: string, options?: { init?: boolean }): Promise<TestFixture> {
+  const fixture = await makeNodeFixture(fixtureName, options)
   // FileSystem implements FileSystemProvider interface, but TypeScript needs explicit cast
   const result = {
     ...fixture,

@@ -178,11 +178,28 @@ All backends provide universal interface methods that work regardless of impleme
     const fs = sqliteBackend.getFileSystem() // Returns null
     ```
 
+- `existsFile(path: string): Promise<boolean>` - Checks if a Git repository file exists
+  - **Purpose**: Generic method to check file existence across all backend types
+  - **Parameters**: `path` - File path relative to gitdir (e.g., `'index'`, `'config'`, `'HEAD'`)
+  - **Returns**: `true` if the file exists, `false` otherwise
+  - **Works with**: All backend types (filesystem, SQLite, in-memory, etc.)
+  - **Example**:
+    ```typescript
+    const backend = createBackend({ type: 'filesystem', fs, gitdir })
+    const indexExists = await backend.existsFile('index') // true if .git/index exists
+    const configExists = await backend.existsFile('config') // true if .git/config exists
+    
+    // Works with any backend type
+    const sqliteBackend = createBackend({ type: 'sqlite', dbPath: '/path/to/repo.db' })
+    const indexExists = await sqliteBackend.existsFile('index') // Checks database
+    ```
+
 ### Core Metadata
 - `readHEAD()` / `writeHEAD()` - HEAD pointer
 - `readConfig()` / `writeConfig()` - Repository config
 - `readIndex()` / `writeIndex()` - Staging area
 - `readDescription()` / `writeDescription()` - Repository description
+- `existsFile(path: string)` - Check if a Git repository file exists (works across all backend types)
 
 ### Object Database
 - `readLooseObject()` / `writeLooseObject()` - Loose objects

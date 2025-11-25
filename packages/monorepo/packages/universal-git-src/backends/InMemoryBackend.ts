@@ -21,6 +21,9 @@ export class InMemoryBackend implements GitBackend {
   private config: UniversalBuffer = UniversalBuffer.alloc(0)
   private index: UniversalBuffer = UniversalBuffer.alloc(0)
   private description: string | null = null
+  
+  // Track which files have been written (for existsFile check)
+  private writtenFiles = new Set<string>()
 
   // State files (FETCH_HEAD, ORIG_HEAD, etc.)
   private stateFiles = new Map<string, string>()
@@ -83,6 +86,7 @@ export class InMemoryBackend implements GitBackend {
 
   async writeConfig(data: UniversalBuffer): Promise<void> {
     this.config = UniversalBuffer.from(data)
+    this.writtenFiles.add('config')
   }
 
   async readIndex(): Promise<UniversalBuffer> {
@@ -91,6 +95,7 @@ export class InMemoryBackend implements GitBackend {
 
   async writeIndex(data: UniversalBuffer): Promise<void> {
     this.index = UniversalBuffer.from(data)
+    this.writtenFiles.add('index')
   }
 
   async readDescription(): Promise<string | null> {
@@ -427,6 +432,55 @@ export class InMemoryBackend implements GitBackend {
     return this.initialized
   }
 
+  async existsFile(path: string): Promise<boolean> {
+    // Check core metadata files
+    if (path === 'index') {
+      return this.writtenFiles.has('index')
+    }
+    if (path === 'config') {
+      return this.writtenFiles.has('config')
+    }
+    if (path === 'HEAD') {
+      return true // HEAD always exists (initialized)
+    }
+    if (path === 'description') {
+      return this.description !== null
+    }
+    
+    // Check state files
+    if (this.stateFiles.has(path)) {
+      return true
+    }
+    
+    // Check sequencer files
+    if (this.sequencerFiles.has(path)) {
+      return true
+    }
+    
+    // Check info files
+    if (this.infoFiles.has(path)) {
+      return true
+    }
+    
+    // Check hooks
+    if (this.hooks.has(path)) {
+      return true
+    }
+    
+    // Check shallow file
+    if (path === 'shallow' && this.shallow !== null) {
+      return true
+    }
+    
+    // Check git-daemon-export-ok
+    if (path === 'git-daemon-export-ok') {
+      return this.gitDaemonExportOk
+    }
+    
+    // For other files, check if they're in writtenFiles
+    return this.writtenFiles.has(path)
+  }
+
   async close(): Promise<void> {
     // For in-memory backend, closing means clearing all data
     // This allows the backend to be reused or garbage collected
@@ -453,6 +507,7 @@ export class InMemoryBackend implements GitBackend {
     this.shallow = null
     this.lfsFiles.clear()
     this.gitDaemonExportOk = false
+    this.writtenFiles.clear()
     this.initialized = false
   }
 
@@ -484,6 +539,7 @@ export class InMemoryBackend implements GitBackend {
     this.shallow = null
     this.lfsFiles.clear()
     this.gitDaemonExportOk = false
+    this.writtenFiles.clear()
   }
 
   /**

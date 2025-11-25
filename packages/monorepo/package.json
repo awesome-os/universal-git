@@ -25,7 +25,6 @@
     "//test": "npm test -- tests/**/*.test.ts",
     "t": "node --experimental-strip-types --test --test-concurrency=0 tests/**/*test.ts 2>&1 | Select-String -Pattern \"Error|FAIL|✖|SyntaxError\"",
     "nps:build": "nps build",
-    "test": "node --experimental-strip-types --test --test-timeout=13000 --test-concurrency=12",
     "perf:heatmap": "node performance/profile-heatmap.mjs",
     "perf:analyze": "node performance/analyze-hot-path.mjs",
     "tests": "npm run -w @awesome-os/universal-git-tests tests",

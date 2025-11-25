@@ -188,6 +188,10 @@ export class Repository {
     ignoreSystemConfig = false,
     gitBackend,
     worktree,
+    init = false,
+    bare = false,
+    defaultBranch = 'master',
+    objectFormat = 'sha1',
   }: {
     fs?: FileSystemProvider | RawFileSystemProvider
     dir?: string
@@ -199,6 +203,10 @@ export class Repository {
     ignoreSystemConfig?: boolean
     gitBackend?: GitBackend
     worktree?: GitWorktreeBackend
+    init?: boolean
+    bare?: boolean
+    defaultBranch?: string
+    objectFormat?: 'sha1' | 'sha256'
   }): Promise<Repository> {
     // If backends are provided, we still need fs for system/global config access
     // Derive fs from backends if not provided using universal interface methods
@@ -395,6 +403,43 @@ export class Repository {
     const repo = new Repository(fs, workingDir, finalGitdir, cache, finalSystemPath, finalGlobalPath, gitBackend, worktree)
     fsCache.set(finalGitdir, repo)
     
+    // 6. Initialize repository if requested
+    if (init) {
+      // Use gitBackend if available, otherwise create a FilesystemBackend
+      let resolvedBackend: GitBackend
+      if (gitBackend) {
+        resolvedBackend = gitBackend
+      } else {
+        const { FilesystemBackend } = await import('../backends/FilesystemBackend.ts')
+        resolvedBackend = new FilesystemBackend(fs, finalGitdir)
+      }
+      
+      // Check if already initialized
+      if (!(await resolvedBackend.isInitialized())) {
+        // Initialize backend structure
+        await resolvedBackend.initialize()
+        
+        // Set initial config values
+        const config = await repo.getConfig()
+        if (objectFormat === 'sha256') {
+          await config.set('core.repositoryformatversion', '1', 'local')
+          await config.set('extensions.objectformat', 'sha256', 'local')
+        } else {
+          await config.set('core.repositoryformatversion', '0', 'local')
+        }
+        await config.set('core.filemode', 'false', 'local')
+        await config.set('core.bare', bare.toString(), 'local')
+        if (!bare) {
+          await config.set('core.logallrefupdates', 'true', 'local')
+        }
+        await config.set('core.symlinks', 'false', 'local')
+        await config.set('core.ignorecase', 'true', 'local')
+        
+        // Set HEAD to default branch
+        await resolvedBackend.writeHEAD(`ref: refs/heads/${defaultBranch}`)
+      }
+    }
+    
     return repo
   }
 
@@ -443,27 +488,59 @@ export class Repository {
   }
 
   /**
+   * Gets the Git backend instance
+   * Returns null if no backend was provided (using legacy fs-based operations)
+   */
+  get gitBackend(): GitBackend | null {
+    return this._gitBackend
+  }
+
+  /**
+   * Gets the worktree backend instance
+   * Returns null if no backend was provided (using legacy fs-based operations)
+   */
+  get worktreeBackend(): GitWorktreeBackend | null {
+    return this._worktreeBackend
+  }
+
+  /**
    * Checks if repository is bare
    */
   async isBare(): Promise<boolean> {
     if (this._isBare === null) {
-      const gitdir = await this.getGitdir()
-      // Check if config exists directly in gitdir (bare) or in gitdir/.git (non-bare)
-      const configPath = join(gitdir, 'config')
-      const configExists = await this.fs.exists(configPath)
-      if (configExists) {
-        // Read config to check bare setting
+      // Use gitBackend if available, otherwise fall back to fs
+      if (this._gitBackend) {
         try {
-          // CRITICAL: Use this repository's config service to ensure state consistency
-          const config = await this.getConfig()
-          const bare = await config.get('core.bare')
+          // Try to read config from backend - if it exists, check bare setting
+          const configBuffer = await this._gitBackend.readConfig()
+          const { parse: parseConfig } = await import('../core-utils/ConfigParser.ts')
+          const config = parseConfig(configBuffer)
+          const bare = config.get('core.bare')
           this._isBare = bare === 'true' || bare === true
         } catch {
-          // Default to non-bare if can't read config
+          // Config doesn't exist or can't be read - default to non-bare
           this._isBare = false
         }
       } else {
-        this._isBare = false
+        // Fallback to fs-based check
+        const gitdir = await this.getGitdir()
+        // Check if config exists directly in gitdir (bare) or in gitdir/.git (non-bare)
+        const configPath = join(gitdir, 'config')
+        const configExists = await this.fs.exists(configPath)
+        if (configExists) {
+          // Read config to check bare setting
+          try {
+            // CRITICAL: Use this repository's config service to ensure state consistency
+            const config = await this.getConfig()
+            const bare = await config.get('core.bare')
+            this._isBare = bare === 'true' || bare === true
+          } catch {
+            // Default to non-bare if can't read config
+            this._isBare = false
+          }
+        } else {
+          this._isBare = false
+        }
       }
     }
     return this._isBare
@@ -518,16 +595,23 @@ export class Repository {
           const localConfig = await loadLocalConfig(repo.fs, gitdir)
           localConfig.set(path, value, append)
           const configBuffer = serializeConfig(localConfig)
-          await repo.fs.write(join(gitdir, 'config'), configBuffer)
+          // Use gitBackend if available, otherwise fall back to fs
+          if (repo._gitBackend) {
+            await repo._gitBackend.writeConfig(configBuffer)
+          } else {
+            await repo.fs.write(join(gitdir, 'config'), configBuffer)
+          }
         } else if (scope === 'global' && repo._globalConfigPath) {
           const globalConfig = await loadGlobalConfig(repo.fs, repo._globalConfigPath)
           globalConfig.set(path, value, append)
           const configBuffer = serializeConfig(globalConfig)
+          // Global config is always written to filesystem (not in gitdir)
           await repo.fs.write(repo._globalConfigPath, configBuffer)
         } else if (scope === 'system' && repo._systemConfigPath) {
           const systemConfig = await loadSystemConfig(repo.fs, repo._systemConfigPath)
           systemConfig.set(path, value, append)
           const configBuffer = serializeConfig(systemConfig)
+          // System config is always written to filesystem (not in gitdir)
           await repo.fs.write(repo._systemConfigPath, configBuffer)
         } else {
           throw new Error(`Cannot set ${scope} config: path not provided`)
@@ -717,7 +801,9 @@ export class Repository {
     }
     
     // If we have an in-memory index, check if it's stale
-    if (this._index) {
+    // Note: mtime checking only works with filesystem backends
+    // For non-filesystem backends, we always re-read (backend handles caching internally)
+    if (this._index && !this._gitBackend) {
       let currentMtime: number | null = null
       try {
         const stat = await normalizedFs.lstat(indexPath)
@@ -764,6 +850,7 @@ export class Repository {
         // Attempt to read the file - if it's corrupted, readIndex() will throw
         // If it's valid, we can return the cached index for efficiency
         try {
+          // Verify by reading from fs (we're in a block that only runs when !this._gitBackend)
           const { readIndex } = await import('../git/index/readIndex.ts')
           const diskIndex = await readIndex({
             fs: this.fs,
@@ -807,26 +894,79 @@ export class Repository {
     // If we're here, we need to read from disk
     // CRITICAL: readIndex() may throw errors for corrupted index files (empty, wrong magic, wrong checksum)
     // These errors should propagate to the caller, not be caught and swallowed
-    const { readIndex } = await import('../git/index/readIndex.ts')
-    const index = await readIndex({
-      fs: this.fs,
-      gitdir,
-    })
+    let index: GitIndex
+    if (this._gitBackend) {
+      // Use backend to read index
+      const objectFormat = await this.getObjectFormat()
+      const indexBuffer = await this._gitBackend.readIndex()
+      // Handle empty index files (same as filesystem version)
+      if (indexBuffer.length === 0) {
+        // Empty buffer - check if file exists to distinguish between:
+        // - File doesn't exist → return empty index (valid state for new repositories)
+        // - File exists but is empty → throw error (corrupted)
+        const indexExists = await this._gitBackend.existsFile('index')
+        if (indexExists) {
+          // File exists but is empty - this is corruption, throw error
+          const { InternalError } = await import('../errors/InternalError.ts')
+          throw new InternalError('Index file is empty (.git/index)')
+        } else {
+          // File doesn't exist - return empty index (valid state)
+          index = new GitIndex()
+        }
+      } else {
+        // Check if magic bytes are invalid (corrupted/invalid index)
+        // A valid index file must start with 'DIRC' magic bytes
+        if (indexBuffer.length >= 4) {
+          const magic = indexBuffer.toString('utf8', 0, 4)
+          if (magic !== 'DIRC') {
+            // Invalid magic bytes - check if first 4 bytes are zeros (common corruption pattern)
+            const magicBytes = indexBuffer.slice(0, 4)
+            const isMagicZeros = magicBytes.every(byte => byte === 0)
+            if (isMagicZeros) {
+              // Magic bytes are zeros - file is corrupted/empty, return empty index
+              index = new GitIndex()
+            } else {
+              // Otherwise, try to parse and let GitIndex.fromBuffer() throw the appropriate error
+              index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+            }
+          } else {
+            // Valid magic bytes - parse the index
+            index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+          }
+        } else {
+          // Buffer too short - return empty index
+          index = new GitIndex()
+        }
+      }
+    } else {
+      // Fallback to fs-based read (handles empty files internally)
+      const { readIndex } = await import('../git/index/readIndex.ts')
+      index = await readIndex({
+        fs: this.fs,
+        gitdir,
+      })
+    }
     
     // Only update the owned instance and its mtime if readIndex() succeeded
     // If readIndex() threw an error, we should not update the cache
     this._index = index
-    try {
-      const stat = await normalizedFs.lstat(indexPath)
-      // Handle both normalized and raw stat objects
-      const mtimeSeconds = (stat as any).mtimeSeconds ?? (stat as any).mtime?.seconds ?? ((stat as any).mtime?.getTime ? (stat as any).mtime.getTime() / 1000 : null) ?? null
-      const mtimeNanoseconds = (stat as any).mtimeNanoseconds ?? (stat as any).mtime?.nanoseconds ?? 0
-      if (mtimeSeconds !== null && mtimeSeconds !== undefined) {
-        this._indexMtime = mtimeSeconds * 1000 + (mtimeNanoseconds || 0) / 1000000
-      } else {
+    // Update mtime only for filesystem backends (non-filesystem backends handle caching internally)
+    if (!this._gitBackend) {
+      try {
+        const stat = await normalizedFs.lstat(indexPath)
+        // Handle both normalized and raw stat objects
+        const mtimeSeconds = (stat as any).mtimeSeconds ?? (stat as any).mtime?.seconds ?? ((stat as any).mtime?.getTime ? (stat as any).mtime.getTime() / 1000 : null) ?? null
+        const mtimeNanoseconds = (stat as any).mtimeNanoseconds ?? (stat as any).mtime?.nanoseconds ?? 0
+        if (mtimeSeconds !== null && mtimeSeconds !== undefined) {
+          this._indexMtime = mtimeSeconds * 1000 + (mtimeNanoseconds || 0) / 1000000
+        } else {
+          this._indexMtime = null
+        }
+      } catch {
         this._indexMtime = null
       }
-    } catch {
+    } else {
+      // For non-filesystem backends, set mtime to null (backend handles caching)
       this._indexMtime = null
     }
     
@@ -869,34 +1009,46 @@ export class Repository {
     const gitdir = gitdirOverride || await this.getGitdir()
     const normalizedFs = createFileSystem(this.fs)
     const { join } = await import('./GitPath.ts')
-    const { writeIndex } = await import('../git/index/writeIndex.ts')
     
-    
-    // Write to disk
-    // Use the stateless writeIndex helper - no cache parameter needed
-    await writeIndex({
-      fs: this.fs,
-      gitdir,
-      index,
-    })
+    // Write to backend if available, otherwise fallback to fs
+    if (this._gitBackend) {
+      // Convert GitIndex to UniversalBuffer and write via backend
+      const objectFormat = await this.getObjectFormat()
+      const indexBuffer = await index.toBuffer(objectFormat)
+      await this._gitBackend.writeIndex(indexBuffer)
+    } else {
+      // Fallback to fs-based write
+      const { writeIndex } = await import('../git/index/writeIndex.ts')
+      await writeIndex({
+        fs: this.fs,
+        gitdir,
+        index,
+      })
+    }
     
     // CRITICAL: Update the repository's owned instance and its mtime
     // This ensures that subsequent readIndexDirect() calls return this exact
     // modified instance, solving the race condition where add() modifies the
     // index but status() reads a stale cached version
     this._index = index
-    const indexPath = join(gitdir, 'index')
-    try {
-      const stat = await normalizedFs.lstat(indexPath)
-      // Handle both normalized and raw stat objects
-      const mtimeSeconds = (stat as any).mtimeSeconds ?? (stat as any).mtime?.seconds ?? ((stat as any).mtime?.getTime ? (stat as any).mtime.getTime() / 1000 : null) ?? null
-      const mtimeNanoseconds = (stat as any).mtimeNanoseconds ?? (stat as any).mtime?.nanoseconds ?? 0
-      if (mtimeSeconds !== null && mtimeSeconds !== undefined) {
-        this._indexMtime = mtimeSeconds * 1000 + (mtimeNanoseconds || 0) / 1000000
-      } else {
+    // Update mtime only for filesystem backends (non-filesystem backends handle caching internally)
+    if (!this._gitBackend) {
+      const indexPath = join(gitdir, 'index')
+      try {
+        const stat = await normalizedFs.lstat(indexPath)
+        // Handle both normalized and raw stat objects
+        const mtimeSeconds = (stat as any).mtimeSeconds ?? (stat as any).mtime?.seconds ?? ((stat as any).mtime?.getTime ? (stat as any).mtime.getTime() / 1000 : null) ?? null
+        const mtimeNanoseconds = (stat as any).mtimeNanoseconds ?? (stat as any).mtime?.nanoseconds ?? 0
+        if (mtimeSeconds !== null && mtimeSeconds !== undefined) {
+          this._indexMtime = mtimeSeconds * 1000 + (mtimeNanoseconds || 0) / 1000000
+        } else {
+          this._indexMtime = null
+        }
+      } catch (e) {
         this._indexMtime = null
       }
-    } catch (e) {
+    } else {
+      // For non-filesystem backends, set mtime to null (backend handles caching)
       this._indexMtime = null
     }
     

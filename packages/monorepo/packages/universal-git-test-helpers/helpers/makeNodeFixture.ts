@@ -58,7 +58,7 @@ export async function useTempDir(fixture: string): Promise<string> {
   return tempDir
 }
 
-export async function makeNodeFixture(fixture: string) {
+export async function makeNodeFixture(fixture: string, options?: { init?: boolean }) {
   onExit(cleanupTempDirs)
 
   const fs = new FileSystem(_fs)
@@ -75,6 +75,7 @@ export async function makeNodeFixture(fixture: string) {
     gitdir,
     cache: {},
     autoDetectConfig: true,
+    init: options?.init || false,
   })
 
   return { _fs, fs, dir, gitdir, repo }

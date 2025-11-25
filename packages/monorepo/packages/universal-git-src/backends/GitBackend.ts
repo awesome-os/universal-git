@@ -396,5 +396,16 @@ export type GitBackend = {
    * should return null.
    */
   getFileSystem?(): FileSystemProvider | null
+
+  /**
+   * Checks if a Git repository file exists
+   * @param path - File path relative to gitdir (e.g., 'index', 'config', 'HEAD')
+   * @returns true if the file exists, false otherwise
+   * 
+   * This is a generic method that works across all backend types.
+   * For filesystem backends, it checks file existence.
+   * For other backends, it checks if the data exists in the storage.
+   */
+  existsFile(path: string): Promise<boolean>
 }
 
