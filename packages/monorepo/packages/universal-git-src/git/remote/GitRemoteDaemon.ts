@@ -6,6 +6,9 @@ import { GitPktLine } from '../../models/GitPktLine.ts'
 import { collect } from '../../utils/collect.ts'
 import { fromValue } from '../../utils/fromValue.ts'
 import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import type { GitRemoteBackend } from './GitRemoteBackend.ts'
+import type { RemoteDiscoverOptions, RemoteDiscoverResult, RemoteConnectOptions, RemoteConnection } from './types.ts'
+import { MissingParameterError } from '../../errors/MissingParameterError.ts'
 
 // ============================================================================
 // GIT DAEMON PROTOCOL TYPES
@@ -64,7 +67,28 @@ function parseGitDaemonUrl(url: string): { host: string; port: number; path: str
 // GIT REMOTE DAEMON CLASS
 // ============================================================================
 
-export class GitRemoteDaemon {
+export class GitRemoteDaemon implements GitRemoteBackend {
+  readonly name = 'tcp'
+  readonly baseUrl: string
+
+  constructor(baseUrl: string) {
+    this.baseUrl = baseUrl
+  }
+
+  supportsRestApi(): boolean {
+    return false
+  }
+
+  async discover(
+    options: RemoteDiscoverOptions
+  ): Promise<RemoteDiscoverResult> {
+    return GitRemoteDaemon.performDiscover(options)
+  }
+
+  async connect(options: RemoteConnectOptions): Promise<RemoteConnection> {
+    return GitRemoteDaemon.performConnect(options)
+  }
+
   /**
    * Returns the capabilities of the GitRemoteDaemon class.
    */
@@ -81,25 +105,20 @@ export class GitRemoteDaemon {
    * 3. Read reference advertisement (pkt-line format)
    * 4. Parse capabilities and refs
    */
-  static async discover({
-    tcp,
-    service,
-    url: _origUrl,
-    onProgress,
-    protocolVersion = 1,
-  }: {
-    tcp: TcpClient
-    service: string
-    url: string
-    onProgress?: TcpProgressCallback
-    protocolVersion?: 1 | 2
-  }): Promise<{
-    refs: Map<string, string>
-    symrefs: Map<string, string>
-    capabilities: string[]
-    auth: GitAuth
-    protocolVersion: 1 | 2
-  }> {
+  private static async performDiscover(
+    options: RemoteDiscoverOptions
+  ): Promise<RemoteDiscoverResult> {
+    const {
+      tcp,
+      service,
+      url: _origUrl,
+      onProgress,
+      protocolVersion = 1,
+    } = options
+
+    if (!tcp) {
+      throw new MissingParameterError('tcp', 'GitRemoteDaemon requires tcp client')
+    }
     const { host, port, path } = parseGitDaemonUrl(_origUrl)
 
     // Connect to the Git daemon server
@@ -130,31 +149,21 @@ export class GitRemoteDaemon {
         console.log(`[Git Protocol] Git Daemon: Using protocol v${result.protocolVersion}`)
       }
 
-      // Convert Set to Array for capabilities
-      const capabilities = result.protocolVersion === 1
-        ? Array.from(result.capabilities)
-        : Object.keys(result.capabilities2)
-
-      // Convert Map to Map for refs (protocol v1) or handle v2
-      let refs: Map<string, string>
-      let symrefs: Map<string, string>
-
+      // Convert to RemoteDiscoverResult format
       if (result.protocolVersion === 1) {
-        refs = result.refs
-        symrefs = result.symrefs
+        return {
+          protocolVersion: 1,
+          refs: result.refs,
+          symrefs: result.symrefs,
+          capabilities: result.capabilities,
+          auth: {}, // Git daemon doesn't use authentication
+        }
       } else {
-        // Protocol v2 - refs are fetched separately via ls-refs command
-        // For now, return empty maps (will be populated during connect phase)
-        refs = new Map()
-        symrefs = new Map()
-      }
-
-      return {
-        refs,
-        symrefs,
-        capabilities,
-        auth: {}, // Git daemon doesn't use authentication
-        protocolVersion: result.protocolVersion,
+        return {
+          protocolVersion: 2,
+          capabilities2: result.capabilities2,
+          auth: {},
+        }
       }
     } finally {
       // Close the connection after discovery
@@ -172,19 +181,20 @@ export class GitRemoteDaemon {
    * 4. Send upload-pack request (want/have lines)
    * 5. Read packfile response
    */
-  static async connect({
-    tcp,
-    onProgress,
-    service,
-    url,
-    body,
-  }: {
-    tcp: TcpClient
-    onProgress?: TcpProgressCallback
-    service: string
-    url: string
-    body?: AsyncIterableIterator<Uint8Array> | Uint8Array | UniversalBuffer | UniversalBuffer[]
-  }): Promise<GitDaemonResponse> {
+  private static async performConnect(
+    options: RemoteConnectOptions
+  ): Promise<RemoteConnection> {
+    const {
+      tcp,
+      onProgress,
+      service,
+      url,
+      body,
+    } = options
+
+    if (!tcp) {
+      throw new MissingParameterError('tcp', 'GitRemoteDaemon requires tcp client')
+    }
     const { host, port, path } = parseGitDaemonUrl(url)
 
     // Connect to the Git daemon server
@@ -239,10 +249,11 @@ export class GitRemoteDaemon {
         }
       }
 
-      // Return the response stream (packfile) - continue reading from the same connection
+      // Return the response stream (packfile) as RemoteConnection
+      // Continue reading from the same connection
       return {
         body: readStream, // Continue reading from the same stream
-      }
+      } as RemoteConnection
     } catch (error) {
       // Ensure connection is closed on error
       await connection.close().catch(() => {
@@ -250,6 +261,19 @@ export class GitRemoteDaemon {
       })
       throw error
     }
+  }
+
+  // Static methods for backward compatibility
+  static async discover(
+    options: RemoteDiscoverOptions
+  ): Promise<RemoteDiscoverResult> {
+    return GitRemoteDaemon.performDiscover(options)
+  }
+
+  static async connect(
+    options: RemoteConnectOptions
+  ): Promise<RemoteConnection> {
+    return GitRemoteDaemon.performConnect(options)
   }
 }
 

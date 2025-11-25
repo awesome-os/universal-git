@@ -5,6 +5,9 @@ import type { SshClient, SshConnection, SshProgressCallback } from '../../ssh/Ss
 import { GitPktLine } from '../../models/GitPktLine.ts'
 import { collect } from '../../utils/collect.ts'
 import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import type { GitRemoteBackend } from './GitRemoteBackend.ts'
+import type { RemoteDiscoverOptions, RemoteDiscoverResult, RemoteConnectOptions, RemoteConnection } from './types.ts'
+import { MissingParameterError } from '../../errors/MissingParameterError.ts'
 
 // ============================================================================
 // SSH PROTOCOL TYPES
@@ -87,7 +90,28 @@ function parseSshUrl(url: string): { host: string; port: number; username: strin
 // GIT REMOTE SSH CLASS
 // ============================================================================
 
-export class GitRemoteSSH {
+export class GitRemoteSSH implements GitRemoteBackend {
+  readonly name = 'ssh'
+  readonly baseUrl: string
+
+  constructor(baseUrl: string) {
+    this.baseUrl = baseUrl
+  }
+
+  supportsRestApi(): boolean {
+    return false
+  }
+
+  async discover(
+    options: RemoteDiscoverOptions
+  ): Promise<RemoteDiscoverResult> {
+    return GitRemoteSSH.performDiscover(options)
+  }
+
+  async connect(options: RemoteConnectOptions): Promise<RemoteConnection> {
+    return GitRemoteSSH.performConnect(options)
+  }
+
   /**
    * Returns the capabilities of the GitRemoteSSH class.
    */
@@ -104,25 +128,20 @@ export class GitRemoteSSH {
    * 3. Read reference advertisement (pkt-line format)
    * 4. Parse capabilities and refs
    */
-  static async discover({
-    ssh,
-    service,
-    url: _origUrl,
-    onProgress,
-    protocolVersion = 1,
-  }: {
-    ssh: SshClient
-    service: string
-    url: string
-    onProgress?: SshProgressCallback
-    protocolVersion?: 1 | 2
-  }): Promise<{
-    refs: Map<string, string>
-    symrefs: Map<string, string>
-    capabilities: string[]
-    auth: GitAuth
-    protocolVersion: 1 | 2
-  }> {
+  private static async performDiscover(
+    options: RemoteDiscoverOptions
+  ): Promise<RemoteDiscoverResult> {
+    const {
+      ssh,
+      service,
+      url: _origUrl,
+      onProgress,
+      protocolVersion = 1,
+    } = options
+
+    if (!ssh) {
+      throw new MissingParameterError('ssh', 'GitRemoteSSH requires ssh client')
+    }
     const { host, port, username, path } = parseSshUrl(_origUrl)
 
     // Connect to SSH server
@@ -160,31 +179,21 @@ export class GitRemoteSSH {
         console.log(`[Git Protocol] SSH: Using protocol v${result.protocolVersion}`)
       }
 
-      // Convert Set to Array for capabilities
-      const capabilities = result.protocolVersion === 1
-        ? Array.from(result.capabilities)
-        : Object.keys(result.capabilities2)
-
-      // Convert Map to Map for refs (protocol v1) or handle v2
-      let refs: Map<string, string>
-      let symrefs: Map<string, string>
-
+      // Convert to RemoteDiscoverResult format
       if (result.protocolVersion === 1) {
-        refs = result.refs
-        symrefs = result.symrefs
+        return {
+          protocolVersion: 1,
+          refs: result.refs,
+          symrefs: result.symrefs,
+          capabilities: result.capabilities,
+          auth: { username }, // SSH auth is handled at connection level
+        }
       } else {
-        // Protocol v2 - refs are fetched separately via ls-refs command
-        // For now, return empty maps (will be populated during connect phase)
-        refs = new Map()
-        symrefs = new Map()
-      }
-
-      return {
-        refs,
-        symrefs,
-        capabilities,
-        auth: { username }, // SSH auth is handled at connection level
-        protocolVersion: result.protocolVersion,
+        return {
+          protocolVersion: 2,
+          capabilities2: result.capabilities2,
+          auth: { username },
+        }
       }
     } finally {
       // Close the connection after discovery
@@ -202,19 +211,20 @@ export class GitRemoteSSH {
    * 4. Send upload-pack request (want/have lines)
    * 5. Read packfile response
    */
-  static async connect({
-    ssh,
-    onProgress,
-    service,
-    url,
-    body,
-  }: {
-    ssh: SshClient
-    onProgress?: SshProgressCallback
-    service: string
-    url: string
-    body?: AsyncIterableIterator<Uint8Array> | Uint8Array | UniversalBuffer | UniversalBuffer[]
-  }): Promise<GitSshResponse> {
+  private static async performConnect(
+    options: RemoteConnectOptions
+  ): Promise<RemoteConnection> {
+    const {
+      ssh,
+      onProgress,
+      service,
+      url,
+      body,
+    } = options
+
+    if (!ssh) {
+      throw new MissingParameterError('ssh', 'GitRemoteSSH requires ssh client')
+    }
     const { host, port, username, path } = parseSshUrl(url)
 
     // Connect to SSH server
@@ -274,11 +284,11 @@ export class GitRemoteSSH {
         console.warn('SSH protocol: Request body provided but stdin not available. Using ssh2 package is recommended for full functionality.')
       }
 
-      // Return the response stream (packfile)
+      // Return the response stream (packfile) as RemoteConnection
       // Continue reading from the same stdout stream
       return {
         body: readStream,
-      }
+      } as RemoteConnection
     } catch (error) {
       // Ensure connection is closed on error
       await connection.close().catch(() => {
@@ -286,6 +296,19 @@ export class GitRemoteSSH {
       })
       throw error
     }
+  }
+
+  // Static methods for backward compatibility
+  static async discover(
+    options: RemoteDiscoverOptions
+  ): Promise<RemoteDiscoverResult> {
+    return GitRemoteSSH.performDiscover(options)
+  }
+
+  static async connect(
+    options: RemoteConnectOptions
+  ): Promise<RemoteConnection> {
+    return GitRemoteSSH.performConnect(options)
   }
 }
 

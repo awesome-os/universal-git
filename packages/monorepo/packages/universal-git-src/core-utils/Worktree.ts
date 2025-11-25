@@ -1,20 +1,25 @@
 // RefManager import removed - using Repository.resolveRef/writeRef methods instead
-import { WorkdirManager } from './filesystem/WorkdirManager.ts'
+import { WorkdirManager } from '../git/worktree/WorkdirManager.ts'
 import { readObject } from '../git/objects/readObject.ts'
 import { parse as parseCommit } from './parsers/Commit.ts'
 import { SparseCheckoutManager } from './filesystem/SparseCheckoutManager.ts'
 import { CheckoutConflictError } from '../errors/CheckoutConflictError.ts'
 // StagingArea removed - use Repository.readIndexDirect/writeIndexDirect directly
 import type { Repository } from './Repository.ts'
-import type { ProgressCallback } from '../git/remote/GitRemoteHTTP.ts'
+import type { ProgressCallback } from '../git/remote/types.ts'
+import type { GitWorktreeBackend } from '../git/worktree/GitWorktreeBackend.ts'
 
 /**
  * Worktree - Represents a working tree (linked worktrees support)
  * Encapsulates the working directory and its associated git directory
  * Each worktree has its own staging area (index) and cache context
+ * 
+ * This class is a thin wrapper that delegates to GitWorktreeBackend implementations,
+ * enabling chainable operations and backend-agnostic worktree operations.
  */
 export class Worktree {
   private readonly repo: Repository
+  private readonly backend: GitWorktreeBackend | null
   public readonly dir: string
   private _gitdir: string | null
   private _name: string | null
@@ -24,12 +29,14 @@ export class Worktree {
     repo: Repository,
     dir: string,
     gitdir: string | null = null,
-    name: string | null = null
+    name: string | null = null,
+    backend: GitWorktreeBackend | null = null
   ) {
     this.repo = repo
     this.dir = dir
     this._gitdir = gitdir
     this._name = name
+    this.backend = backend
   }
 
   /**
@@ -385,6 +392,339 @@ export class Worktree {
           }
         }
       }
+    }
+  }
+
+  // ============================================================================
+  // Backend Delegation Methods (Phase 0A.1)
+  // ============================================================================
+  // These methods delegate to GitWorktreeBackend when available,
+  // falling back to direct command calls for backward compatibility
+
+  /**
+   * Initialize sparse checkout
+   * @param cone - Use cone mode (default: false)
+   * @returns This worktree instance for chaining
+   */
+  async sparseCheckoutInit(cone: boolean = false): Promise<Worktree> {
+    const gitdir = await this.getGitdir()
+    if (this.backend) {
+      await this.backend.sparseCheckoutInit(gitdir, cone)
+    } else {
+      // Fallback to direct command call
+      const { sparseCheckout } = await import('../commands/sparseCheckout.ts')
+      await sparseCheckout({
+        repo: this.repo,
+        gitdir,
+        init: true,
+        cone,
+      })
+    }
+    return this // Return self for chaining
+  }
+
+  /**
+   * Set sparse checkout patterns
+   * @param patterns - Array of patterns to include/exclude
+   * @param cone - Use cone mode (optional, uses config if not provided)
+   * @returns This worktree instance for chaining
+   */
+  async sparseCheckoutSet(patterns: string[], cone?: boolean): Promise<Worktree> {
+    const gitdir = await this.getGitdir()
+    if (this.backend) {
+      const headOid = await this.repo.resolveRef('HEAD')
+      const { object: commitObject } = await readObject({
+        fs: this.repo.fs,
+        cache: this.repo.cache,
+        gitdir,
+        oid: headOid,
+      })
+      const commit = parseCommit(commitObject)
+      await this.backend.sparseCheckoutSet(gitdir, patterns, commit.tree, cone)
+    } else {
+      // Fallback to direct command call
+      const { sparseCheckout } = await import('../commands/sparseCheckout.ts')
+      await sparseCheckout({
+        repo: this.repo,
+        gitdir,
+        set: patterns,
+        cone,
+      })
+    }
+    return this // Return self for chaining
+  }
+
+  /**
+   * List current sparse checkout patterns
+   * @returns Array of patterns
+   */
+  async sparseCheckoutList(): Promise<string[]> {
+    const gitdir = await this.getGitdir()
+    if (this.backend) {
+      return await this.backend.sparseCheckoutList(gitdir)
+    } else {
+      // Fallback to direct command call
+      const { sparseCheckout } = await import('../commands/sparseCheckout.ts')
+      return await sparseCheckout({
+        repo: this.repo,
+        gitdir,
+        list: true,
+      })
+    }
+  }
+
+  /**
+   * Add files to the staging area
+   * @param filepaths - Files or directories to add
+   * @param options - Add options (force, update, etc.)
+   * @returns This worktree instance for chaining
+   */
+  async add(
+    filepaths: string | string[],
+    options?: { force?: boolean; update?: boolean }
+  ): Promise<Worktree> {
+    const gitdir = await this.getGitdir()
+    if (this.backend) {
+      await this.backend.add(gitdir, filepaths, options)
+    } else {
+      // Fallback to direct command call
+      const { add } = await import('../commands/add.ts')
+      await add({
+        repo: this.repo,
+        dir: this.dir,
+        gitdir,
+        filepath: filepaths,
+        ...options,
+      })
+    }
+    return this // Return self for chaining
+  }
+
+  /**
+   * Remove files from the staging area and working directory
+   * @param filepaths - Files to remove
+   * @param options - Remove options (cached, force, etc.)
+   * @returns This worktree instance for chaining
+   */
+  async remove(
+    filepaths: string | string[],
+    options?: { cached?: boolean; force?: boolean }
+  ): Promise<Worktree> {
+    const gitdir = await this.getGitdir()
+    if (this.backend) {
+      await this.backend.remove(gitdir, filepaths, options)
+    } else {
+      // Fallback to direct command call
+      const { remove } = await import('../commands/remove.ts')
+      await remove({
+        repo: this.repo,
+        dir: this.dir,
+        gitdir,
+        filepath: filepaths,
+        ...options,
+      })
+    }
+    return this // Return self for chaining
+  }
+
+  /**
+   * Create a commit from the current staging area
+   * @param message - Commit message
+   * @param options - Commit options (author, committer, noVerify, etc.)
+   * @returns Commit OID
+   */
+  async commit(
+    message: string,
+    options?: {
+      author?: Partial<import('../models/GitCommit.ts').Author>
+      committer?: Partial<import('../models/GitCommit.ts').Author>
+      noVerify?: boolean
+      amend?: boolean
+      ref?: string
+      parent?: string[]
+      tree?: string
+    }
+  ): Promise<string> {
+    const gitdir = await this.getGitdir()
+    if (this.backend) {
+      return await this.backend.commit(gitdir, message, options)
+    } else {
+      // Fallback to direct command call
+      const { commit } = await import('../commands/commit.ts')
+      return await commit({
+        repo: this.repo,
+        dir: this.dir,
+        gitdir,
+        message,
+        ...options,
+      })
+    }
+  }
+
+  /**
+   * Switch to a different branch (alias for checkout with branch switching)
+   * @param branch - Branch name to switch to
+   * @param options - Switch options (create, force, etc.)
+   * @returns This worktree instance for chaining
+   */
+  async switch(
+    branch: string,
+    options?: {
+      create?: boolean
+      force?: boolean
+      track?: boolean
+      remote?: string
+    }
+  ): Promise<Worktree> {
+    const gitdir = await this.getGitdir()
+    if (this.backend) {
+      await this.backend.switch(gitdir, branch, options)
+    } else {
+      // Fallback to checkout with branch switching logic
+      // For now, just use checkout - a proper switch command can be added later
+      await this.checkout(branch, {
+        force: options?.force,
+        track: options?.track,
+        remote: options?.remote,
+      })
+    }
+    return this // Return self for chaining
+  }
+
+  /**
+   * Get the status of a single file in the working directory
+   * @param filepath - File path relative to working directory root
+   * @returns File status
+   */
+  async status(filepath: string): Promise<import('../commands/status.ts').FileStatus> {
+    const gitdir = await this.getGitdir()
+    if (this.backend) {
+      return await this.backend.status(gitdir, filepath)
+    } else {
+      // Fallback to direct command call
+      const { status } = await import('../commands/status.ts')
+      return await status({
+        repo: this.repo,
+        dir: this.dir,
+        gitdir,
+        filepath,
+      })
+    }
+  }
+
+  /**
+   * Get status matrix (more detailed than status) for multiple files
+   * @param options - Status matrix options (filepaths, etc.)
+   * @returns Status matrix array
+   */
+  async statusMatrix(
+    options?: { filepaths?: string[] }
+  ): Promise<import('../commands/statusMatrix.ts').StatusRow[]> {
+    const gitdir = await this.getGitdir()
+    if (this.backend) {
+      return await this.backend.statusMatrix(gitdir, options)
+    } else {
+      // Fallback to direct command call
+      const { statusMatrix } = await import('../commands/statusMatrix.ts')
+      return await statusMatrix({
+        repo: this.repo,
+        dir: this.dir,
+        gitdir,
+        ...options,
+      })
+    }
+  }
+
+  /**
+   * Reset the working directory and/or index to a specific commit
+   * @param ref - Commit to reset to (default: HEAD)
+   * @param mode - Reset mode: 'soft', 'mixed', 'hard' (default: 'mixed')
+   * @returns This worktree instance for chaining
+   */
+  async reset(
+    ref: string = 'HEAD',
+    mode: 'soft' | 'mixed' | 'hard' = 'mixed'
+  ): Promise<Worktree> {
+    const gitdir = await this.getGitdir()
+    if (this.backend) {
+      await this.backend.reset(gitdir, ref, mode)
+    } else {
+      // Fallback to direct command call
+      const { reset } = await import('../commands/reset.ts')
+      await reset({
+        repo: this.repo,
+        dir: this.dir,
+        gitdir,
+        ref,
+        mode,
+      })
+    }
+    return this // Return self for chaining
+  }
+
+  /**
+   * Show changes between commits, commit and working tree, etc.
+   * @param options - Diff options
+   * @returns Diff result
+   */
+  async diff(
+    options?: {
+      ref?: string
+      filepaths?: string[]
+      cached?: boolean
+    }
+  ): Promise<import('../commands/diff.ts').DiffResult> {
+    const gitdir = await this.getGitdir()
+    if (this.backend) {
+      return await this.backend.diff(gitdir, options)
+    } else {
+      // Fallback to direct command call
+      const { diff } = await import('../commands/diff.ts')
+      return await diff({
+        repo: this.repo,
+        dir: this.dir,
+        gitdir,
+        ...options,
+      })
+    }
+  }
+
+  /**
+   * Merge trees with index management and worktree file writing
+   * @param ourOid - Our tree OID
+   * @param baseOid - Base tree OID
+   * @param theirOid - Their tree OID
+   * @param options - Merge options
+   * @returns Merged tree OID or MergeConflictError
+   */
+  async mergeTree(
+    ourOid: string,
+    baseOid: string,
+    theirOid: string,
+    options?: {
+      ourName?: string
+      baseName?: string
+      theirName?: string
+      dryRun?: boolean
+      abortOnConflict?: boolean
+      mergeDriver?: import('../git/merge/types.ts').MergeDriverCallback
+    }
+  ): Promise<string | import('../errors/MergeConflictError.ts').MergeConflictError> {
+    const gitdir = await this.getGitdir()
+    if (this.backend) {
+      return await this.backend.mergeTree(gitdir, ourOid, baseOid, theirOid, options)
+    } else {
+      // Fallback to direct command call
+      const { mergeTree } = await import('../git/merge/mergeTree.ts')
+      const index = await this.repo.readIndexDirect(false, true, gitdir)
+      return await mergeTree({
+        repo: this.repo,
+        index,
+        ourOid,
+        baseOid,
+        theirOid,
+        ...options,
+      })
     }
   }
 }

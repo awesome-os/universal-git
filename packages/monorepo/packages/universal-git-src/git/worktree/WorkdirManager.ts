@@ -1,16 +1,16 @@
 import { InternalError } from "../../errors/InternalError.ts"
 import { CheckoutConflictError } from "../../errors/CheckoutConflictError.ts"
-import { readObject } from '../../git/objects/readObject.ts'
-import { parse as parseTree } from '../parsers/Tree.ts'
-import { parse as parseCommit } from '../parsers/Commit.ts'
-import { SparseCheckoutManager } from './SparseCheckoutManager.ts'
-import { join } from '../GitPath.ts'
+import { readObject } from '../objects/readObject.ts'
+import { parse as parseTree } from '../../core-utils/parsers/Tree.ts'
+import { parse as parseCommit } from '../../core-utils/parsers/Commit.ts'
+import { SparseCheckoutManager } from '../../core-utils/filesystem/SparseCheckoutManager.ts'
+import { join } from '../../core-utils/GitPath.ts'
 // Using src/git/ functions directly for refs, index, and other operations
 import { normalizeStats } from "../../utils/normalizeStats.ts"
 import { createFileSystem } from '../../utils/createFileSystem.ts'
 import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
 import type { FileSystemProvider } from "../../models/FileSystem.ts"
-import type { ProgressCallback } from "../../git/remote/types.ts"
+import type { ProgressCallback } from "../remote/types.ts"
 
 type CheckoutOperation = ['create' | 'update' | 'delete' | 'delete-index' | 'mkdir' | 'conflict' | 'keep', string, ...unknown[]]
 
@@ -45,7 +45,7 @@ export const analyzeCheckout = async ({
   if (!dir || !gitdir) {
     throw new Error('analyzeCheckout requires both dir and gitdir to be provided to prevent auto-detection of wrong repository')
   }
-  const { Repository } = await import('../Repository.ts')
+  const { Repository } = await import('../../core-utils/Repository.ts')
   const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true, ignoreSystemConfig: false })
   const normalizedFs = repo.fs
   
@@ -217,7 +217,7 @@ export const analyzeCheckout = async ({
         let workdirOid: string | null = null
         try {
           const workdirContent = await normalizedFs.read(workdirPath)
-          const { hashObject } = await import('../ShaHasher.ts')
+          const { hashObject } = await import('../../core-utils/ShaHasher.ts')
           workdirOid = await hashObject({
             type: 'blob',
             content: workdirContent as UniversalBuffer | Uint8Array,
@@ -349,7 +349,7 @@ export const executeCheckout = async ({
   // CRITICAL: Use the Repository's fs (which is already normalized) for all file operations
   // This ensures we're using the exact same fs instance that the Repository uses
   // Get the Repository instance to access normalized fs
-  const { Repository } = await import('../Repository.ts')
+  const { Repository } = await import('../../core-utils/Repository.ts')
   // CRITICAL: Always pass both dir and gitdir to prevent Repository.open() from calling findRoot
   // which could find the wrong repository (e.g., the workspace repo instead of the test fixture)
   if (!dir || !gitdir) {
@@ -585,7 +585,7 @@ export const getFileStatus = async ({
   repo,
   filepath,
 }: {
-  repo: import('../Repository.ts').Repository
+  repo: import('../../core-utils/Repository.ts').Repository
   filepath: string
 }): Promise<string> => {
   // CRITICAL: Normalize fs to ensure consistency with add() and other operations
@@ -655,7 +655,7 @@ export const getFileStatus = async ({
     await fs.lstat(workdirPath)
     workdirExists = true
     const content = await fs.read(workdirPath)
-    const { hashObject } = await import('../ShaHasher.ts')
+    const { hashObject } = await import('../../core-utils/ShaHasher.ts')
     workdirOid = await hashObject({ type: 'blob', content: content as UniversalBuffer | Uint8Array })
   } catch {
     // File doesn't exist
@@ -726,7 +726,7 @@ export const checkout = async ({
   if (!dir || !gitdir) {
     throw new Error('WorkdirManager.checkout requires both dir and gitdir to be provided to prevent auto-detection of wrong repository')
   }
-  const { Repository } = await import('../Repository.ts')
+  const { Repository } = await import('../../core-utils/Repository.ts')
   const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true, ignoreSystemConfig: false })
   const gitIndex = await repo.readIndexDirect(false) // Force fresh read
   

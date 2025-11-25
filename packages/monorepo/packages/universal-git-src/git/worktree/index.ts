@@ -24,6 +24,9 @@ export { GitWorktreeFs } from './fs/GitWorktreeFs.ts'
 // Export legacy name for backward compatibility during migration
 export { GitWorktreeFs as FilesystemGitWorktreeBackend } from './fs/GitWorktreeFs.ts'
 
+// WorkdirManager exports
+export { WorkdirManager, analyzeCheckout, executeCheckout, getFileStatus, checkout } from './WorkdirManager.ts'
+
 import type { GitWorktreeBackend } from './GitWorktreeBackend.ts'
 import type { FileSystemProvider, RawFileSystemProvider } from '../../models/FileSystem.ts'
 import { GitWorktreeFs } from './fs/GitWorktreeFs.ts'

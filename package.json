@@ -8,7 +8,7 @@
   "scripts": {
     "test:comment": "// Run all tests across workspaces",
     "//test": "npm run test --workspaces --if-present",
-    "test": "node --experimental-strip-types --test --test-timeout=13000 --test-concurrency=12",
+    "test": "npm run -w @awesome-os/universal-git-tests test",
     "perf:heatmap": "node performance/profile-heatmap.mjs",
     "perf:analyze": "node performance/analyze-hot-path.mjs",
     "tests": "npm run -w @awesome-os/universal-git-tests tests",

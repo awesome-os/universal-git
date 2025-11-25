@@ -18,6 +18,7 @@ import type {
   AuthFailureCallback,
   AuthSuccessCallback,
 } from "../git/remote/types.ts"
+import type { GitRemoteBackend } from "../git/remote/GitRemoteBackend.ts"
 import type { TcpClient, TcpProgressCallback } from "../daemon/TcpClient.ts"
 import type { SshClient, SshProgressCallback } from "../ssh/SshClient.ts"
 import type { MessageCallback } from './push.ts'
@@ -29,9 +30,10 @@ import type { PostCheckoutCallback } from './checkout.ts'
  * in the same way as other commands. It uses BaseCommandOptions for consistency.
  */
 export type CloneOptions = BaseCommandOptions & {
-  http?: HttpClient
-  tcp?: TcpClient
-  ssh?: SshClient | Promise<SshClient>
+  remoteBackend?: GitRemoteBackend // Optional: use provided backend or auto-detect
+  http?: HttpClient // Required for HTTP/HTTPS URLs if remoteBackend not provided
+  tcp?: TcpClient // Required for git:// URLs if remoteBackend not provided
+  ssh?: SshClient | Promise<SshClient> // Required for SSH URLs if remoteBackend not provided
   onProgress?: ProgressCallback | TcpProgressCallback | SshProgressCallback
   onMessage?: MessageCallback
   onAuth?: AuthCallback
@@ -61,6 +63,7 @@ export type CloneOptions = BaseCommandOptions & {
 export async function clone({
   repo: _repo,
   fs: _fs,
+  remoteBackend,
   http,
   tcp,
   ssh,
@@ -131,6 +134,7 @@ export async function clone({
       repo: _repo,
       fs,
       cache,
+      remoteBackend,
       http,
       tcp,
       ssh: resolvedSsh,
@@ -171,6 +175,7 @@ export async function _clone({
   repo: _repo,
   fs: _fs,
   cache: _cache,
+  remoteBackend,
   http,
   tcp,
   ssh,
@@ -201,9 +206,10 @@ export async function _clone({
   repo?: Repository
   fs?: FileSystemProvider
   cache?: Record<string, unknown>
-  http?: HttpClient
-  tcp?: TcpClient
-  ssh?: SshClient
+  remoteBackend?: GitRemoteBackend // Optional: use provided backend or auto-detect
+  http?: HttpClient // Required for HTTP/HTTPS URLs if remoteBackend not provided
+  tcp?: TcpClient // Required for git:// URLs if remoteBackend not provided
+  ssh?: SshClient // Required for SSH URLs if remoteBackend not provided
   onProgress?: ProgressCallback
   onMessage?: MessageCallback
   onAuth?: AuthCallback
@@ -581,6 +587,7 @@ export async function _clone({
       repo: repoForFetch,
       fs,
       cache,
+      remoteBackend,
       http,
       tcp,
       ssh,

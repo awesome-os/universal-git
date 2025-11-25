@@ -1,5 +1,5 @@
 import { IgnoreManager } from "../core-utils/filesystem/IgnoreManager.ts"
-import { WorkdirManager } from "../core-utils/filesystem/WorkdirManager.ts"
+import { WorkdirManager } from "../git/worktree/WorkdirManager.ts"
 import { MissingParameterError } from "../errors/MissingParameterError.ts"
 import { createFileSystem } from '../utils/createFileSystem.ts'
 import { assertParameter } from "../utils/assertParameter.ts"

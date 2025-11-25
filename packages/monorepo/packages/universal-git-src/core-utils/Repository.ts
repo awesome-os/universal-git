@@ -1141,7 +1141,7 @@ export class Repository {
       // Note: gitdir will be resolved when needed
       // If _dir is still null but _worktreeBackend exists, get it from the backend
       const worktreeDir = this._dir || (this._worktreeBackend?.getDirectory?.() || null)
-      this._worktree = new Worktree(this, worktreeDir, this._gitdir)
+      this._worktree = new Worktree(this, worktreeDir, this._gitdir, null, this._worktreeBackend || null)
     }
     return this._worktree
   }
@@ -1239,8 +1239,8 @@ export class Repository {
     const indexPath = join(worktreeGitdir, 'index')
     // Index will be created on first access by readIndexDirect
     
-    // Create Worktree instance
-    const worktree = new Worktree(this, normalizedWorktreeDir, worktreeGitdir, worktreeName)
+    // Create Worktree instance (use same backend as main worktree)
+    const worktree = new Worktree(this, normalizedWorktreeDir, worktreeGitdir, worktreeName, this._worktreeBackend || null)
     
     // Checkout files to worktree directory if requested
     if (options.checkout !== false) {
@@ -1332,7 +1332,7 @@ export class Repository {
     sparsePatterns?: string[]
   }): Promise<Array<['create' | 'update' | 'delete' | 'delete-index' | 'mkdir' | 'conflict' | 'keep', string, ...unknown[]]>> {
     const gitdir = await this.getGitdir()
-    const { WorkdirManager } = await import('./filesystem/WorkdirManager.ts')
+    const { WorkdirManager } = await import('../git/worktree/WorkdirManager.ts')
     
     // Ensure index is synchronized before analysis
     // This ensures that any staged changes are visible to analyzeCheckout

@@ -1,5 +1,6 @@
 import { GitRemoteHTTP } from "../git/remote/GitRemoteHTTP.ts"
 import { GitRemoteDaemon } from "../git/remote/GitRemoteDaemon.ts"
+import { RemoteBackendRegistry } from "../git/remote/RemoteBackendRegistry.ts"
 import { assertParameter } from "../utils/assertParameter.ts"
 import { formatInfoRefs } from "../utils/formatInfoRefs.ts"
 import type {
@@ -8,7 +9,9 @@ import type {
   AuthFailureCallback,
   AuthSuccessCallback,
   GitAuth,
+  SshClient,
 } from "../git/remote/types.ts"
+import type { GitRemoteBackend } from "../git/remote/GitRemoteBackend.ts"
 import type { ServerRef } from "../git/refs/types.ts"
 import type { TcpClient, TcpProgressCallback } from "../daemon/TcpClient.ts"
 
@@ -37,7 +40,10 @@ export type GetRemoteInfoResult = {
  * If you just care about refs, use [`listServerRefs`](./listServerRefs.md)
  *
  * @param {object} args
- * @param {HttpClient} args.http - an HTTP client
+ * @param {GitRemoteBackend} [args.remoteBackend] - Optional remote backend instance. If not provided, will be auto-detected from URL.
+ * @param {HttpClient} [args.http] - HTTP client (required for HTTP/HTTPS URLs if remoteBackend not provided)
+ * @param {TcpClient} [args.tcp] - TCP client (required for git:// URLs if remoteBackend not provided)
+ * @param {SshClient} [args.ssh] - SSH client (required for SSH URLs if remoteBackend not provided)
  * @param {AuthCallback} [args.onAuth] - optional auth fill callback
  * @param {AuthFailureCallback} [args.onAuthFailure] - optional auth rejected callback
  * @param {AuthSuccessCallback} [args.onAuthSuccess] - optional auth approved callback
@@ -61,8 +67,10 @@ export type GetRemoteInfoResult = {
  *
  */
 export async function getRemoteInfo({
+  remoteBackend,
   http,
   tcp,
+  ssh,
   onAuth,
   onAuthSuccess,
   onAuthFailure,
@@ -73,12 +81,14 @@ export async function getRemoteInfo({
   forPush = false,
   protocolVersion = 2,
 }: {
-  http?: HttpClient // Required if tcp is not provided
-  tcp?: TcpClient // Required if http is not provided (for git:// protocol)
+  remoteBackend?: GitRemoteBackend // Optional: use provided backend or auto-detect
+  http?: HttpClient // Required for HTTP/HTTPS URLs if remoteBackend not provided
+  tcp?: TcpClient // Required for git:// URLs if remoteBackend not provided
+  ssh?: SshClient // Required for SSH URLs if remoteBackend not provided
   onAuth?: AuthCallback
   onAuthSuccess?: AuthSuccessCallback
   onAuthFailure?: AuthFailureCallback
-  onProgress?: TcpProgressCallback // For TCP protocol
+  onProgress?: TcpProgressCallback | import('../git/remote/types.ts').ProgressCallback | import('../ssh/SshClient.ts').SshProgressCallback
   corsProxy?: string
   url: string
   headers?: Record<string, string>
@@ -86,87 +96,51 @@ export async function getRemoteInfo({
   protocolVersion?: 1 | 2
 }): Promise<GetRemoteInfoResult> {
   try {
-    // Require either http or tcp
-    if (!http && !tcp) {
-      const { MissingParameterError } = await import('../errors/MissingParameterError.ts')
-      throw new MissingParameterError('http OR tcp')
-    }
     assertParameter('url', url)
 
-    // Determine protocol type
-    const isGitDaemon = url.startsWith('git://')
-    const isSsh = url.startsWith('ssh://') || (url.includes('@') && url.includes(':') && !url.startsWith('http') && !isGitDaemon)
-    const isHttp = url.startsWith('http://') || url.startsWith('https://')
-
-    // Handle git:// protocol with TCP
-    if (isGitDaemon) {
-      if (!tcp) {
-        const { MissingParameterError } = await import('../errors/MissingParameterError.ts')
-        throw new MissingParameterError('tcp')
-      }
-      const remote = await GitRemoteDaemon.discover({
-        tcp,
-        service: forPush ? 'git-receive-pack' : 'git-upload-pack',
+    // Use provided backend or auto-detect from URL
+    let backend: GitRemoteBackend
+    if (remoteBackend) {
+      backend = remoteBackend
+    } else {
+      // Auto-detect backend from URL using registry
+      backend = RemoteBackendRegistry.getBackend({
         url,
-        onProgress: onProgress as TcpProgressCallback | undefined,
-        protocolVersion: protocolVersion || 1,
+        http,
+        tcp,
+        ssh,
+        useRestApi: false, // getRemoteInfo only uses Git protocol, not REST API
       })
-
-      // Convert capabilities array to object
-      const capabilities: Record<string, string | true> = {}
-      for (const cap of remote.capabilities) {
-        const [key, value] = cap.split('=')
-        if (value) {
-          capabilities[key] = value
-        } else {
-          capabilities[key] = true
-        }
-      }
-
-      return {
-        protocolVersion: remote.protocolVersion,
-        capabilities,
-        refs: formatInfoRefs({ refs: remote.refs, symrefs: remote.symrefs }, '', true, true),
-      }
     }
 
-    // Handle SSH protocol
-    if (isSsh) {
-      const { UnknownTransportError } = await import('../errors/UnknownTransportError.ts')
-      throw new UnknownTransportError(url, 'ssh', undefined)
-    }
-
-    // Handle HTTP protocol
-    if (!http) {
-      const { MissingParameterError } = await import('../errors/MissingParameterError.ts')
-      throw new MissingParameterError('http')
-    }
-
-    const remote = await GitRemoteHTTP.discover({
+    // Call backend.discover() with protocol-agnostic options
+    const remote = await backend.discover({
+      service: forPush ? 'git-receive-pack' : 'git-upload-pack',
+      url,
+      protocolVersion,
+      onProgress,
+      // HTTP-specific options
       http,
+      headers,
+      corsProxy,
       onAuth,
       onAuthSuccess,
       onAuthFailure,
-      corsProxy,
-      service: forPush ? 'git-receive-pack' : 'git-upload-pack',
-      url,
-      headers,
-      protocolVersion,
-    }) as
-      | { protocolVersion: 1; refs: Map<string, string>; symrefs: Map<string, string>; capabilities: Set<string>; auth: GitAuth }
-      | { protocolVersion: 2; capabilities2: Record<string, string | true>; auth: GitAuth }
+      // SSH-specific options
+      ssh,
+      // TCP/Daemon-specific options
+      tcp,
+    })
 
+    // Convert RemoteDiscoverResult to GetRemoteInfoResult format
     if (remote.protocolVersion === 2) {
       return {
-        protocolVersion: remote.protocolVersion,
+        protocolVersion: 2,
         capabilities: remote.capabilities2,
       }
     }
 
-    // TypeScript now knows remote is protocolVersion 1
-    // Note: remote.capabilities, remote.refs, and remote.symrefs are Set and Map objects,
-    // but one of the objectives of the public API is to always return JSON-compatible objects
-    // so we must JSONify them.
+    // Protocol version 1: convert Set to object and format refs
     const capabilities: Record<string, string | true> = {}
     for (const cap of remote.capabilities) {
       const [key, value] = cap.split('=')
@@ -176,10 +150,11 @@ export async function getRemoteInfo({
         capabilities[key] = true
       }
     }
+
     return {
       protocolVersion: 1,
       capabilities,
-      refs: formatInfoRefs(remote, '', true, true),
+      refs: formatInfoRefs({ refs: remote.refs, symrefs: remote.symrefs }, '', true, true),
     }
   } catch (err) {
     ;(err as { caller?: string }).caller = 'git.getRemoteInfo'

@@ -17,6 +17,7 @@ import { deleteRef } from "../git/refs/deleteRef.ts"
 import { Repository } from "../core-utils/Repository.ts"
 import { findMergeBase } from "../core-utils/algorithms/CommitGraphWalker.ts"
 import { getRemoteHelperFor } from "../git/remote/getRemoteHelper.ts"
+import { RemoteBackendRegistry } from "../git/remote/RemoteBackendRegistry.ts"
 import { GitSideBand } from "../models/GitSideBand.ts"
 import { filterCapabilities } from "../utils/filterCapabilities.ts"
 import { collect } from "../utils/collect.ts"
@@ -38,6 +39,7 @@ import type {
   AuthFailureCallback,
   AuthSuccessCallback,
 } from "../git/remote/types.ts"
+import type { GitRemoteBackend } from "../git/remote/GitRemoteBackend.ts"
 import type { TcpClient, TcpProgressCallback } from "../daemon/TcpClient.ts"
 import type { SshClient, SshProgressCallback } from "../ssh/SshClient.ts"
 import { GitRemoteDaemon } from "../git/remote/GitRemoteDaemon.ts"
@@ -85,6 +87,7 @@ export type PushResult = {
 export async function push({
   repo: _repo,
   fs: _fs,
+  remoteBackend,
   http,
   tcp,
   ssh,
@@ -108,9 +111,10 @@ export async function push({
 }: {
   repo?: Repository
   fs?: FileSystemProvider
-  http?: HttpClient
-  tcp?: TcpClient
-  ssh?: SshClient | Promise<SshClient>
+  remoteBackend?: GitRemoteBackend // Optional: use provided backend or auto-detect
+  http?: HttpClient // Required for HTTP/HTTPS URLs if remoteBackend not provided
+  tcp?: TcpClient // Required for git:// URLs if remoteBackend not provided
+  ssh?: SshClient | Promise<SshClient> // Required for SSH URLs if remoteBackend not provided
   onProgress?: ProgressCallback | TcpProgressCallback | SshProgressCallback
   onMessage?: MessageCallback
   onAuth?: AuthCallback
@@ -159,6 +163,7 @@ export async function push({
       repo,
       fs,
       cache: effectiveCache,
+      remoteBackend,
       http,
       tcp,
       ssh,
@@ -191,6 +196,7 @@ async function _push({
   repo,
   fs,
   cache,
+  remoteBackend,
   http,
   tcp,
   ssh,
@@ -213,9 +219,10 @@ async function _push({
   repo: Repository
   fs: FileSystemProvider
   cache: Record<string, unknown>
-  http?: HttpClient
-  tcp?: TcpClient
-  ssh?: SshClient | Promise<SshClient>
+  remoteBackend?: GitRemoteBackend // Optional: use provided backend or auto-detect
+  http?: HttpClient // Required for HTTP/HTTPS URLs if remoteBackend not provided
+  tcp?: TcpClient // Required for git:// URLs if remoteBackend not provided
+  ssh?: SshClient | Promise<SshClient> // Required for SSH URLs if remoteBackend not provided
   onProgress?: ProgressCallback | TcpProgressCallback | SshProgressCallback
   onMessage?: MessageCallback
   onAuth?: AuthCallback
@@ -270,43 +277,37 @@ async function _push({
     corsProxy = (await configService.get('http.corsProxy')) as string | undefined
   }
 
-  // Determine protocol type
-  const isGitDaemon = url.startsWith('git://')
-  const isSsh = url.startsWith('ssh://') || (url.includes('@') && url.includes(':') && !url.startsWith('http'))
-  const isHttp = url.startsWith('http://') || url.startsWith('https://')
-
-  // For git:// protocol, we need tcp client; for http/https, we need http client
-  // For SSH, we need ssh client - if not provided, throw UnknownTransportError
-  // Check these BEFORE remoteRef to ensure proper error message order
-  if (isGitDaemon) {
-    if (!tcp) {
-      // Try to import default TCP client
+  // Use provided backend or auto-detect from URL
+  // This will throw MissingParameterError for missing http/tcp/ssh if needed
+  let backend: GitRemoteBackend
+  if (remoteBackend) {
+    backend = remoteBackend
+  } else {
+    // Auto-detect backend from URL using registry
+    // For git:// protocol, try to get default TCP client if not provided
+    if (url.startsWith('git://') && !tcp) {
       try {
         const { tcpClient } = await import('../daemon/node/index.ts')
         tcp = tcpClient
       } catch {
-        throw new Error('TCP client is required for git:// protocol. Please provide tcp parameter or ensure Node.js environment.')
+        // If we can't import TCP client, let RemoteBackendRegistry handle the error
       }
     }
-  } else if (isHttp) {
-    if (!http) {
-      throw new MissingParameterError('http')
-    }
-  } else if (isSsh) {
-    if (!ssh) {
-      const { UnknownTransportError } = await import('../errors/UnknownTransportError.ts')
-      throw new UnknownTransportError(url, 'ssh', undefined)
-    }
+    
+    backend = RemoteBackendRegistry.getBackend({
+      url,
+      http,
+      tcp,
+      ssh,
+      useRestApi: false, // push only uses Git protocol, not REST API
+    })
   }
-  
-  // Figure out what remote ref to use
+
+  // Figure out what remote ref to use (after backend detection, so http/tcp/ssh errors come first)
   const remoteRef = _remoteRef || ((await configService.get(`branch.${branchName}.merge`)) as string)
   if (typeof remoteRef === 'undefined') {
     throw new MissingParameterError('remoteRef')
   }
-
-  // Get remote helper - this will throw UnknownTransportError for unsupported protocols
-  const RemoteHelper = getRemoteHelperFor({ url })
 
   // Use capability modules for basic ref operations
   const fullRef = await expandRef({ fs, gitdir, ref })
@@ -314,49 +315,43 @@ async function _push({
     ? '0000000000000000000000000000000000000000'
     : await resolveRef({ fs, gitdir, ref: fullRef })
 
-  // Call discover with appropriate parameters based on protocol
-  let remoteInfo: any
-  if (isGitDaemon) {
-    remoteInfo = await (RemoteHelper as typeof GitRemoteDaemon).discover({
-      tcp: tcp!,
-      service: 'git-receive-pack',
-      url,
-      onProgress: onProgress as TcpProgressCallback,
-      protocolVersion: 2,
-    })
-  } else if (RemoteHelper === GitRemoteSSH) {
-    // SSH protocol - ensure we have SSH client
-    if (!ssh) {
-      const { UnknownTransportError } = await import('../errors/UnknownTransportError.ts')
-      throw new UnknownTransportError(url, 'ssh', undefined)
-    }
-    const resolvedSsh = await ssh
-    remoteInfo = await (RemoteHelper as typeof GitRemoteSSH).discover({
-      ssh: resolvedSsh,
-      service: 'git-receive-pack',
-      url,
-      onProgress: onProgress as SshProgressCallback,
-      protocolVersion: 2,
-    })
-  } else {
-    // HTTP protocol
-    remoteInfo = await (RemoteHelper as typeof GitRemoteHTTP).discover({
-      http: http!,
-      onAuth,
-      onAuthSuccess,
-      onAuthFailure,
-      corsProxy,
-      service: 'git-receive-pack',
-      url,
-      headers,
-      protocolVersion: 2,
-    })
-  }
+  // Call backend.discover() for git-receive-pack (push service)
+  const resolvedSsh = ssh instanceof Promise ? await ssh : ssh
+  const remoteInfo = await backend.discover({
+    service: 'git-receive-pack',
+    url,
+    protocolVersion: 2,
+    onProgress,
+    // HTTP-specific options
+    http,
+    headers,
+    corsProxy,
+    onAuth,
+    onAuthSuccess,
+    onAuthFailure,
+    // SSH-specific options
+    ssh: resolvedSsh,
+    // TCP/Daemon-specific options
+    tcp,
+  })
 
   // Convert capabilities to Set for compatibility
-  const capabilitiesSet = remoteInfo.capabilities instanceof Set
-    ? remoteInfo.capabilities
-    : new Set(remoteInfo.capabilities || [])
+  // Handle both protocol v1 (Set<string>) and v2 (Record<string, string | true>)
+  let capabilitiesSet: Set<string>
+  if (remoteInfo.protocolVersion === 2) {
+    capabilitiesSet = new Set<string>()
+    for (const [key, value] of Object.entries(remoteInfo.capabilities2)) {
+      if (value === true) {
+        capabilitiesSet.add(key)
+      } else {
+        capabilitiesSet.add(`${key}=${value}`)
+      }
+    }
+  } else {
+    capabilitiesSet = remoteInfo.capabilities instanceof Set
+      ? remoteInfo.capabilities
+      : new Set(remoteInfo.capabilities || [])
+  }
 
   const auth = remoteInfo.auth
   let fullRemoteRef: string
@@ -544,56 +539,31 @@ async function _push({
         oids: [...objects],
       })
   
-  // Call connect with appropriate parameters based on protocol
-  let res: any
-  if (isGitDaemon) {
-    const daemonResponse = await (RemoteHelper as typeof GitRemoteDaemon).connect({
-      tcp: tcp!,
-      onProgress: onProgress as TcpProgressCallback,
-      service: 'git-receive-pack',
-      url,
-      body: [...packstream1, ...packstream2],
-    })
-    // Convert daemon response to HTTP-like format for compatibility
-    res = {
-      body: daemonResponse.body,
-      headers: {},
-      statusCode: 200,
-      statusMessage: 'OK',
-    }
-  } else if (RemoteHelper === GitRemoteSSH) {
-    // SSH protocol - ensure we have SSH client
-    if (!ssh) {
-      const { UnknownTransportError } = await import('../errors/UnknownTransportError.ts')
-      throw new UnknownTransportError(url, 'ssh', undefined)
-    }
-    const resolvedSsh = await ssh
-    const sshResponse = await (RemoteHelper as typeof GitRemoteSSH).connect({
-      ssh: resolvedSsh,
-      onProgress: onProgress as SshProgressCallback,
-      service: 'git-receive-pack',
-      url,
-      body: [...packstream1, ...packstream2], // Array of Buffers
-    })
-    // Convert SSH response to HTTP-like format for compatibility
-    res = {
-      body: sshResponse.body,
-      headers: {},
-      statusCode: 200,
-      statusMessage: 'OK',
-    }
-  } else {
-    // HTTP protocol
-    res = await (RemoteHelper as typeof GitRemoteHTTP).connect({
-      http: http!,
-      onProgress: onProgress as ProgressCallback,
-      corsProxy,
-      service: 'git-receive-pack',
-      url,
-      auth,
-      headers,
-      body: [...packstream1, ...packstream2],
-    })
+  // Call backend.connect() for git-receive-pack (push)
+  const resolvedSshForPush = ssh instanceof Promise ? await ssh : ssh
+  const rawConnection = await backend.connect({
+    service: 'git-receive-pack',
+    url,
+    protocolVersion: remoteInfo.protocolVersion,
+    body: [...packstream1, ...packstream2], // Array of Buffers (backend will convert to async iterator)
+    onProgress,
+    // HTTP-specific options
+    http,
+    headers,
+    auth: remoteInfo.auth,
+    corsProxy,
+    // SSH-specific options
+    ssh: resolvedSshForPush,
+    // TCP/Daemon-specific options
+    tcp,
+  })
+  
+  // Normalize response format (all backends return RemoteConnection, but HTTP has extra fields)
+  const res = {
+    body: rawConnection.body,
+    headers: rawConnection.headers || {},
+    statusCode: rawConnection.statusCode || 200,
+    statusMessage: rawConnection.statusMessage || 'OK',
   }
   
   // Collect the response body into a buffer so we can use it multiple times

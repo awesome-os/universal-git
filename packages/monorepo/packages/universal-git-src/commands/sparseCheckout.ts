@@ -1,6 +1,6 @@
 import { MissingParameterError } from "../errors/MissingParameterError.ts"
 import { SparseCheckoutManager } from "../core-utils/filesystem/SparseCheckoutManager.ts"
-import { WorkdirManager } from "../core-utils/filesystem/WorkdirManager.ts"
+import { WorkdirManager } from "../git/worktree/WorkdirManager.ts"
 import { readObject } from "../git/objects/readObject.ts"
 import { parse as parseCommit } from "../core-utils/parsers/Commit.ts"
 import { normalizeCommandArgs } from '../utils/commandHelpers.ts'

@@ -121,6 +121,11 @@ export class GitRemoteHttp implements GitRemoteBackend {
       url: _origUrl,
       protocolVersion = 1,
     } = options
+    
+    if (!http) {
+      const { MissingParameterError } = await import('../../errors/MissingParameterError.ts')
+      throw new MissingParameterError('http', 'GitRemoteHttp requires http client')
+    }
     const requestHeaders = options.headers ?? (options.headers = {})
     let { url, auth } = extractAuthFromUrl(_origUrl)
     const proxifiedURL = corsProxy ? corsProxify(corsProxy, url) : url
@@ -237,6 +242,11 @@ export class GitRemoteHttp implements GitRemoteBackend {
       protocolVersion,
       command,
     } = options
+    
+    if (!http) {
+      const { MissingParameterError } = await import('../../errors/MissingParameterError.ts')
+      throw new MissingParameterError('http', 'GitRemoteHttp requires http client')
+    }
     const requestHeaders = options.headers ?? (options.headers = {})
     const urlAuth = extractAuthFromUrl(url)
     let finalUrl = url
@@ -246,7 +256,15 @@ export class GitRemoteHttp implements GitRemoteBackend {
 
     requestHeaders['content-type'] = `application/x-${service}-request`
     requestHeaders.accept = `application/x-${service}-result`
-    updateHeaders(requestHeaders, auth)
+    if (auth) {
+      updateHeaders(requestHeaders, auth)
+    } else {
+      // Extract auth from URL if not provided
+      const urlAuth = extractAuthFromUrl(url)
+      if (urlAuth && urlAuth.auth) {
+        updateHeaders(requestHeaders, urlAuth.auth)
+      }
+    }
 
     let bodyIterator: AsyncIterableIterator<Uint8Array> | undefined
     if (body) {

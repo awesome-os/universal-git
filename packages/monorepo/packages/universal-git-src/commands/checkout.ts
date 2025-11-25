@@ -3,7 +3,7 @@ import { CommitNotFetchedError } from "../errors/CommitNotFetchedError.ts"
 import { NotFoundError } from "../errors/NotFoundError.ts"
 import { MissingParameterError } from "../errors/MissingParameterError.ts"
 // RefManager import removed - using Repository.resolveRef/writeRef methods instead
-import { WorkdirManager } from "../core-utils/filesystem/WorkdirManager.ts"
+import { WorkdirManager } from "../git/worktree/WorkdirManager.ts"
 import { SparseCheckoutManager } from "../core-utils/filesystem/SparseCheckoutManager.ts"
 import { normalizeCommandArgs } from '../utils/commandHelpers.ts'
 import { readObject } from "../git/objects/readObject.ts"

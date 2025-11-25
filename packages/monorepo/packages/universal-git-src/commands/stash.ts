@@ -1,5 +1,5 @@
 import { checkout } from './checkout.ts'
-import { WorkdirManager } from '../core-utils/filesystem/WorkdirManager.ts'
+import { WorkdirManager } from '../git/worktree/WorkdirManager.ts'
 import { readCommit } from './readCommit.ts'
 import { NotFoundError } from '../errors/NotFoundError.ts'
 import { UnmergedPathsError } from '../errors/UnmergedPathsError.ts'

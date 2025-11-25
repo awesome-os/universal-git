@@ -68,17 +68,32 @@ export type AuthSuccessCallback = (
   auth: GitAuth
 ) => void | Promise<void>
 
+// Protocol-specific client types
+export type SshClient = import('../../ssh/SshClient.ts').SshClient
+export type SshProgressCallback = import('../../ssh/SshClient.ts').SshProgressCallback
+export type TcpClient = import('../../daemon/TcpClient.ts').TcpClient
+export type TcpProgressCallback = import('../../daemon/TcpClient.ts').TcpProgressCallback
+export type FileSystemProvider = import('../../models/FileSystem.ts').FileSystemProvider
+
+// Protocol-agnostic discover options
 export type RemoteDiscoverOptions = {
-  http: HttpClient
   service: 'git-upload-pack' | 'git-receive-pack'
   url: string
-  headers?: Record<string, string>
   protocolVersion?: 1 | 2
+  onProgress?: ProgressCallback | SshProgressCallback | TcpProgressCallback
+  // HTTP-specific options
+  http?: HttpClient
+  headers?: Record<string, string>
   corsProxy?: string
-  onProgress?: ProgressCallback
   onAuth?: AuthCallback
   onAuthSuccess?: AuthSuccessCallback
   onAuthFailure?: AuthFailureCallback
+  // SSH-specific options
+  ssh?: SshClient
+  // TCP/Daemon-specific options
+  tcp?: TcpClient
+  // Filesystem-specific options
+  fs?: FileSystemProvider
 }
 
 export type RemoteDiscoverResult =
@@ -95,30 +110,48 @@ export type RemoteDiscoverResult =
       auth: GitAuth
     }
 
+// Protocol-agnostic connect options
 export type RemoteConnectOptions = {
-  http: HttpClient
   service: 'git-upload-pack' | 'git-receive-pack'
   url: string
-  headers?: Record<string, string>
-  auth: GitAuth
-  corsProxy?: string
-  onProgress?: ProgressCallback
   protocolVersion?: 1 | 2
-  command?: string
+  onProgress?: ProgressCallback | SshProgressCallback | TcpProgressCallback
   body?:
     | AsyncIterableIterator<Uint8Array>
     | Uint8Array
     | UniversalBuffer
     | UniversalBuffer[]
+  // HTTP-specific options
+  http?: HttpClient
+  headers?: Record<string, string>
+  auth?: GitAuth
+  corsProxy?: string
+  command?: string
+  // SSH-specific options
+  ssh?: SshClient
+  // TCP/Daemon-specific options
+  tcp?: TcpClient
+  // Filesystem-specific options
+  fs?: FileSystemProvider
 }
 
-export type RemoteConnection = GitHttpResponse
+// Protocol-agnostic connection response
+export type RemoteConnection = {
+  body: AsyncIterableIterator<Uint8Array>
+  // HTTP-specific fields (optional)
+  url?: string
+  method?: string
+  headers?: Record<string, string>
+  statusCode?: number
+  statusMessage?: string
+}
 
 export type RemoteBackendOptions = {
   url: string
   http?: HttpClient
-  ssh?: unknown
-  fs?: unknown
+  ssh?: SshClient
+  tcp?: TcpClient
+  fs?: FileSystemProvider
   auth?: ForgeAuth
   useRestApi?: boolean
 }
