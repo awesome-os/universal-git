@@ -88,7 +88,7 @@ export async function setConfig({
   const { join } = await import('../core-utils/GitPath.ts')
 
   if (scope === 'local') {
-    const localConfig = await loadLocalConfig(fs, gitdir)
+    const localConfig = await loadLocalConfig(undefined, fs, gitdir)
     localConfig.set(path, value)
     const configBuffer = serializeConfig(localConfig)
     await fs.write(join(gitdir, 'config'), configBuffer)
@@ -136,6 +136,7 @@ export async function getConfigAll({
   
   // Load all config sources
   const { system, global, local, worktree } = await loadAllConfigs({
+    gitBackend: undefined, // git/config.ts doesn't have backend access
     fs,
     gitdir,
     systemConfigPath,

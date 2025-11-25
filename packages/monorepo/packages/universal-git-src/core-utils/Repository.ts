@@ -82,7 +82,7 @@ export class Repository {
   private _proxiedRepository?: ProxiedRepository
 
   constructor(
-    fs: FileSystemProvider,
+    fs: FileSystemProvider | null,
     dir: string | null,
     gitdir: string | null,
     cache: Record<string, unknown> = {},
@@ -91,7 +91,21 @@ export class Repository {
     gitBackend?: GitBackend,
     worktreeBackend?: GitWorktreeBackend
   ) {
-    this.fs = fs
+    // Derive fs from backends if not provided
+    if (fs) {
+      this.fs = fs
+    } else if (gitBackend?.getFileSystem) {
+      this.fs = gitBackend.getFileSystem() || (() => {
+        throw new Error("Cannot create Repository: filesystem is required. At least one backend must provide a filesystem via getFileSystem().")
+      })()
+    } else if (worktreeBackend?.getFileSystem) {
+      this.fs = worktreeBackend.getFileSystem() || (() => {
+        throw new Error("Cannot create Repository: filesystem is required. At least one backend must provide a filesystem via getFileSystem().")
+      })()
+    } else {
+      throw new Error("Cannot create Repository: filesystem is required. Either provide 'fs' or use backends that provide filesystem via getFileSystem().")
+    }
+    
     this._gitdir = gitdir
     this.cache = cache
     this._systemConfigPath = systemConfigPath
@@ -208,175 +222,180 @@ export class Repository {
     defaultBranch?: string
     objectFormat?: 'sha1' | 'sha256'
   }): Promise<Repository> {
-    // If backends are provided, we still need fs for system/global config access
-    // Derive fs from backends if not provided using universal interface methods
-    let fs: FileSystemProvider
-    if (inputFs) {
-      fs = createFileSystem(inputFs)
-    } else if (gitBackend) {
-      // Use universal interface method - backend consumers don't need to know implementation
+    const { normalize, join } = await import('./GitPath.ts')
+    const { FilesystemBackend } = await import('../backends/FilesystemBackend.ts')
+    const { createGitWorktreeBackend } = await import('../git/worktree/index.ts')
+    
+    // Step 1: Auto-create backends from dir/gitdir/fs if not provided
+    // This ensures Repository always has backends, removing fs dependency
+    let resolvedGitBackend: GitBackend
+    let resolvedWorktreeBackend: GitWorktreeBackend | null = null
+    let fs: FileSystemProvider | null = null
+    
+    if (gitBackend) {
+      // Use provided gitBackend
+      resolvedGitBackend = gitBackend
+      // Derive fs from gitBackend for system/global config access
       if (gitBackend.getFileSystem) {
-        const backendFs = gitBackend.getFileSystem()
-        if (backendFs) {
-          fs = backendFs
-        } else if (worktree && worktree.getFileSystem) {
-          const worktreeFs = worktree.getFileSystem()
-          if (worktreeFs) {
-            fs = worktreeFs
-          } else {
-            throw new Error("When using backends without 'fs', at least one must provide a filesystem via getFileSystem()")
-          }
-        } else {
-          throw new Error("When using non-filesystem gitBackend, 'fs' is required for system/global config access")
-        }
-      } else if (worktree && worktree.getFileSystem) {
-        const worktreeFs = worktree.getFileSystem()
-        if (worktreeFs) {
-          fs = worktreeFs
-        } else {
-          throw new Error("When using non-filesystem worktree, 'fs' is required for system/global config access")
-        }
-      } else {
-        throw new Error("When using non-filesystem gitBackend, 'fs' is required for system/global config access")
-      }
-    } else if (worktree) {
-      // Use universal interface method - backend consumers don't need to know implementation
-      if (worktree.getFileSystem) {
-        const worktreeFs = worktree.getFileSystem()
-        if (worktreeFs) {
-          fs = worktreeFs
-        } else {
-          throw new Error("When using non-filesystem worktree, 'fs' is required for system/global config access")
-        }
-      } else {
-        throw new Error("When using non-filesystem worktree, 'fs' is required for system/global config access")
+        fs = gitBackend.getFileSystem() || null
       }
     } else {
-      throw new Error("Either 'fs' or 'gitBackend'/'worktree' is required.")
-    }
-
-    const { normalize } = await import('./GitPath.ts')
-    
-    // 1. Determine the canonical gitdir path. This will be our unique key.
-    // If gitBackend is provided, derive gitdir from it (gitdir parameter has no effect)
-    let finalGitdir: string
-    // If worktree is provided, dir parameter has no effect - we'll derive it from worktree
-    let workingDir: string | null = worktree ? null : (dir || null)
-
-    // Derive gitdir from gitBackend if provided
-    if (gitBackend) {
-      // Check if it's a FilesystemBackend and get gitdir from it
-      const { FilesystemBackend } = await import('../backends/FilesystemBackend.ts')
-      if (gitBackend instanceof FilesystemBackend) {
-        finalGitdir = normalize(gitBackend.getGitdir())
-        // If providedGitdir was also given, it's ignored (backend already has it)
-      } else {
-        // For non-filesystem backends, we still need gitdir for caching
-        // TODO: In Phase 4/5, we'll use backend-specific identifiers for caching
-        if (!providedGitdir) {
-          throw new Error("When using non-filesystem gitBackend, 'gitdir' is required for caching (will be derived in future)")
-        }
-        finalGitdir = normalize(providedGitdir)
+      // Need to create FilesystemBackend - require fs and gitdir
+      if (!inputFs) {
+        throw new Error("Either 'fs' or 'gitBackend' is required. When 'gitBackend' is not provided, 'fs' is required to create FilesystemBackend.")
       }
-    } else if (providedGitdir) {
-      // If gitdir is explicitly provided (and no gitBackend), use it directly
-      finalGitdir = normalize(providedGitdir)
+      fs = createFileSystem(inputFs)
       
-      // Only use dir if worktree is not provided (worktree overrides dir)
-      if (dir && !worktree) {
-        // CRITICAL: When both dir and gitdir are provided, treat this as:
-        // - gitdir === bare repository (or main repository)
-        // - dir === linked worktree checkout
-        workingDir = dir
-      } else {
-        // If gitdir is provided but dir is not, try to infer working dir
-        // Check if gitdir is a bare repo (has config file directly)
-        const configPath = join(providedGitdir, 'config')
-        const isBare = await fs.exists(configPath)
-        if (!isBare) {
-          // gitdir is .git subdirectory, working dir is parent
-          const { dirname } = await import('../utils/dirname.ts')
-          workingDir = dirname(providedGitdir)
-        } else {
-          workingDir = null
-        }
-      }
-    } else if (dir && !worktree) {
-      // Find .git directory by walking up from dir (only if worktree is not provided)
-      try {
+      // Determine gitdir
+      let finalGitdir: string
+      if (providedGitdir) {
+        finalGitdir = normalize(providedGitdir)
+      } else if (dir) {
+        // When only dir is provided: gitdir = dir/.git
         // Check if dir itself is a bare repo (has config file directly)
         const configPath = join(dir, 'config')
         const isBare = await fs.exists(configPath)
         if (isBare) {
           finalGitdir = normalize(dir)
-          workingDir = null
         } else {
-          // Find .git directory by walking up
-          const root = await findRoot({ fs, filepath: dir })
-          finalGitdir = normalize(join(root, '.git'))
-          workingDir = root
+          // Find .git directory by walking up from dir
+          try {
+            const root = await findRoot({ fs, filepath: dir })
+            finalGitdir = normalize(join(root, '.git'))
+          } catch (err) {
+            if (err instanceof NotFoundError) {
+              // If not found and init is true, create new repo at dir/.git
+              if (init) {
+                finalGitdir = normalize(join(dir, '.git'))
+              } else {
+                throw new NotFoundError(`Not a git repository: ${dir}`)
+              }
+            } else {
+              throw err
+            }
+          }
         }
-      } catch (err) {
-        if (err instanceof NotFoundError) {
-          throw new NotFoundError(`Not a git repository: ${dir}`)
-        }
-        throw err
+      } else {
+        throw new Error("Either 'dir', 'gitdir', or 'gitBackend' is required.")
       }
-    } else {
-      throw new Error("Either 'dir', 'gitdir', or 'gitBackend'/'worktree' is required.")
+      
+      // Create FilesystemBackend
+      resolvedGitBackend = new FilesystemBackend(fs, finalGitdir)
     }
-
-    // Derive dir from worktree if provided (dir parameter has no effect when worktree is provided)
+    
     if (worktree) {
-      // Use universal interface method - backend consumers don't need to know implementation
-      if (worktree.getDirectory) {
-        const worktreeDir = worktree.getDirectory()
-        if (worktreeDir) {
-          workingDir = worktreeDir
-          // dir parameter is ignored - backend already has it
-        } else if (!dir) {
-          throw new Error("When using worktree backend without directory, 'dir' is required")
+      // Use provided worktree backend
+      resolvedWorktreeBackend = worktree
+      // Derive fs from worktree if not already set
+      if (!fs && worktree.getFileSystem) {
+        fs = worktree.getFileSystem() || null
+      }
+    } else if (dir) {
+      // Need to create GitWorktreeFs - require fs and dir
+      if (!fs) {
+        if (!inputFs) {
+          throw new Error("Either 'fs' or 'worktree' is required. When 'worktree' is not provided, 'fs' is required to create GitWorktreeFs.")
         }
-      } else if (!dir) {
-        throw new Error("When using worktree backend without getDirectory() method, 'dir' is required")
+        fs = createFileSystem(inputFs)
+      }
+      
+      // Create GitWorktreeFs
+      resolvedWorktreeBackend = createGitWorktreeBackend({ fs, dir })
+    }
+    
+    // Ensure we have fs for system/global config access (derive from backends if needed)
+    if (!fs) {
+      if (resolvedGitBackend.getFileSystem) {
+        fs = resolvedGitBackend.getFileSystem() || null
+      }
+      if (!fs && resolvedWorktreeBackend?.getFileSystem) {
+        fs = resolvedWorktreeBackend.getFileSystem() || null
+      }
+      if (!fs) {
+        throw new Error("Cannot access system/global config: no filesystem available. At least one backend must provide a filesystem via getFileSystem().")
       }
     }
 
-    // 2. Get or create the fs-specific cache
+    // Step 2: Determine gitdir and workingDir from resolved backends
+    let finalGitdir: string
+    let workingDir: string | null = null
+    
+    // Derive gitdir from gitBackend
+    if (resolvedGitBackend instanceof FilesystemBackend) {
+      finalGitdir = normalize(resolvedGitBackend.getGitdir())
+    } else {
+      // For non-filesystem backends, use providedGitdir or derive from dir
+      if (providedGitdir) {
+        finalGitdir = normalize(providedGitdir)
+      } else if (dir) {
+        // Derive gitdir from dir (dir/.git)
+        if (fs) {
+          const configPath = join(dir, 'config')
+          const isBare = await fs.exists(configPath)
+          if (isBare) {
+            finalGitdir = normalize(dir)
+          } else {
+            finalGitdir = normalize(join(dir, '.git'))
+          }
+        } else {
+          // Default to dir/.git if no fs available
+          finalGitdir = normalize(join(dir, '.git'))
+        }
+      } else {
+        throw new Error("Cannot determine gitdir: 'gitdir' or 'dir' is required when using non-filesystem gitBackend.")
+      }
+    }
+    
+    // Derive workingDir from worktree backend or dir
+    if (resolvedWorktreeBackend) {
+      if (resolvedWorktreeBackend.getDirectory) {
+        workingDir = resolvedWorktreeBackend.getDirectory() || null
+      }
+      // If worktree backend doesn't have getDirectory, use dir parameter
+      if (!workingDir && dir) {
+        workingDir = dir
+      }
+    } else if (dir) {
+      workingDir = dir
+    }
+
+    // Step 3: Get or create the fs-specific cache
     // CRITICAL: We use a two-level cache to ensure that:
     // - Different filesystem instances get different Repository instances (test isolation)
     // - Same filesystem + same gitdir = same Repository instance (state consistency)
+    if (!fs) {
+      throw new Error("Cannot cache Repository: filesystem is required for caching. At least one backend must provide a filesystem.")
+    }
     if (!Repository._instanceCache.has(fs)) {
       Repository._instanceCache.set(fs, new Map<string, Repository>())
     }
     const fsCache = Repository._instanceCache.get(fs)!
 
-    // 3. Check the fs-specific cache for the instance
+    // Step 4: Check the fs-specific cache for the instance
     // CRITICAL: If dir is provided and cached instance has dir=null, don't use cached instance
     // This ensures that non-bare repositories created via clone() work correctly
     if (fsCache.has(finalGitdir)) {
       const cachedRepo = fsCache.get(finalGitdir)!
-      // If we're opening with a worktree backend, always create a new instance
-      // (worktree backends are not part of the cache key, so we can't reuse cached instances)
-      if (worktree) {
-        // Don't use cached instance - will create new one below
+      // Check if we can reuse the cached instance
+      // We can reuse if:
+      // 1. Both have the same workingDir (or both are null)
+      // 2. Worktree backends are compatible (both auto-created for same dir, or both explicitly provided)
+      const cachedDir = await cachedRepo.getDir()
+      const dirsMatch = (workingDir === null && cachedDir === null) || (workingDir === cachedDir)
+      
+      if (dirsMatch) {
+        // Same gitdir and same dir - can reuse cached instance
+        // Note: Even if backends are different instances, they're for the same repository,
+        // so we can reuse the cached Repository instance
+        return cachedRepo
       } else {
-        // If we're opening with a dir but cached instance has no dir, create a new instance
+        // Different dirs - create new instance
         // This handles the case where a bare repo was cached, but we're now opening it as non-bare
-        // Use getDir() to check if cached instance has a dir (handles private _dir)
-        const cachedDir = await cachedRepo.getDir()
-        if (dir && !cachedDir) {
-          // Don't use cached instance - will create new one below
-        } else if (!dir && cachedDir) {
-          // If we're opening without dir but cached has dir, also create new instance
-          // This handles the case where a non-bare repo was cached, but we're now opening it as bare
-        } else {
-          return cachedRepo
-        }
+        // or vice versa
       }
     }
 
-    // 4. Auto-detect config paths if not provided and auto-detection is enabled
+    // Step 5: Auto-detect config paths if not provided and auto-detection is enabled
     let finalSystemPath = systemConfigPath
     let finalGlobalPath = globalConfigPath
 
@@ -388,36 +407,17 @@ export class Repository {
       finalGlobalPath = finalGlobalPath || detected.globalConfigPath
     }
 
-    // 5. Create new Repository instance and cache it in fs-specific cache
-    // CRITICAL: When both dir and gitdir are provided, this is treated as:
-    // - gitdir === bare repository (or main repository)
-    // - dir === linked worktree checkout
-    // This matches Git's worktree pattern where the worktree's .git is a file
-    // pointing to the gitdir, not a directory.
-    // IMPORTANT: If dir was provided and worktree is not provided, use it as workingDir
-    // When worktree is provided, workingDir is already set from worktree.getDirectory()
-    // This ensures both regular repositories and linked worktrees work correctly
-    if (dir && !worktree) {
-      workingDir = dir
-    }
-    const repo = new Repository(fs, workingDir, finalGitdir, cache, finalSystemPath, finalGlobalPath, gitBackend, worktree)
+    // Step 6: Create new Repository instance and cache it in fs-specific cache
+    // CRITICAL: Repository now always has backends - fs is only for system/global config
+    const repo = new Repository(fs, workingDir, finalGitdir, cache, finalSystemPath, finalGlobalPath, resolvedGitBackend, resolvedWorktreeBackend)
     fsCache.set(finalGitdir, repo)
     
-    // 6. Initialize repository if requested
+    // Step 7: Initialize repository if requested
     if (init) {
-      // Use gitBackend if available, otherwise create a FilesystemBackend
-      let resolvedBackend: GitBackend
-      if (gitBackend) {
-        resolvedBackend = gitBackend
-      } else {
-        const { FilesystemBackend } = await import('../backends/FilesystemBackend.ts')
-        resolvedBackend = new FilesystemBackend(fs, finalGitdir)
-      }
-      
       // Check if already initialized
-      if (!(await resolvedBackend.isInitialized())) {
+      if (!(await resolvedGitBackend.isInitialized())) {
         // Initialize backend structure
-        await resolvedBackend.initialize()
+        await resolvedGitBackend.initialize()
         
         // Set initial config values
         const config = await repo.getConfig()
@@ -436,7 +436,7 @@ export class Repository {
         await config.set('core.ignorecase', 'true', 'local')
         
         // Set HEAD to default branch
-        await resolvedBackend.writeHEAD(`ref: refs/heads/${defaultBranch}`)
+        await resolvedGitBackend.writeHEAD(`ref: refs/heads/${defaultBranch}`)
       }
     }
     
@@ -471,13 +471,22 @@ export class Repository {
     if (this._gitdir) {
       return this._gitdir
     }
+    // Use gitBackend if available
+    if (this._gitBackend) {
+      const { FilesystemBackend } = await import('../backends/FilesystemBackend.ts')
+      if (this._gitBackend instanceof FilesystemBackend) {
+        this._gitdir = this._gitBackend.getGitdir()
+        return this._gitdir
+      }
+    }
+    // Fallback: derive from dir
     if (this._dir) {
       // Find .git directory
       const root = await findRoot({ fs: this.fs, filepath: this._dir })
       this._gitdir = join(root, '.git')
       return this._gitdir
     }
-    throw new Error('Cannot determine gitdir: neither dir nor gitdir provided')
+    throw new Error('Cannot determine gitdir: neither dir nor gitdir provided, and gitBackend does not provide gitdir')
   }
 
   /**
@@ -522,25 +531,9 @@ export class Repository {
           this._isBare = false
         }
       } else {
-        // Fallback to fs-based check
-        const gitdir = await this.getGitdir()
-        // Check if config exists directly in gitdir (bare) or in gitdir/.git (non-bare)
-        const configPath = join(gitdir, 'config')
-        const configExists = await this.fs.exists(configPath)
-        if (configExists) {
-          // Read config to check bare setting
-          try {
-            // CRITICAL: Use this repository's config service to ensure state consistency
-            const config = await this.getConfig()
-            const bare = await config.get('core.bare')
-            this._isBare = bare === 'true' || bare === true
-          } catch {
-            // Default to non-bare if can't read config
-            this._isBare = false
-          }
-        } else {
-          this._isBare = false
-        }
+        // This should never happen since we always have gitBackend now
+        // But keep for safety - default to non-bare
+        this._isBare = false
       }
     }
     return this._isBare
@@ -566,14 +559,18 @@ export class Repository {
     const { loadAllConfigs } = await import('../git/config/loader.ts')
     const { mergeConfigs, getConfigDefault } = await import('../git/config/merge.ts')
     const { loadLocalConfig, loadGlobalConfig, loadSystemConfig } = await import('../git/config/loader.ts')
-    const { serialize: serializeConfig } = await import('../core-utils/ConfigParser.ts')
+    const { serialize: serializeConfig, parse: parseConfig } = await import('../core-utils/ConfigParser.ts')
+    type ConfigObject = import('../core-utils/ConfigParser.ts').ConfigObject
+    const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
     const { join } = await import('./GitPath.ts')
     const repo = this
     // Helper to load and merge all configs
+    // Use gitBackend for local config (preferred), fs only for system/global (CLI usage)
     const loadMerged = async () => {
       const { system, global, local, worktree } = await loadAllConfigs({
-        fs: repo.fs,
-        gitdir,
+        gitBackend: repo._gitBackend || undefined,
+        fs: repo.fs || undefined, // Only for system/global config (CLI usage)
+        gitdir, // For worktree config and backward compatibility
         systemConfigPath: repo._systemConfigPath,
         globalConfigPath: repo._globalConfigPath,
       })
@@ -592,29 +589,46 @@ export class Repository {
 
       async set(path: string, value: unknown, scope: 'local' | 'global' | 'system' = 'local', append = false): Promise<void> {
         if (scope === 'local') {
-          const localConfig = await loadLocalConfig(repo.fs, gitdir)
+          // Read current config from backend
+          let localConfig: ConfigObject
+          if (repo._gitBackend) {
+            try {
+              const configBuffer = await repo._gitBackend.readConfig()
+              localConfig = parseConfig(configBuffer)
+            } catch {
+              // Config doesn't exist yet - create empty config
+              localConfig = parseConfig(UniversalBuffer.alloc(0))
+            }
+          } else {
+            // Fallback to fs-based read (backward compatibility)
+            localConfig = await loadLocalConfig(undefined, repo.fs, gitdir)
+          }
+          
           localConfig.set(path, value, append)
           const configBuffer = serializeConfig(localConfig)
+          
           // Use gitBackend if available, otherwise fall back to fs
           if (repo._gitBackend) {
             await repo._gitBackend.writeConfig(configBuffer)
-          } else {
+          } else if (repo.fs) {
             await repo.fs.write(join(gitdir, 'config'), configBuffer)
+          } else {
+            throw new Error('Cannot set local config: no gitBackend or fs available')
           }
-        } else if (scope === 'global' && repo._globalConfigPath) {
+        } else if (scope === 'global' && repo._globalConfigPath && repo.fs) {
+          // Global config is always written to filesystem (for CLI usage)
           const globalConfig = await loadGlobalConfig(repo.fs, repo._globalConfigPath)
           globalConfig.set(path, value, append)
           const configBuffer = serializeConfig(globalConfig)
-          // Global config is always written to filesystem (not in gitdir)
           await repo.fs.write(repo._globalConfigPath, configBuffer)
-        } else if (scope === 'system' && repo._systemConfigPath) {
+        } else if (scope === 'system' && repo._systemConfigPath && repo.fs) {
+          // System config is always written to filesystem (for CLI usage)
           const systemConfig = await loadSystemConfig(repo.fs, repo._systemConfigPath)
           systemConfig.set(path, value, append)
           const configBuffer = serializeConfig(systemConfig)
-          // System config is always written to filesystem (not in gitdir)
           await repo.fs.write(repo._systemConfigPath, configBuffer)
         } else {
-          throw new Error(`Cannot set ${scope} config: path not provided`)
+          throw new Error(`Cannot set ${scope} config: path not provided or fs not available`)
         }
       },
 
@@ -677,7 +691,13 @@ export class Repository {
   async getObjectFormat(): Promise<ObjectFormat> {
     if (!this._objectFormat) {
       const gitdir = await this.getGitdir()
-      this._objectFormat = await detectObjectFormat(this.fs, gitdir)
+      // Use gitBackend if available, otherwise fall back to fs
+      this._objectFormat = await detectObjectFormat(
+        this.fs,
+        gitdir,
+        this.cache,
+        this._gitBackend || undefined
+      )
     }
     return this._objectFormat
   }
@@ -901,16 +921,17 @@ export class Repository {
       const indexBuffer = await this._gitBackend.readIndex()
       // Handle empty index files (same as filesystem version)
       if (indexBuffer.length === 0) {
-        // Empty buffer - check if file exists to distinguish between:
-        // - File doesn't exist → return empty index (valid state for new repositories)
-        // - File exists but is empty → throw error (corrupted)
-        const indexExists = await this._gitBackend.existsFile('index')
+        // Empty buffer - check if index exists to distinguish between:
+        // - Index doesn't exist → repository is not instantiated (since init creates index)
+        // - Index exists but is empty → throw error (corrupted)
+        const indexExists = await this._gitBackend.hasIndex()
         if (indexExists) {
-          // File exists but is empty - this is corruption, throw error
+          // Index exists but is empty - this is corruption, throw error
           const { InternalError } = await import('../errors/InternalError.ts')
           throw new InternalError('Index file is empty (.git/index)')
         } else {
-          // File doesn't exist - return empty index (valid state)
+          // Index doesn't exist - repository is not instantiated
+          // Return empty index as valid state (will be created on first write)
           index = new GitIndex()
         }
       } else {
@@ -1344,28 +1365,65 @@ export class Repository {
       throw new Error(`Invalid worktree name: ${worktreeName}`)
     }
     
+    // Check if worktree directory is within the current worktree root
+    // If not, we must use fs directly (worktreeBackend only handles paths relative to its root)
+    const currentWorktree = this.getWorktree()
+    const currentWorktreeDir = currentWorktree?.dir || this._dir
+    const isWithinWorktree = currentWorktreeDir && normalizedWorktreeDir.startsWith(currentWorktreeDir)
+    
     // Check if worktree directory already exists
-    if (await this.fs.exists(normalizedWorktreeDir)) {
+    // Use worktreeBackend only if the path is within the current worktree root
+    const worktreeDirExists = (this._worktreeBackend && isWithinWorktree)
+      ? await this._worktreeBackend.exists(normalizedWorktreeDir.substring(currentWorktreeDir!.length + 1))
+      : await this.fs.exists(normalizedWorktreeDir)
+    
+    if (worktreeDirExists) {
       if (!options.force) {
         throw new Error(`Worktree directory already exists: ${normalizedWorktreeDir}`)
       }
       // Force: remove existing directory
-      await this.fs.rm(normalizedWorktreeDir)
+      if (this._worktreeBackend && isWithinWorktree) {
+        await this._worktreeBackend.rm(normalizedWorktreeDir.substring(currentWorktreeDir!.length + 1), { recursive: true })
+      } else {
+        await this.fs.rm(normalizedWorktreeDir)
+      }
     }
     
     // Create worktree directory
-    await this.fs.mkdir(normalizedWorktreeDir)
+    // Use worktreeBackend only if the path is within the current worktree root
+    // Otherwise, use fs directly (for linked worktrees outside the main worktree)
+    if (this._worktreeBackend && isWithinWorktree) {
+      // Path is relative to worktree root
+      const relativePath = normalizedWorktreeDir.substring(currentWorktreeDir!.length + 1)
+      await this._worktreeBackend.mkdir(relativePath)
+    } else {
+      // Path is absolute or outside worktree root - use fs directly
+      await this.fs.mkdir(normalizedWorktreeDir)
+    }
     
     // Create worktree gitdir: <repo>/.git/worktrees/<name>
+    // This is part of the Git repository structure, so use fs directly
+    // (gitBackend doesn't have directory operations - it's for Git data, not directory structure)
     const worktreeGitdir = join(gitdir, 'worktrees', worktreeName)
     await this.fs.mkdir(worktreeGitdir)
     
     // Write <worktree-dir>/.git file containing path to worktree gitdir
+    // Use worktreeBackend only if the path is within the current worktree root
+    // Otherwise, use fs directly (for linked worktrees outside the main worktree)
     const gitFile = join(normalizedWorktreeDir, '.git')
-    await this.fs.write(gitFile, UniversalBuffer.from(worktreeGitdir, 'utf8'))
+    const gitFileContent = UniversalBuffer.from(worktreeGitdir, 'utf8')
+    if (this._worktreeBackend && isWithinWorktree && currentWorktreeDir) {
+      // Path is relative to worktree root
+      const relativePath = normalizedWorktreeDir.substring(currentWorktreeDir.length + 1) + '/.git'
+      await this._worktreeBackend.write(relativePath, gitFileContent)
+    } else {
+      // Path is absolute or outside worktree root - use fs directly
+      await this.fs.write(gitFile, gitFileContent)
+    }
     
     // Write .git/worktrees/<name>/gitdir file containing absolute path to worktree directory
     // This is the reverse mapping that Git uses to find worktrees
+    // This is part of the Git repository structure, so use fs directly
     const worktreeGitdirFile = join(worktreeGitdir, 'gitdir')
     await this.fs.write(worktreeGitdirFile, UniversalBuffer.from(normalizedWorktreeDir, 'utf8'))
     

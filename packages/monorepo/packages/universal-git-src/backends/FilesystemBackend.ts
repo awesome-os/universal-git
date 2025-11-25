@@ -82,6 +82,11 @@ export class FilesystemBackend implements GitBackend {
     await this.fs.write(path, data)
   }
 
+  async hasConfig(): Promise<boolean> {
+    const path = join(this.gitdir, 'config')
+    return this.fs.exists(path)
+  }
+
   async readIndex(): Promise<UniversalBuffer> {
     const path = join(this.gitdir, 'index')
     try {
@@ -95,6 +100,11 @@ export class FilesystemBackend implements GitBackend {
   async writeIndex(data: UniversalBuffer): Promise<void> {
     const path = join(this.gitdir, 'index')
     await this.fs.write(path, data)
+  }
+
+  async hasIndex(): Promise<boolean> {
+    const path = join(this.gitdir, 'index')
+    return this.fs.exists(path)
   }
 
   async readDescription(): Promise<string | null> {

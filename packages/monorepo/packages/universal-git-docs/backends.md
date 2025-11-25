@@ -187,17 +187,58 @@ All backends provide universal interface methods that work regardless of impleme
     ```typescript
     const backend = createBackend({ type: 'filesystem', fs, gitdir })
     const indexExists = await backend.existsFile('index') // true if .git/index exists
-    const configExists = await backend.existsFile('config') // true if .git/config exists
     
     // Works with any backend type
     const sqliteBackend = createBackend({ type: 'sqlite', dbPath: '/path/to/repo.db' })
     const indexExists = await sqliteBackend.existsFile('index') // Checks database
     ```
 
+- `hasConfig(): Promise<boolean>` - Checks if the repository config file exists
+  - **Purpose**: Dedicated method to check if a repository is initialized (since `init` creates config)
+  - **Returns**: `true` if config exists (repository is initialized), `false` otherwise (repository is not initialized)
+  - **Works with**: All backend types (filesystem, SQLite, in-memory, etc.)
+  - **Note**: If config doesn't exist, the repository is not initialized. Use this method instead of `existsFile('config')` when checking repository initialization status.
+  - **Example**:
+    ```typescript
+    const backend = createBackend({ type: 'filesystem', fs, gitdir })
+    const isInitialized = await backend.hasConfig() // true if repository is initialized
+    
+    if (!isInitialized) {
+      // Repository is not initialized - need to run init first
+      await backend.initialize()
+    }
+    
+    // Works with any backend type
+    const sqliteBackend = createBackend({ type: 'sqlite', dbPath: '/path/to/repo.db' })
+    const isInitialized = await sqliteBackend.hasConfig() // Checks database
+    ```
+
+- `hasIndex(): Promise<boolean>` - Checks if the repository index file exists
+  - **Purpose**: Dedicated method to check if a repository is instantiated (since `init` creates index)
+  - **Returns**: `true` if index exists (repository is instantiated), `false` otherwise (repository is not instantiated)
+  - **Works with**: All backend types (filesystem, SQLite, in-memory, etc.)
+  - **Note**: If index doesn't exist, the repository is not instantiated. Use this method instead of `existsFile('index')` when checking repository instantiation status.
+  - **Example**:
+    ```typescript
+    const backend = createBackend({ type: 'filesystem', fs, gitdir })
+    const isInstantiated = await backend.hasIndex() // true if repository is instantiated
+    
+    if (!isInstantiated) {
+      // Repository is not instantiated - need to run init first
+      await backend.initialize()
+    }
+    
+    // Works with any backend type
+    const sqliteBackend = createBackend({ type: 'sqlite', dbPath: '/path/to/repo.db' })
+    const isInstantiated = await sqliteBackend.hasIndex() // Checks database
+    ```
+
 ### Core Metadata
 - `readHEAD()` / `writeHEAD()` - HEAD pointer
 - `readConfig()` / `writeConfig()` - Repository config
+- `hasConfig()` - Check if repository config exists (indicates if repository is initialized)
 - `readIndex()` / `writeIndex()` - Staging area
+- `hasIndex()` - Check if repository index exists (indicates if repository is instantiated)
 - `readDescription()` / `writeDescription()` - Repository description
 - `existsFile(path: string)` - Check if a Git repository file exists (works across all backend types)
 

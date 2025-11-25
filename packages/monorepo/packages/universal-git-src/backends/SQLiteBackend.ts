@@ -246,6 +246,12 @@ export class SQLiteBackend implements GitBackend {
     )
   }
 
+  async hasConfig(): Promise<boolean> {
+    const db = await this._getDB()
+    const row = db.prepare('SELECT key FROM core_metadata WHERE key = ?').get('config')
+    return !!row
+  }
+
   async readIndex(): Promise<UniversalBuffer> {
     const db = await this._getDB()
     const row = db.prepare('SELECT value FROM core_metadata WHERE key = ?').get('index')
@@ -261,6 +267,12 @@ export class SQLiteBackend implements GitBackend {
       'index',
       data
     )
+  }
+
+  async hasIndex(): Promise<boolean> {
+    const db = await this._getDB()
+    const row = db.prepare('SELECT key FROM core_metadata WHERE key = ?').get('index')
+    return !!row
   }
 
   async readDescription(): Promise<string | null> {

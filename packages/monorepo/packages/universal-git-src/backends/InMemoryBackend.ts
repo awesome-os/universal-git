@@ -89,6 +89,10 @@ export class InMemoryBackend implements GitBackend {
     this.writtenFiles.add('config')
   }
 
+  async hasConfig(): Promise<boolean> {
+    return this.writtenFiles.has('config')
+  }
+
   async readIndex(): Promise<UniversalBuffer> {
     return this.index
   }
@@ -96,6 +100,10 @@ export class InMemoryBackend implements GitBackend {
   async writeIndex(data: UniversalBuffer): Promise<void> {
     this.index = UniversalBuffer.from(data)
     this.writtenFiles.add('index')
+  }
+
+  async hasIndex(): Promise<boolean> {
+    return this.writtenFiles.has('index')
   }
 
   async readDescription(): Promise<string | null> {

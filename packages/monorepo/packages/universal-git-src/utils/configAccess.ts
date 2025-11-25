@@ -90,7 +90,7 @@ export class ConfigAccess {
     scope: 'local' | 'global' | 'system' = 'local'
   ): Promise<void> {
     if (scope === 'local') {
-      const localConfig = await loadLocalConfig(this.fs, this.gitdir)
+      const localConfig = await loadLocalConfig(undefined, this.fs, this.gitdir)
       localConfig.set(path, value, false)
       const configBuffer = serializeConfig(localConfig)
       await this.fs.write(join(this.gitdir, 'config'), configBuffer)
@@ -118,7 +118,7 @@ export class ConfigAccess {
     scope: 'local' | 'global' | 'system' = 'local'
   ): Promise<void> {
     if (scope === 'local') {
-      const localConfig = await loadLocalConfig(this.fs, this.gitdir)
+      const localConfig = await loadLocalConfig(undefined, this.fs, this.gitdir)
       localConfig.set(path, value, true)
       const configBuffer = serializeConfig(localConfig)
       await this.fs.write(join(this.gitdir, 'config'), configBuffer)
@@ -181,6 +181,7 @@ export class ConfigAccess {
     const access = this
     const loadMerged = async () => {
       const { system, global, local, worktree } = await loadAllConfigs({
+        gitBackend: undefined, // configAccess doesn't have backend access
         fs: this.fs,
         gitdir: this.gitdir,
         systemConfigPath: this.systemConfigPath,

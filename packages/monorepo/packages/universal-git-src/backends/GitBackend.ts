@@ -36,6 +36,13 @@ export type GitBackend = {
   writeConfig(data: UniversalBuffer): Promise<void>
 
   /**
+   * Checks if the repository config file exists
+   * If config doesn't exist, the repository is not initialized (since init creates config)
+   * @returns true if config exists, false otherwise
+   */
+  hasConfig(): Promise<boolean>
+
+  /**
    * Reads the index (staging area)
    */
   readIndex(): Promise<UniversalBuffer>
@@ -44,6 +51,13 @@ export type GitBackend = {
    * Writes the index (staging area)
    */
   writeIndex(data: UniversalBuffer): Promise<void>
+
+  /**
+   * Checks if the repository index file exists
+   * If index doesn't exist, the repository is not instantiated (since init creates index)
+   * @returns true if index exists, false otherwise
+   */
+  hasIndex(): Promise<boolean>
 
   /**
    * Reads the description file
