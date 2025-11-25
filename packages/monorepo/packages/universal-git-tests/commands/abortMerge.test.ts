@@ -12,6 +12,8 @@ import {
   WORKDIR,
   walk,
 } from '@awesome-os/universal-git-src/index.ts'
+// Keep Repository import independent to avoid circular dependency issues
+// Import directly from the module instead of through index.ts
 import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 import { modified } from '@awesome-os/universal-git-src/utils/modified.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
@@ -119,15 +121,13 @@ describe('abortMerge', () => {
 
   it('ok:abort-merge', async () => {
     // Setup
-    const { fs, gitdir, dir } = await makeFixture('test-abortMerge')
+    const { repo } = await makeFixture('test-abortMerge')
 
     // Test
     let error: unknown = null
     try {
       await merge({
-        fs,
-        dir,
-        gitdir,
+        repo,
         ours: 'a',
         theirs: 'b',
         abortOnConflict: false,
@@ -145,13 +145,11 @@ describe('abortMerge', () => {
     assert.notStrictEqual(error, null)
     assert.ok(error instanceof Errors.MergeConflictError || (error as any).code === Errors.MergeConflictError.code)
 
-    await abortMerge({ fs, dir, gitdir })
+    await abortMerge({ repo })
 
     const trees = [TREE({ ref: 'HEAD' }), WORKDIR(), STAGE()]
     await walk({
-      fs,
-      dir,
-      gitdir,
+      repo,
       trees,
       map: async function (path, [head, workdir, index]) {
         if (path === '.') return
@@ -173,15 +171,13 @@ describe('abortMerge', () => {
 
   it('ok:abort-after-modifying-files', async () => {
     // Setup
-    const { fs, gitdir, dir } = await makeFixture('test-abortMerge')
+    const { repo, fs, dir } = await makeFixture('test-abortMerge')
 
     // Test
     let error: unknown = null
     try {
       await merge({
-        fs,
-        dir,
-        gitdir,
+        repo,
         ours: 'a',
         theirs: 'b',
         abortOnConflict: false,
@@ -203,13 +199,11 @@ describe('abortMerge', () => {
     await fs.write(`${dir}/b`, 'new text for file b')
     await fs.write(`${dir}/c`, 'new text for file c')
 
-    await abortMerge({ fs, dir, gitdir })
+    await abortMerge({ repo })
 
     const trees = [TREE({ ref: 'HEAD' }), WORKDIR(), STAGE()]
     await walk({
-      fs,
-      dir,
-      gitdir,
+      repo,
       trees,
       map: async function (path, [head, workdir, index]) {
         if (path === '.') return

@@ -1,6 +1,7 @@
 import { MissingParameterError } from '../errors/MissingParameterError.ts'
 import { AlreadyExistsError } from '../errors/AlreadyExistsError.ts'
-import { RefManager } from "../core-utils/refs/RefManager.ts"
+import { resolveRef } from "../git/refs/readRef.ts"
+import { writeRef } from "../git/refs/writeRef.ts"
 import { readObject } from "../git/objects/readObject.ts"
 import { writeTag } from "./writeTag.ts"
 import { parse as parseTag, serialize as serializeTag } from "../core-utils/parsers/Tag.ts"
@@ -161,7 +162,7 @@ export async function _annotatedTag({
 
   if (!force) {
     try {
-      await RefManager.resolve({ fs, gitdir, ref })
+      await resolveRef({ fs, gitdir, ref })
       // Tag exists
       throw new AlreadyExistsError('tag', ref)
     } catch (e) {
@@ -171,7 +172,7 @@ export async function _annotatedTag({
   }
 
   // Resolve passed value
-  const oid = await RefManager.resolve({
+  const oid = await resolveRef({
     fs,
     gitdir,
     ref: object || 'HEAD',
@@ -219,7 +220,7 @@ export async function _annotatedTag({
       format: 'content',
     })
 
-    await RefManager.writeRef({ fs, gitdir, ref, value })
+    await writeRef({ fs, gitdir, ref, value })
     return
   }
   
@@ -230,6 +231,6 @@ export async function _annotatedTag({
     tag: tagObject,
   })
 
-  await RefManager.writeRef({ fs, gitdir, ref, value })
+  await writeRef({ fs, gitdir, ref, value })
 }
 

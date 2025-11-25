@@ -386,5 +386,15 @@ export type GitBackend = {
    * Gets the backend type identifier
    */
   getType(): string
+
+  /**
+   * Gets the filesystem instance if this backend uses a filesystem
+   * @returns FileSystemProvider if available, null otherwise
+   * 
+   * This method allows consumers to access the filesystem without knowing
+   * the backend implementation. Non-filesystem backends (e.g., SQLite, in-memory)
+   * should return null.
+   */
+  getFileSystem?(): FileSystemProvider | null
 }
 

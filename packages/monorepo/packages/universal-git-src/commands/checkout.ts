@@ -13,7 +13,7 @@ import { createFileSystem } from '../utils/createFileSystem.ts'
 import { assertParameter } from "../utils/assertParameter.ts"
 import { join } from "../utils/join.ts"
 import type { FileSystem } from "../models/FileSystem.ts"
-import type { ProgressCallback } from "../git/remote/GitRemoteHTTP.ts"
+import type { ProgressCallback } from "../git/remote/types.ts"
 
 // ============================================================================
 // CHECKOUT TYPES
@@ -149,31 +149,11 @@ export async function checkout({
 
     const ref = _ref || 'HEAD'
     
-    // If repo is provided, use repo.checkout() directly for maximum consistency
-    if (_repo) {
-      return await repo.checkout(ref, {
-        filepaths,
-        force,
-        noCheckout,
-        noUpdateHead,
-        dryRun,
-        remote,
-        track,
-        onProgress,
-      })
-    }
-    
-    // Otherwise, use _checkout for backward compatibility
+    // Always use _checkout() to ensure consistent behavior and support for onPostCheckout
+    // Repository.checkout() doesn't support onPostCheckout, so we use _checkout() for all cases
     if (!effectiveDir) {
-      // If gitdir is provided but dir is not, check if it's a bare repository
-      if (effectiveGitdir) {
-        const { Repository } = await import('../core-utils/Repository.ts')
-        const tempRepo = await Repository.open({ fs, dir: undefined, gitdir: effectiveGitdir, cache: effectiveCache, autoDetectConfig: true })
-        const worktree = tempRepo.getWorktree()
-        if (!worktree) {
-          throw new Error('Cannot checkout in bare repository')
-        }
-      }
+      // If dir is missing, throw MissingParameterError immediately
+      // The bare repository check will happen in _checkout() if needed
       throw new MissingParameterError('dir')
     }
     return await _checkout({
@@ -241,6 +221,7 @@ export async function _checkout({
 }): Promise<void> {
   // Use Repository to get worktree context
   // CRITICAL: Pass gitdir to Repository.open() to ensure we use the same gitdir where refs were written
+  // Import Repository dynamically to avoid circular dependency issues
   const { Repository } = await import('../core-utils/Repository.ts')
   const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
   const worktree = repo.getWorktree()
@@ -338,8 +319,13 @@ export async function _checkout({
         }
         await repo.writeRef(`refs/heads/${ref}`, oid)
       } catch (remoteErr: any) {
-        // If remote ref also doesn't exist, throw the original error
-        // This preserves the original error message about the local ref
+        // If remote ref also doesn't exist, check if the original error was about a missing commit
+        // This can happen when a ref exists but points to an unfetched commit
+        if (err instanceof NotFoundError && (err as any).data && (err as any).data.what) {
+          // The ref exists but the commit is not found - this is CommitNotFetchedError
+          throw new CommitNotFetchedError(ref, (err as any).data.what)
+        }
+        // Otherwise, throw the original error
         throw err
       }
     }

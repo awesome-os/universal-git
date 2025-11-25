@@ -1,9 +1,9 @@
 import type { GitWorkerAPI, RepositoryOptions, GitBackendOptions, GitWorktreeBackendOptions, ProxiedRepository, ProxiedGitBackend, ProxiedGitWorktreeBackend } from './Proxies.ts'
 import type { GitBackend } from '../backends/GitBackend.ts'
-import type { GitWorktreeBackend } from '../backends/git-worktree/GitWorktreeBackend.ts'
+import type { GitWorktreeBackend } from '../git/worktree/GitWorktreeBackend.ts'
 import { Repository } from '../core-utils/Repository.ts'
 import { createBackend } from '../backends/index.ts'
-import { FilesystemGitWorktreeBackend } from '../backends/git-worktree/FilesystemGitWorktreeBackend.ts'
+import { GitWorktreeFs } from '../git/worktree/fs/GitWorktreeFs.ts'
 import { createFileSystem } from '../utils/createFileSystem.ts'
 import type { FileSystemProvider, RawFileSystemProvider } from '../models/FileSystem.ts'
 import { readObject } from '../git/objects/readObject.ts'
@@ -87,7 +87,7 @@ export class GitWorkerImpl implements GitWorkerAPI {
       throw new Error('Filesystem required for GitWorktreeBackend')
     }
     
-    const backend = new FilesystemGitWorktreeBackend(fs, options.dir)
+    const backend = new GitWorktreeFs(fs, options.dir)
     
     // Explicitly proxy the backend via Comlink (Comlink will handle this automatically, but we make it explicit for TypeScript)
     return Comlink.proxy(backend) as unknown as ProxiedGitWorktreeBackend

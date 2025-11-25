@@ -1,4 +1,4 @@
-import { RefManager } from "../core-utils/refs/RefManager.ts"
+import { resolveRef } from "../git/refs/readRef.ts"
 import { readLog, type ReflogEntry as GitReflogEntry } from "../git/logs/readLog.ts"
 import { readObject } from "../git/objects/readObject.ts"
 import { parse as parseCommit } from "../core-utils/parsers/Commit.ts"
@@ -54,7 +54,7 @@ export class RevisionParser {
     }
 
     // Simple ref resolution
-    return RefManager.resolve({ fs: this.fs, gitdir: this.gitdir, ref: revision })
+    return resolveRef({ fs: this.fs, gitdir: this.gitdir, ref: revision })
   }
 
   /**
@@ -63,7 +63,7 @@ export class RevisionParser {
    */
   private async _resolveReflog(ref: string, selector: string): Promise<string> {
     // First resolve the base ref
-    const baseOid = await RefManager.resolve({ fs: this.fs, gitdir: this.gitdir, ref })
+    const baseOid = await resolveRef({ fs: this.fs, gitdir: this.gitdir, ref })
 
     // Get reflog entries
     const entries = (await readLog({ fs: this.fs, gitdir: this.gitdir, ref, parsed: true })) as ReflogEntry[]
@@ -95,7 +95,7 @@ export class RevisionParser {
    * @private
    */
   private async _resolveRelative(ref: string, operators: string, count: number): Promise<string> {
-    let oid = await RefManager.resolve({ fs: this.fs, gitdir: this.gitdir, ref })
+    let oid = await resolveRef({ fs: this.fs, gitdir: this.gitdir, ref })
 
     // Process each operator
     for (let i = 0; i < count; i++) {

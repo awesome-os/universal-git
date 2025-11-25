@@ -2,7 +2,10 @@ import { _currentBranch } from './currentBranch.ts'
 import { MissingParameterError } from "../errors/MissingParameterError.ts"
 import { RemoteCapabilityError } from "../errors/RemoteCapabilityError.ts"
 import { ConfigAccess } from "../utils/configAccess.ts"
-import { RefManager } from "../core-utils/refs/RefManager.ts"
+import { expandRef, resolveRefAgainstMap } from "../git/refs/expandRef.ts"
+import { resolveRef } from "../git/refs/readRef.ts"
+import { listRefs } from "../git/refs/listRefs.ts"
+import { updateRemoteRefs } from "../git/refs/updateRemoteRefs.ts"
 import { readShallow, writeShallow } from "../git/shallow.ts"
 import { getRemoteHelperFor } from "../git/remote/getRemoteHelper.ts"
 import { GitCommit } from "../models/GitCommit.ts"
@@ -32,7 +35,7 @@ import type {
   AuthCallback,
   AuthFailureCallback,
   AuthSuccessCallback,
-} from "../git/remote/GitRemoteHTTP.ts"
+} from "../git/remote/types.ts"
 import type { TcpClient, TcpProgressCallback } from "../daemon/TcpClient.ts"
 import type { SshClient, SshProgressCallback } from "../ssh/SshClient.ts"
 import { GitRemoteDaemon } from "../git/remote/GitRemoteDaemon.ts"
@@ -296,7 +299,7 @@ export async function _fetch({
     cache = repo.cache
   }
 
-  const ref = _ref || (await _currentBranch({ fs, gitdir, test: true }))
+  const ref = _ref || (await _currentBranch({ repo, test: true }))
   const configService = await repo.getConfig()
   
   // Figure out what remote to use
@@ -580,7 +583,7 @@ export async function _fetch({
     throw new RemoteCapabilityError('deepen-relative', 'relative')
   }
   
-  const { oid, fullref } = RefManager.resolveAgainstMap({
+  const { oid, fullref } = resolveRefAgainstMap({
     ref: remoteRef,
     map: remoteRefs,
   })
@@ -618,7 +621,7 @@ export async function _fetch({
   // Come up with a reasonable list of oids to tell the remote we already have
   const haveRefs = singleBranch
     ? ref ? [ref] : []
-    : await RefManager.listRefs({
+    : await listRefs({
         fs,
         gitdir,
         filepath: 'refs',
@@ -627,8 +630,8 @@ export async function _fetch({
   let haves: string[] = []
   for (let ref of haveRefs) {
     try {
-      ref = await RefManager.expand({ fs, gitdir, ref })
-      const oid = await RefManager.resolve({ fs, gitdir, ref })
+      ref = await expandRef({ fs, gitdir, ref })
+      const oid = await resolveRef({ fs, gitdir, ref })
       if (await hasObject({ fs, cache, gitdir, oid })) {
         haves.push(oid)
       }
@@ -817,7 +820,7 @@ export async function _fetch({
     // refs/remotes/origin/HEAD which might point to a branch we didn't fetch (e.g., main)
     const filteredRefs = singleBranch ? new Map([...refs.entries()].filter(([k]) => k !== 'HEAD' && k !== undefined)) : refs
     const filteredSymrefs = singleBranch ? new Map([...localSymrefs.entries()].filter(([k]) => k !== 'HEAD' && k !== undefined)) : localSymrefs
-    const { pruned } = await RefManager.updateRemoteRefs({
+    const { pruned } = await updateRemoteRefs({
       fs,
       gitdir,
       remote,
@@ -830,7 +833,7 @@ export async function _fetch({
       response.pruned = pruned
     }
   } else {
-    const { pruned } = await RefManager.updateRemoteRefs({
+    const { pruned } = await updateRemoteRefs({
       fs,
       gitdir,
       remote,
@@ -847,7 +850,7 @@ export async function _fetch({
   
   response.HEAD = symrefs.get('HEAD')
   if (response.HEAD === undefined) {
-    const { oid } = RefManager.resolveAgainstMap({
+    const { oid } = resolveRefAgainstMap({
       ref: 'HEAD',
       map: remoteRefs,
     })

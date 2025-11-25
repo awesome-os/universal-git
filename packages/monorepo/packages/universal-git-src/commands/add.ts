@@ -42,6 +42,8 @@ export type AddOptions = BaseCommandOptions & {
 export async function add({
   repo: _repo,
   fs: _fs,
+  gitBackend,
+  worktree: _worktree,
   dir,
   gitdir = dir ? join(dir, '.git') : undefined,
   filepath,
@@ -53,6 +55,8 @@ export async function add({
     const { repo, fs, gitdir: effectiveGitdir, dir: effectiveDir } = await normalizeCommandArgs({
       repo: _repo,
       fs: _fs,
+      gitBackend,
+      worktree: _worktree,
       dir,
       gitdir,
       cache,
@@ -62,7 +66,17 @@ export async function add({
     })
 
     // add requires a working directory
-    if (!effectiveDir) {
+    // If worktree backend is provided, dir should be derived from it using universal interface method
+    // Otherwise, effectiveDir should be set
+    let finalDir = effectiveDir
+    if (!finalDir) {
+      // Try to get dir from worktree backend if available using universal interface method
+      const worktreeBackend = _worktree
+      if (worktreeBackend && worktreeBackend.getDirectory) {
+        finalDir = worktreeBackend.getDirectory() || null
+      }
+    }
+    if (!finalDir) {
       throw new MissingParameterError('dir')
     }
 
@@ -90,7 +104,7 @@ export async function add({
     
     // Modify index
     await addToIndex({
-      dir: effectiveDir,
+      dir: finalDir,
       gitdir: effectiveGitdir,
       fs,
       filepath,

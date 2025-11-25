@@ -1,4 +1,4 @@
-import { listRefs } from "../git/refs/listRefs.ts"
+import { listTagRefs } from "../git/refs/tags/tags.ts"
 import { MissingParameterError } from "../errors/MissingParameterError.ts"
 import { Repository } from "../core-utils/Repository.ts"
 import { normalizeCommandArgs } from '../utils/commandHelpers.ts'
@@ -42,7 +42,7 @@ export async function listTags({
       cache: {},
     })
 
-    return listRefs({ fs, gitdir: effectiveGitdir, filepath: 'refs/tags' })
+    return listTagRefs({ fs, gitdir: effectiveGitdir })
   } catch (err) {
     ;(err as { caller?: string }).caller = 'git.listTags'
     throw err

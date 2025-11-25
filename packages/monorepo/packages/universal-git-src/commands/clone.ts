@@ -8,7 +8,7 @@ import { createFileSystem } from "../utils/createFileSystem.ts"
 import { assertParameter } from "../utils/assertParameter.ts"
 import { join } from "../utils/join.ts"
 import { Repository } from "../core-utils/Repository.ts"
-import { RefManager } from "../core-utils/refs/RefManager.ts"
+// RefManager import removed - using capability modules directly
 import type { FileSystemProvider } from "../models/FileSystem.ts"
 import type { BaseCommandOptions } from "../types/commandOptions.ts"
 import type {
@@ -17,7 +17,7 @@ import type {
   AuthCallback,
   AuthFailureCallback,
   AuthSuccessCallback,
-} from "../git/remote/GitRemoteHTTP.ts"
+} from "../git/remote/types.ts"
 import type { TcpClient, TcpProgressCallback } from "../daemon/TcpClient.ts"
 import type { SshClient, SshProgressCallback } from "../ssh/SshClient.ts"
 import type { MessageCallback } from './push.ts'

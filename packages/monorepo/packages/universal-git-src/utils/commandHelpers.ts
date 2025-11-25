@@ -11,21 +11,51 @@ import { join } from './join.ts'
 import { Repository } from '../core-utils/Repository.ts'
 import type { FileSystemProvider } from '../models/FileSystem.ts'
 import type { BaseCommandOptions } from '../types/commandOptions.ts'
+import type { GitBackend } from '../backends/GitBackend.ts'
+import type { GitWorktreeBackend } from '../git/worktree/GitWorktreeBackend.ts'
+import { createBackend } from '../backends/index.ts'
+import { createGitWorktreeBackend } from '../git/worktree/index.ts'
 
 /**
- * Normalizes command arguments to handle both repo and fs/gitdir/dir patterns.
+ * Normalizes command arguments to handle repo, backend, and legacy fs/gitdir/dir patterns.
  * 
  * This unifies the common pattern where commands accept either:
- * - repo: Repository (preferred, modern API)
- * - fs + gitdir/dir (backward compatibility)
+ * - `repo: Repository` (preferred, modern API)
+ * - `gitBackend: GitBackend` + `worktree: GitWorktreeBackend` (new advanced API)
+ * - `fs` + `gitdir`/`dir` (backward compatibility - auto-creates backends)
  * 
- * @param args - Command arguments with optional repo or fs/gitdir/dir (extends BaseCommandOptions)
+ * **Parameter Precedence:**
+ * 1. If `repo` is provided, everything is extracted from it (highest priority)
+ * 2. If `gitBackend`/`worktree` are provided, they are used (and `gitdir`/`dir` are ignored)
+ * 3. If only `fs`/`gitdir`/`dir` are provided, backends are auto-created from them
+ * 
+ * **Important Notes:**
+ * - When `gitBackend` is provided, the `gitdir` parameter has no effect (gitdir is already set in the backend)
+ * - When `worktree` is provided, the `dir` parameter has no effect (dir is already set in the worktree backend)
+ * - The returned `fs` instance matches `repo.fs` for consistency
+ * 
+ * @param args - Command arguments with optional repo, gitBackend/worktree, or fs/gitdir/dir (extends BaseCommandOptions)
  * @returns Normalized arguments with repo, fs, gitdir, dir, and cache
  * 
  * @example
  * ```typescript
+ * // Using repo (preferred)
  * const { repo, fs, gitdir, dir, cache } = await normalizeCommandArgs({
  *   repo: someRepo,
+ *   // ... other args
+ * })
+ * 
+ * // Using backends (new advanced API)
+ * const { repo, fs, gitdir, dir, cache } = await normalizeCommandArgs({
+ *   gitBackend: myGitBackend,
+ *   worktree: myWorktreeBackend,
+ *   // ... other args
+ * })
+ * 
+ * // Using legacy parameters (auto-creates backends)
+ * const { repo, fs, gitdir, dir, cache } = await normalizeCommandArgs({
+ *   fs,
+ *   dir: '/path/to/repo',
  *   // ... other args
  * })
  * ```
@@ -38,37 +68,132 @@ export async function normalizeCommandArgs<T extends Record<string, unknown>>(
   gitdir: string
   dir?: string
   cache: Record<string, unknown>
-} & Omit<T, 'repo' | 'fs' | 'dir' | 'gitdir' | 'cache' | 'autoDetectConfig'>> {
+} & Omit<T, 'repo' | 'gitBackend' | 'worktree' | 'fs' | 'dir' | 'gitdir' | 'cache' | 'autoDetectConfig'>> {
   let repo: Repository
   let fs: FileSystemProvider
   let gitdir: string
   let dir: string | undefined
   let cache: Record<string, unknown>
+  let gitBackend: GitBackend | undefined = args.gitBackend
+  let worktree: GitWorktreeBackend | undefined = args.worktree
 
   if (args.repo) {
+    // repo is provided - extract everything from it
     repo = args.repo
     fs = repo.fs
     gitdir = await repo.getGitdir()
     dir = await repo.getDir() || args.dir
     cache = repo.cache
   } else {
-    if (!args.fs) {
-      throw new MissingParameterError('fs')
+    // No repo provided - need to create one
+    // Check if backends are provided, or if we need to auto-create them from legacy inputs
+    
+    if (!gitBackend && !worktree) {
+      // No backends provided - need legacy inputs to auto-create backends
+      if (!args.fs) {
+        throw new MissingParameterError('fs')
+      }
+      if (!args.gitdir && !args.dir) {
+        throw new MissingParameterError('dir OR gitdir')
+      }
+      
+      // Normalize fs first - this ensures consistent FileSystemProvider instance
+      fs = createFileSystem(args.fs)
+      const effectiveGitdir = args.gitdir || join(args.dir!, '.git')
+      dir = args.dir
+      
+      // Auto-create backends from legacy inputs
+      // Use the same fs instance for both backends to ensure consistency
+      gitBackend = createBackend({
+        type: 'filesystem',
+        fs,
+        gitdir: effectiveGitdir,
+      })
+      
+      // Only create worktree backend if dir is provided AND dir !== gitdir (not a bare repo)
+      // For bare repos, dir === gitdir, so we skip worktree backend creation
+      if (dir && dir !== effectiveGitdir) {
+        worktree = createGitWorktreeBackend({ fs, dir })
+      }
+    } else {
+      // Backends are provided - extract fs from them if needed
+      if (gitBackend) {
+        // Use universal interface method - backend consumers don't need to know implementation
+        if (gitBackend.getFileSystem) {
+          const backendFs = gitBackend.getFileSystem()
+          if (backendFs) {
+            fs = backendFs
+          } else if (args.fs) {
+            fs = createFileSystem(args.fs)
+          } else {
+            throw new MissingParameterError('fs (required when using non-filesystem gitBackend)')
+          }
+        } else if (args.fs) {
+          fs = createFileSystem(args.fs)
+        } else {
+          throw new MissingParameterError('fs (required when using non-filesystem gitBackend)')
+        }
+      } else if (worktree) {
+        // Use universal interface method - backend consumers don't need to know implementation
+        if (worktree.getFileSystem) {
+          const worktreeFs = worktree.getFileSystem()
+          if (worktreeFs) {
+            fs = worktreeFs
+          } else if (args.fs) {
+            fs = createFileSystem(args.fs)
+          } else {
+            throw new MissingParameterError('fs (required when using non-filesystem worktree)')
+          }
+        } else if (args.fs) {
+          fs = createFileSystem(args.fs)
+        } else {
+          throw new MissingParameterError('fs (required when using non-filesystem worktree)')
+        }
+      } else {
+        // Should not happen, but TypeScript needs this
+        if (!args.fs) {
+          throw new MissingParameterError('fs')
+        }
+        fs = createFileSystem(args.fs)
+      }
+      
+      // If backends are provided, gitdir/dir are ignored (already set in backends)
+      // But we still need them for Repository.open() caching logic
+      // Repository.open() will derive them from backends
     }
-    if (!args.gitdir && !args.dir) {
-      throw new MissingParameterError('dir OR gitdir')
-    }
-    fs = createFileSystem(args.fs)
-    gitdir = args.gitdir || join(args.dir!, '.git')
-    dir = args.dir
+    
     cache = args.cache || {}
     const autoDetectConfig = args.autoDetectConfig !== undefined ? args.autoDetectConfig : true
-    repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig })
+    const ignoreSystemConfig = (args as any).ignoreSystemConfig !== undefined ? (args as any).ignoreSystemConfig : false
+    
+    // Open repository with backends (if provided) or legacy inputs
+    repo = await Repository.open({
+      fs,
+      dir,
+      gitdir: args.gitdir,
+      cache,
+      autoDetectConfig,
+      ignoreSystemConfig,
+      gitBackend,
+      worktree,
+    })
+    
     gitdir = await repo.getGitdir()
+    // If worktree backend was provided, try to get dir from it
+    if (!dir && worktree && worktree.getDirectory) {
+      dir = worktree.getDirectory() || undefined
+    }
+    // Fallback to repo.getDir() if still not set
+    dir = await repo.getDir() || dir
     cache = repo.cache
+    
+    // CRITICAL: Ensure fs matches repo.fs for consistency
+    // When backends are auto-created, repo.fs should be the same instance
+    // but we want to return the fs that was used (which should match repo.fs)
+    fs = repo.fs
   }
 
-  const { repo: _, fs: __, dir: ___, gitdir: ____, cache: _____, autoDetectConfig: ______, ...rest } = args
+  const { repo: _, gitBackend: __, worktree: ___, fs: ____, dir: _____, gitdir: ______, cache: _______, autoDetectConfig: ________, ...rest } = args
   return {
     ...rest,
     repo,

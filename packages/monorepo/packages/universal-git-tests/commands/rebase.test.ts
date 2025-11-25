@@ -31,7 +31,13 @@ test('rebase', async (t) => {
       
       // Make commit in upstream worktree
       await fs.write(`${upstreamWorktreePath}/upstream-file.txt`, 'upstream content')
-      await add({ fs, dir: upstreamWorktreePath, gitdir, filepath: 'upstream-file.txt', cache })
+      // Create worktree backend for the worktree path
+      const { createGitWorktreeBackend } = await import('@awesome-os/universal-git-src/git/worktree/index.ts')
+      const upstreamWorktreeBackend = createGitWorktreeBackend({ fs, dir: upstreamWorktreePath })
+      const { createBackend } = await import('@awesome-os/universal-git-src/backends/index.ts')
+      const gitBackend = createBackend({ type: 'filesystem', fs, gitdir })
+      
+      await add({ gitBackend, worktree: upstreamWorktreeBackend, filepath: 'upstream-file.txt', cache })
       
       const repo = await Repository.open({ fs, dir, gitdir, cache })
       const upstreamCommitOid = await commitInWorktree({
@@ -129,7 +135,13 @@ test('rebase', async (t) => {
       
       // Make commit in upstream worktree
       await fs.write(`${upstreamWorktreePath}/upstream-file.txt`, 'upstream content')
-      await add({ fs, dir: upstreamWorktreePath, gitdir, filepath: 'upstream-file.txt', cache })
+      // Create worktree backend for the worktree path
+      const { createGitWorktreeBackend } = await import('@awesome-os/universal-git-src/git/worktree/index.ts')
+      const upstreamWorktreeBackend3 = createGitWorktreeBackend({ fs, dir: upstreamWorktreePath })
+      const { createBackend } = await import('@awesome-os/universal-git-src/backends/index.ts')
+      const gitBackend3 = createBackend({ type: 'filesystem', fs, gitdir })
+      
+      await add({ gitBackend: gitBackend3, worktree: upstreamWorktreeBackend3, filepath: 'upstream-file.txt', cache })
       
       const repo = await Repository.open({ fs, dir, gitdir, cache })
       const upstreamCommitOid = await commitInWorktree({
@@ -225,7 +237,13 @@ test('rebase', async (t) => {
       
       // Make commit in upstream worktree
       await fs.write(`${upstreamWorktreePath}/conflict-file.txt`, 'upstream version')
-      await add({ fs, dir: upstreamWorktreePath, gitdir, filepath: 'conflict-file.txt', cache })
+      // Create worktree backend for the worktree path
+      const { createGitWorktreeBackend: createGitWorktreeBackend2 } = await import('@awesome-os/universal-git-src/git/worktree/index.ts')
+      const upstreamWorktreeBackend2 = createGitWorktreeBackend2({ fs, dir: upstreamWorktreePath })
+      const { createBackend: createBackend2 } = await import('@awesome-os/universal-git-src/backends/index.ts')
+      const gitBackend2 = createBackend2({ type: 'filesystem', fs, gitdir })
+      
+      await add({ gitBackend: gitBackend2, worktree: upstreamWorktreeBackend2, filepath: 'conflict-file.txt', cache })
       
       const repo = await Repository.open({ fs, dir, gitdir, cache })
       const upstreamCommitOid = await commitInWorktree({

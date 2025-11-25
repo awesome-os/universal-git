@@ -359,11 +359,129 @@ await merge({
 })
 ```
 
+## Merge Architecture
+
+The merge system is organized into capability modules (pure algorithms) and higher-level utilities:
+
+### Pure Algorithm Capability Modules
+
+**`mergeBlobs()`** - Pure algorithm for merging blob content
+- **Location**: `src/git/merge/mergeBlobs.ts`
+- **Purpose**: Stateless capability module that performs three-way merge on raw content
+- **Input**: `{ base, ours, theirs, ourName?, theirName? }` (strings or UniversalBuffer)
+- **Output**: `{ mergedContent: UniversalBuffer, hasConflict: boolean }`
+- **Use when**: You have raw content to merge, need a pure algorithm, or are implementing merge operations in `cherryPick`/`rebase`
+- **No file system operations** - works with raw content only
+
+**`mergeTrees()`** - Pure algorithm for merging tree structures
+- **Location**: `src/git/merge/mergeTrees.ts`
+- **Purpose**: Stateless capability module that performs recursive three-way merge on trees
+- **Input**: `{ fs, cache, gitdir, base, ours, theirs }` (tree OIDs)
+- **Output**: `{ mergedTree: TreeEntry[], mergedTreeOid: string, conflicts: string[] }`
+- **Use when**: You have tree OIDs and need a merged tree without index management
+- **No index or worktree operations** - only reads/writes Git objects
+
+### Higher-Level Utilities
+
+**`mergeTree()`** - Higher-level utility with index management
+- **Location**: `src/git/merge/mergeTree.ts` (will be moved to `GitWorktreeBackend` in Phase 0A.1)
+- **Purpose**: Merges trees with index management and worktree operations
+- **Input**: `{ repo, index, ourOid, baseOid, theirOid, ... }`
+- **Output**: `string | MergeConflictError` (tree OID or error)
+- **Use when**: You need to merge trees with index management, write conflicted files to worktree, or work with `Repository` and `GitIndex`
+- **Note**: This is a worktree-level operation and will be moved to `GitWorktreeBackend`
+
+**`mergeFile()`** - Adapter function for merge drivers
+- **Location**: `src/git/merge/mergeFile.ts`
+- **Purpose**: Adapter that bridges the `MergeDriverCallback` interface to the `mergeBlobs()` capability module
+- **Input**: `{ branches: [baseName, ourName, theirName], contents: [baseContent, ourContent, theirContent], path? }`
+- **Output**: `{ cleanMerge: boolean, mergedText: string }`
+- **Use when**: You need a `MergeDriverCallback` for `mergeTree()` operations
+- **Interface Bridging**: Converts between `MergeDriverCallback` format and `mergeBlobs()` format
+
+### How They Work Together
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    merge() command                           │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│              MergeStream.ts                                  │
+│  (Manages merge process, emits events)                      │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│         mergeTree() (Higher-level utility)                   │
+│  - Manages GitIndex                                          │
+│  - Writes conflicted files to worktree                       │
+│  - Calls mergeBlobs() helper for each file                  │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│    mergeBlobs() helper (in mergeTree.ts)                     │
+│  - Extracts content from WalkerEntry objects                 │
+│  - Calls mergeFile() adapter OR mergeBlobs() capability      │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+        ┌──────────────┴──────────────┐
+        │                             │
+        ▼                             ▼
+┌──────────────────┐         ┌──────────────────┐
+│  mergeFile()     │         │  mergeBlobs()    │
+│  (Adapter)       │────────▶│  (Capability)    │
+│                  │         │                  │
+│  Converts:       │         │  Pure algorithm │
+│  - Array params  │         │  - diff3Merge    │
+│  - Return format │         │  - Conflict      │
+│                  │         │    markers       │
+└──────────────────┘         └──────────────────┘
+```
+
+### Single Source of Truth
+
+The merge algorithm logic lives in the `mergeBlobs()` capability module. Both `mergeFile()` (adapter) and `mergeTree()`'s `mergeBlobs()` helper use this capability module internally, ensuring:
+
+- **No code duplication**: Merge algorithm logic exists in one place
+- **Consistent behavior**: All merge operations use the same algorithm
+- **Easier maintenance**: Changes to merge algorithm only need to be made once
+- **Better testability**: Algorithm tests are separate from utility tests
+
+### When to Use Each Function
+
+**Use `mergeBlobs()` capability module** when:
+- You have raw content (strings/buffers) to merge
+- You need a pure algorithm (no file system operations)
+- You're implementing merge operations in `cherryPick` or `rebase`
+- You want to merge content without writing to Git object database
+
+**Use `mergeTrees()` capability module** when:
+- You have tree OIDs and need a merged tree
+- You need a pure algorithm (no index management)
+- You're implementing merge logic in commands like `cherryPick`, `rebase`
+
+**Use `mergeTree()` utility** when:
+- You need to merge trees with index management
+- You need to write conflicted files to the worktree
+- You're working with `Repository` and `GitIndex` in higher-level operations
+
+**Use `mergeFile()` adapter** when:
+- You need a `MergeDriverCallback` for `mergeTree()` operations
+- You want the default merge behavior (uses `mergeBlobs()` capability module)
+- You're implementing a custom merge driver that wraps `mergeBlobs()`
+
+For more details, see [Merge Driver](./mergeDriver.md) and [Architecture](./architecture.md#5-merge-capability-modules).
+
 ## See Also
 
 - [Abort Merge](./abort-merge.md) - Abort merge in progress
 - [Cherry Pick](./cherry-pick.md) - Apply individual commits
 - [Rebase](./rebase.md) - Rebase branches
 - [Status](./status.md) - Check repository status
+- [Merge Driver](./mergeDriver.md) - Custom merge drivers
+- [Architecture](./architecture.md#5-merge-capability-modules) - Merge capability modules
 
 

@@ -1,7 +1,7 @@
 import * as Comlink from 'comlink'
 import type { Repository } from '../core-utils/Repository.ts'
 import type { GitBackend } from '../backends/GitBackend.ts'
-import type { GitWorktreeBackend } from '../backends/git-worktree/GitWorktreeBackend.ts'
+import type { GitWorktreeBackend } from '../git/worktree/GitWorktreeBackend.ts'
 
 /**
  * Proxied Repository for worker threads

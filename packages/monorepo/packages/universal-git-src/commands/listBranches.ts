@@ -1,4 +1,5 @@
-import { listRefs } from "../git/refs/listRefs.ts"
+import { listHeadRefs } from "../git/refs/heads/heads.ts"
+import { listRemoteRefs } from "../git/refs/remotes/remotes.ts"
 import { MissingParameterError } from "../errors/MissingParameterError.ts"
 import { Repository } from "../core-utils/Repository.ts"
 import { normalizeCommandArgs } from '../utils/commandHelpers.ts'
@@ -57,11 +58,17 @@ export async function listBranches({
       remote,
     })
 
-    const filepath = remote ? `refs/remotes/${remote}` : 'refs/heads'
-    return listRefs({
+    if (remote) {
+      return listRemoteRefs({
+        fs: fs as any,
+        gitdir: effectiveGitdir,
+        remote,
+      })
+    }
+
+    return listHeadRefs({
       fs: fs as any,
       gitdir: effectiveGitdir,
-      filepath,
     })
   } catch (err) {
     ;(err as { caller?: string }).caller = 'git.listBranches'

@@ -24,8 +24,7 @@ test('sparse checkout cone mode', async (t) => {
     // Initialize repository
     await init({ fs, dir })
     
-    // Reopen repo after init
-    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
+    // Reopen repo after init (reuse Repository from above)
     const initializedRepo = await Repository.open({
       fs,
       dir,
@@ -67,6 +66,7 @@ test('sparse checkout cone mode', async (t) => {
     assert.ok(coneModeEnabled === 'true' || coneModeEnabled === true, `Expected 'true' or true, got ${coneModeEnabled}`)
     
     // Verify sparse-checkout file exists
+    const gitdir = await initializedRepo.getGitdir()
     const sparseCheckoutFile = join(gitdir, 'info', 'sparse-checkout')
     const fileExists = await fs.exists(sparseCheckoutFile)
     assert.strictEqual(fileExists, true)
@@ -77,7 +77,7 @@ test('sparse checkout cone mode', async (t) => {
   })
 
   await t.test('ok:set-patterns-cone-mode', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-sparse-checkout-cone')
+    const { repo, fs, dir } = await makeFixture('test-sparse-checkout-cone')
     
     // Initialize repository
     await init({ fs, dir })
@@ -90,20 +90,19 @@ test('sparse checkout cone mode', async (t) => {
     await fs.write(join(dir, 'tests', 'test.js'), 'test content')
     await fs.write(join(dir, 'config.json'), 'config content')
     
-    await add({ fs, dir, filepath: '.' })
-    await commit({ fs, dir, message: 'Initial commit', author: { name: 'Test', email: 'test@test.com' } })
+    await add({ repo, filepath: '.' })
+    await commit({ repo, message: 'Initial commit', author: { name: 'Test', email: 'test@test.com' } })
     
     // Initialize sparse checkout with cone mode
-    await sparseCheckout({ fs, dir, init: true, cone: true })
+    await sparseCheckout({ repo, init: true, cone: true })
     
     // Set pattern to only include src/ directory
-    await sparseCheckout({ fs, dir, set: ['src/'], cone: true })
+    await sparseCheckout({ repo, set: ['src/'], cone: true })
     
     // Checkout to apply sparse patterns
-    await checkout({ fs, dir, ref: 'HEAD' })
     
     // Verify only src/ files are checked out
-    const files = await listFiles({ fs, dir })
+    const files = await listFiles({ repo })
     
     // Should include src/ files
     assert.ok(files.includes('src/main/app.js'))
@@ -117,7 +116,7 @@ test('sparse checkout cone mode', async (t) => {
   })
 
   await t.test('ok:cone-mode-multiple-patterns', async () => {
-    const { fs, dir } = await makeFixture('test-sparse-checkout-multi-cone')
+    const { repo, fs, dir } = await makeFixture('test-sparse-checkout-multi-cone')
     
     await init({ fs, dir })
     
@@ -128,17 +127,16 @@ test('sparse checkout cone mode', async (t) => {
     await fs.write(join(dir, 'lib', 'util.js'), 'util')
     await fs.write(join(dir, 'other', 'file.txt'), 'other')
     
-    await add({ fs, dir, filepath: '.' })
-    await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
+    await add({ repo, filepath: '.' })
+    await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
     
-    await sparseCheckout({ fs, dir, init: true, cone: true })
+    await sparseCheckout({ repo, init: true, cone: true })
     
     // Set patterns to include both src/ and docs/
-    await sparseCheckout({ fs, dir, set: ['src/', 'docs/'], cone: true })
+    await sparseCheckout({ repo, set: ['src/', 'docs/'], cone: true })
     
-    await checkout({ fs, dir, ref: 'HEAD' })
     
-    const files = await listFiles({ fs, dir })
+    const files = await listFiles({ repo })
     
     // Should include src/ and docs/ files
     assert.ok(files.includes('src/app.js'))
@@ -151,7 +149,7 @@ test('sparse checkout cone mode', async (t) => {
   })
 
   await t.test('behavior:cone-mode-nested-directories', async () => {
-    const { fs, dir } = await makeFixture('test-sparse-checkout-nested')
+    const { repo, fs, dir } = await makeFixture('test-sparse-checkout-nested')
     
     await init({ fs, dir })
     
@@ -161,17 +159,16 @@ test('sparse checkout cone mode', async (t) => {
     await fs.write(join(dir, 'src', 'other', 'file.js'), 'other file')
     await fs.write(join(dir, 'docs', 'api', 'index.md'), 'api docs')
     
-    await add({ fs, dir, filepath: '.' })
-    await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
+    await add({ repo, filepath: '.' })
+    await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
     
-    await sparseCheckout({ fs, dir, init: true, cone: true })
+    await sparseCheckout({ repo, init: true, cone: true })
     
     // Set pattern to src/main/ - should include all nested files
-    await sparseCheckout({ fs, dir, set: ['src/main/'], cone: true })
+    await sparseCheckout({ repo, set: ['src/main/'], cone: true })
     
-    await checkout({ fs, dir, ref: 'HEAD' })
     
-    const files = await listFiles({ fs, dir })
+    const files = await listFiles({ repo })
     
     // Should include all files under src/main/
     assert.ok(files.includes('src/main/file.js'))
@@ -192,7 +189,6 @@ test('sparse checkout cone mode', async (t) => {
     await init({ fs, dir })
     
     // Reopen repo after init
-    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     const initializedRepo = await Repository.open({
       fs,
       dir,
@@ -210,11 +206,9 @@ test('sparse checkout cone mode', async (t) => {
     await commit({ repo: initializedRepo, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
     
     // Test cone mode: pattern 'src/' should only match src/ directory
+    // sparseCheckout already handles checkout internally with force: true
     await sparseCheckout({ repo: initializedRepo, init: true, cone: true })
     await sparseCheckout({ repo: initializedRepo, set: ['src/'], cone: true })
-    
-    // Explicitly call checkout to ensure index is updated
-    await checkout({ repo: initializedRepo, ref: 'HEAD' })
     
     const files = await listFiles({ repo: initializedRepo })
     assert.ok(files.includes('src/file.js'))
@@ -253,10 +247,8 @@ test('sparse checkout cone mode', async (t) => {
     await sparseCheckout({ repo: initializedRepo, init: true, cone: false })
     // Set a pattern - the exact matching behavior may need further investigation
     // but the key is that we can switch to non-cone mode and set patterns
+    // sparseCheckout already handles checkout internally with force: true
     await sparseCheckout({ repo: initializedRepo, set: ['src/**'], cone: false })
-    
-    // Explicitly call checkout to ensure index is updated
-    await checkout({ repo: initializedRepo, ref: 'HEAD' })
     
     const files = await listFiles({ repo: initializedRepo })
     // Verify that sparse checkout is working (some filtering is happening)
@@ -335,7 +327,6 @@ test('sparse checkout cone mode', async (t) => {
     await sparseCheckout({ repo: initializedRepo, set: ['src/'], cone: true })
     
     // Apply checkout
-    await checkout({ repo: initializedRepo, ref: 'HEAD' })
     
     const files = await listFiles({ repo: initializedRepo })
     
@@ -391,7 +382,6 @@ test('sparse checkout cone mode', async (t) => {
     await sparseCheckout({ repo: initializedRepo, set: ['src/'], cone: false })
     
     // Apply checkout
-    await checkout({ repo: initializedRepo, ref: 'HEAD' })
     
     const files = await listFiles({ repo: initializedRepo })
     
@@ -425,7 +415,6 @@ test('sparse checkout cone mode', async (t) => {
     
     await sparseCheckout({ repo: repoCone, init: true, cone: true })
     await sparseCheckout({ repo: repoCone, set: ['src/'], cone: true })
-    await checkout({ repo: repoCone, ref: 'HEAD' })
     
     const filesCone = await listFiles({ repo: repoCone })
     
@@ -442,7 +431,6 @@ test('sparse checkout cone mode', async (t) => {
     await sparseCheckout({ repo: repoNonCone, init: true, cone: false })
     // In non-cone mode, patterns are inclusion patterns
     await sparseCheckout({ repo: repoNonCone, set: ['src/'], cone: false })
-    await checkout({ repo: repoNonCone, ref: 'HEAD' })
     
     const filesNonCone = await listFiles({ repo: repoNonCone })
     
@@ -456,28 +444,28 @@ test('sparse checkout cone mode', async (t) => {
   })
 
   await t.test('behavior:disabled-by-default', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-sparse-checkout-disabled')
+    const { repo, fs, dir } = await makeFixture('test-sparse-checkout-disabled')
     
     await init({ fs, dir })
     await fs.write(join(dir, 'file.txt'), 'content')
-    await add({ fs, dir, filepath: '.' })
-    await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
+    await add({ repo, filepath: '.' })
+    await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
     
     // Don't initialize sparse checkout
-    await checkout({ fs, dir, ref: 'HEAD' })
     
     // Verify sparse checkout is not enabled
+    const gitdir = await repo.getGitdir()
     const sparseCheckoutFile = join(gitdir, 'info', 'sparse-checkout')
     const exists = await fs.exists(sparseCheckoutFile).catch(() => false)
     assert.strictEqual(exists, false, 'Sparse checkout file should not exist')
     
     // All files should be checked out
-    const files = await listFiles({ fs, dir })
+    const files = await listFiles({ repo })
     assert.ok(files.includes('file.txt'))
   })
 
   await t.test('behavior:negative-patterns-cone-mode', async () => {
-    const { fs, dir } = await makeFixture('test-sparse-checkout-negative')
+    const { repo, fs, dir } = await makeFixture('test-sparse-checkout-negative')
     
     await init({ fs, dir })
     
@@ -488,17 +476,16 @@ test('sparse checkout cone mode', async (t) => {
     await fs.write(join(dir, 'src', 'tests', 'test.js'), 'test content')
     await fs.write(join(dir, 'docs', 'readme.md'), 'docs content')
     
-    await add({ fs, dir, filepath: '.' })
-    await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
+    await add({ repo, filepath: '.' })
+    await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
     
-    await sparseCheckout({ fs, dir, init: true, cone: true })
+    await sparseCheckout({ repo, init: true, cone: true })
     
     // Include src/ but exclude src/tests/ and src/main/temp/
-    await sparseCheckout({ fs, dir, set: ['src/', '!src/tests/', '!src/main/temp/'], cone: true })
+    await sparseCheckout({ repo, set: ['src/', '!src/tests/', '!src/main/temp/'], cone: true })
     
-    await checkout({ fs, dir, ref: 'HEAD' })
     
-    const files = await listFiles({ fs, dir })
+    const files = await listFiles({ repo })
     
     // Should include src/ files
     assert.ok(files.includes('src/main/app.js'))
@@ -513,7 +500,7 @@ test('sparse checkout cone mode', async (t) => {
   })
 
   await t.test('behavior:negative-patterns-nested', async () => {
-    const { fs, dir } = await makeFixture('test-sparse-checkout-negative-nested')
+    const { repo, fs, dir } = await makeFixture('test-sparse-checkout-negative-nested')
     
     await init({ fs, dir })
     
@@ -522,17 +509,16 @@ test('sparse checkout cone mode', async (t) => {
     await fs.write(join(dir, 'src', 'app', 'core', 'temp', 'temp.js'), 'temp')
     await fs.write(join(dir, 'src', 'app', 'utils', 'helper.js'), 'helper')
     
-    await add({ fs, dir, filepath: '.' })
-    await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
+    await add({ repo, filepath: '.' })
+    await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
     
-    await sparseCheckout({ fs, dir, init: true, cone: true })
+    await sparseCheckout({ repo, init: true, cone: true })
     
     // Include src/app/ but exclude src/app/core/temp/
-    await sparseCheckout({ fs, dir, set: ['src/app/', '!src/app/core/temp/'], cone: true })
+    await sparseCheckout({ repo, set: ['src/app/', '!src/app/core/temp/'], cone: true })
     
-    await checkout({ fs, dir, ref: 'HEAD' })
     
-    const files = await listFiles({ fs, dir })
+    const files = await listFiles({ repo })
     
     // Should include src/app/ files
     assert.ok(files.includes('src/app/core/main.js'))
@@ -543,7 +529,7 @@ test('sparse checkout cone mode', async (t) => {
   })
 
   await t.test('behavior:negative-patterns-multiple', async () => {
-    const { fs, dir } = await makeFixture('test-sparse-checkout-multiple-negative')
+    const { repo, fs, dir } = await makeFixture('test-sparse-checkout-multiple-negative')
     
     await init({ fs, dir })
     
@@ -552,17 +538,16 @@ test('sparse checkout cone mode', async (t) => {
     await fs.write(join(dir, 'src', 'temp2', 'file.js'), 'temp2')
     await fs.write(join(dir, 'src', 'main', 'app.js'), 'app')
     
-    await add({ fs, dir, filepath: '.' })
-    await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
+    await add({ repo, filepath: '.' })
+    await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
     
-    await sparseCheckout({ fs, dir, init: true, cone: true })
+    await sparseCheckout({ repo, init: true, cone: true })
     
     // Include src/ but exclude multiple temp directories
-    await sparseCheckout({ fs, dir, set: ['src/', '!src/temp1/', '!src/temp2/'], cone: true })
+    await sparseCheckout({ repo, set: ['src/', '!src/temp1/', '!src/temp2/'], cone: true })
     
-    await checkout({ fs, dir, ref: 'HEAD' })
     
-    const files = await listFiles({ fs, dir })
+    const files = await listFiles({ repo })
     
     // Should include src/ files
     assert.ok(files.includes('src/file1.js'))
@@ -574,25 +559,25 @@ test('sparse checkout cone mode', async (t) => {
   })
 
   await t.test('behavior:negative-patterns-exclude-all', async () => {
-    const { fs, dir } = await makeFixture('test-sparse-checkout-negative-only')
+    const { repo, fs, dir } = await makeFixture('test-sparse-checkout-negative-only')
     
     await init({ fs, dir })
     
     await fs.write(join(dir, 'src', 'file.js'), 'file')
     await fs.write(join(dir, 'docs', 'readme.md'), 'readme')
     
-    await add({ fs, dir, filepath: '.' })
-    await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
+    await add({ repo, filepath: '.' })
+    await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
     
-    await sparseCheckout({ fs, dir, init: true, cone: true })
+    await sparseCheckout({ repo, init: true, cone: true })
     
     // Only exclusion patterns, no inclusion patterns
     // This should result in nothing being included
-    await sparseCheckout({ fs, dir, set: ['!src/'], cone: true })
+    await sparseCheckout({ repo, set: ['!src/'], cone: true })
     
-    await checkout({ fs, dir, ref: 'HEAD' })
+    await checkout({ repo, ref: 'HEAD' })
     
-    const files = await listFiles({ fs, dir })
+    const files = await listFiles({ repo })
     
     // With no inclusion patterns, nothing should be checked out
     // (This tests the behavior when only exclusions are provided)
@@ -601,19 +586,20 @@ test('sparse checkout cone mode', async (t) => {
   })
 
   await t.test('behavior:negative-patterns-preserve-prefix', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-sparse-checkout-negative-file')
+    const { repo, fs, dir } = await makeFixture('test-sparse-checkout-negative-file')
     
     await init({ fs, dir })
     await fs.write(join(dir, 'file.txt'), 'content')
-    await add({ fs, dir, filepath: '.' })
-    await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
+    await add({ repo, filepath: '.' })
+    await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
     
-    await sparseCheckout({ fs, dir, gitdir, init: true, cone: true })
+    await sparseCheckout({ repo, init: true, cone: true })
     
     // Set patterns with negative patterns
-    await sparseCheckout({ fs, dir, gitdir, set: ['src/', '!src/temp/'], cone: true })
+    await sparseCheckout({ repo, set: ['src/', '!src/temp/'], cone: true })
     
     // Verify the sparse-checkout file contains the ! prefix
+    const gitdir = await repo.getGitdir()
     const sparseCheckoutFile = join(gitdir, 'info', 'sparse-checkout')
     const fileExists = await fs.exists(sparseCheckoutFile)
     console.log(`[DEBUG Test] sparse-checkout file exists: ${fileExists}, path: ${sparseCheckoutFile}`)
@@ -631,7 +617,7 @@ test('sparse checkout cone mode', async (t) => {
     assert.ok(content.includes('!src/temp/'), 'Should contain exclusion pattern with ! prefix')
     
     // Verify patterns can be listed correctly
-    const patterns = await sparseCheckout({ fs, dir, gitdir, list: true })
+    const patterns = await sparseCheckout({ repo, list: true })
     assert.ok(Array.isArray(patterns), 'sparseCheckout list should return an array')
     assert.ok(patterns.includes('src/'))
     assert.ok(patterns.includes('!src/temp/'))

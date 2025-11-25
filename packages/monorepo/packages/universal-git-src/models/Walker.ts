@@ -1,11 +1,11 @@
 import { GitWalkSymbol } from "../utils/symbols.ts"
 import type { FileSystemProvider, Stat } from './FileSystem.ts'
+import type { Repository } from "../core-utils/Repository.ts"
+import { flat } from '../utils/flat.ts'
 
 // ============================================================================
 // WALKER TYPES
 // ============================================================================
-
-import type { Repository } from "../core-utils/Repository.ts"
 
 /**
  * Walker - an opaque handle for tree traversal
@@ -137,7 +137,8 @@ export class WalkerFactory {
   static workdir(): Walker {
     return WalkerFactory.from(async ({ repo }) => {
       const { GitWalkerFs } = await import('./GitWalkerFs.ts')
-      const dir = repo.dir
+      // Use getDir() to properly check if repository has a working directory
+      const dir = await repo.getDir()
       if (!dir) {
         throw new Error('Cannot create WORKDIR walker for bare repository')
       }
@@ -251,7 +252,6 @@ export function WalkerReduceTree<T = unknown>(
  */
 export function WalkerReduceFlat(): WalkerReduce {
   return async (parent: unknown, children: unknown[]): Promise<unknown> => {
-    const { flat } = await import('../utils/flat.ts')
     const childrenArray = Array.isArray(children) ? children : []
     const flatten = flat(childrenArray as unknown[][])
     if (parent !== undefined) flatten.unshift(parent)
@@ -261,6 +261,10 @@ export function WalkerReduceFlat(): WalkerReduce {
 
 /**
  * Wraps a WalkerIterate function to normalize iteration
+ * 
+ * CRITICAL: Do NOT add custom batching here. The underlying function (fn) should handle
+ * concurrency management. Custom batching with Promise.all() can cause deadlocks in
+ * recursive walks due to resource pool exhaustion (e.g., file handle limits).
  */
 export function WalkerIterate(
   fn: (
@@ -272,6 +276,8 @@ export function WalkerIterate(
     walk: WalkerIterateCallback,
     children: IterableIterator<WalkerEntry[]>
   ): Promise<unknown[]> => {
+    // Simply delegate to the original function.
+    // The underlying library should handle concurrency.
     return fn(walk, children)
   }
 }

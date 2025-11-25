@@ -1,5 +1,5 @@
 import { join } from "../core-utils/GitPath.ts"
-import type { FileSystem } from "../models/FileSystem.ts"
+import type { FileSystem, FileSystemProvider } from "../models/FileSystem.ts"
 import type { GitBackend } from './GitBackend.ts'
 import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
 
@@ -23,6 +23,28 @@ export class FilesystemBackend implements GitBackend {
 
   getType(): string {
     return 'filesystem'
+  }
+
+  /**
+   * Get the gitdir path
+   */
+  getGitdir(): string {
+    return this.gitdir
+  }
+
+  /**
+   * Get the filesystem instance
+   */
+  getFs(): FileSystem {
+    return this.fs
+  }
+
+  /**
+   * Gets the filesystem instance (universal interface method)
+   * @returns FileSystemProvider instance
+   */
+  getFileSystem(): FileSystemProvider {
+    return this.fs
   }
 
   // ============================================================================

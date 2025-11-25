@@ -1,6 +1,6 @@
 import { join } from "../utils/join.ts"
 import { ConfigAccess } from "../utils/configAccess.ts"
-import { RefManager } from "../core-utils/refs/RefManager.ts"
+import { writeSymbolicRef } from "../git/refs/writeRef.ts"
 import { FilesystemBackend } from '../backends/index.ts'
 import { assertParameter } from "../utils/assertParameter.ts"
 import type { ObjectFormat } from "../utils/detectObjectFormat.ts"
@@ -106,7 +106,7 @@ export async function _init({
   await configAccess.setConfigValue('core.symlinks', 'false', 'local')
   await configAccess.setConfigValue('core.ignorecase', 'true', 'local')
 
-  // Use RefManager to set HEAD (symbolic ref)
+  // Use writeSymbolicRef to set HEAD (symbolic ref)
   await gitBackend.writeHEAD(`ref: refs/heads/${defaultBranch}`)
 }
 

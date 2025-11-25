@@ -63,6 +63,12 @@ export async function makeFixture(fixtureName: string): Promise<TestFixture> {
  * This is a wrapper around the git.resetToCommit utility function.
  * It provides a convenient interface for test fixtures.
  * 
+ * @overload
+ * @param repo - Repository instance (preferred approach)
+ * @param ref - Reference or OID to reset to (defaults to 'HEAD')
+ * @param mode - Reset mode: 'soft', 'mixed', or 'hard' (defaults to 'hard' for clean state)
+ * 
+ * @overload
  * @param fs - File system client
  * @param dir - Working directory path
  * @param gitdir - Git directory path (optional, defaults to join(dir, '.git'))
@@ -73,13 +79,39 @@ export async function makeFixture(fixtureName: string): Promise<TestFixture> {
  * @param mode - Reset mode: 'soft', 'mixed', or 'hard' (defaults to 'hard' for clean state)
  */
 export async function resetToCommit(
-  fs: FileSystemProvider,
-  dir: string,
-  gitdir?: string,
-  ref: string = 'HEAD',
-  cache: Record<string, unknown> = {},
-  mode: 'soft' | 'mixed' | 'hard' = 'hard'
+  repoOrFs: Repository | FileSystemProvider,
+  dirOrRef?: string,
+  gitdirOrMode?: string | 'soft' | 'mixed' | 'hard',
+  refOrCache?: string | Record<string, unknown>,
+  cacheOrMode?: Record<string, unknown> | 'soft' | 'mixed' | 'hard',
+  mode?: 'soft' | 'mixed' | 'hard'
 ): Promise<void> {
+  // Check if first parameter is a Repository instance
+  if (repoOrFs && typeof repoOrFs === 'object' && 'getGitdir' in repoOrFs) {
+    const repo = repoOrFs as Repository
+    const ref = (dirOrRef as string) || 'HEAD'
+    const resetMode = (gitdirOrMode as 'soft' | 'mixed' | 'hard') || 'hard'
+    
+    await gitResetToCommit({
+      repo,
+      ref,
+      mode: resetMode,
+    })
+    return
+  }
+  
+  // Fallback to old signature for backward compatibility
+  const fs = repoOrFs as FileSystemProvider
+  const dir = dirOrRef as string
+  const gitdir = gitdirOrMode as string | undefined
+  const ref = (refOrCache as string) || 'HEAD'
+  const cache = (typeof refOrCache === 'object' ? refOrCache : cacheOrMode) as Record<string, unknown> | undefined
+  const resetMode = (typeof cacheOrMode === 'string' ? cacheOrMode : mode) || 'hard'
+  
+  if (!fs || !dir) {
+    throw new Error('resetToCommit: Either repo must be provided, or both fs and dir must be provided')
+  }
+  
   // Use the utility function from isomorphic-git
   // This ensures proper branch state (HEAD is not detached)
   await gitResetToCommit({
@@ -87,8 +119,8 @@ export async function resetToCommit(
     dir,
     gitdir,
     ref,
-    cache,
-    mode,
+    cache: cache || {},
+    mode: resetMode,
   })
 }
 

@@ -1,6 +1,6 @@
 import { NotFoundError } from "../errors/NotFoundError.ts"
 import { MissingParameterError } from "../errors/MissingParameterError.ts"
-import { RefManager } from "../core-utils/refs/RefManager.ts"
+import { resolveRef } from "../git/refs/readRef.ts"
 import { Repository } from "../core-utils/Repository.ts"
 import { normalizeCommandArgs } from '../utils/commandHelpers.ts'
 import { readObject } from "../git/objects/readObject.ts"
@@ -128,7 +128,7 @@ async function _log({
       : Math.floor(since.valueOf() / 1000)
   
   const commits: ReadCommitResult[] = []
-  const oid = await RefManager.resolve({ fs, gitdir, ref })
+  const oid = await resolveRef({ fs, gitdir, ref })
   const visited = new Set<string>()
   const queue: string[] = [oid]
   

@@ -285,7 +285,7 @@ describe('commit', () => {
     // Setup
     const { fs, gitdir } = await makeFixture('test-commit')
     // Test
-    // Use autoDetectConfig: false to ensure no global/system config is read
+    // Use ignoreSystemConfig: true to ensure no global/system config is read
     // This makes the test hermetic and independent of the test environment
     let error = null
     try {
@@ -298,7 +298,8 @@ describe('commit', () => {
           timezoneOffset: 0,
         },
         message: 'Initial commit',
-        autoDetectConfig: false, // Disable auto-detection to ensure no user.name is found
+        autoDetectConfig: false,
+        ignoreSystemConfig: true, // Ignore system/global config to ensure no user.name is found
       })
     } catch (err) {
       error = err
@@ -498,8 +499,9 @@ describe('commit', () => {
         fs,
         gitdir,
         message: 'Test commit',
-        // Missing author - use autoDetectConfig: false to ensure no author from config
+        // Missing author - use ignoreSystemConfig: true to ensure no author from config
         autoDetectConfig: false,
+        ignoreSystemConfig: true,
       })
     } catch (err) {
       error = err

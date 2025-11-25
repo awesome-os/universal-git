@@ -6,7 +6,7 @@
  * that adapts the forge's specific API to this common interface.
  */
 
-import type { HttpClient } from '../../git/remote/GitRemoteHTTP.ts'
+import type { HttpClient } from '../../git/remote/types.ts'
 import type {
   Repository,
   CreateRepoOptions,

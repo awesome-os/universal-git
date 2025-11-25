@@ -270,14 +270,9 @@ export async function verifyBundle({
   }
 }
 
-export interface UnbundleOptions {
-  repo?: Repository
-  fs?: FileSystemProvider
-  dir?: string
-  gitdir?: string
+export interface UnbundleOptions extends BaseCommandOptions {
   filepath: string
   refs?: string[]
-  cache?: Record<string, unknown>
 }
 
 export interface UnbundleResult {
@@ -308,6 +303,8 @@ export interface UnbundleResult {
 export async function unbundle({
   repo: _repo,
   fs: _fs,
+  gitBackend,
+  worktree,
   dir,
   gitdir = dir ? join(dir, '.git') : undefined,
   filepath,
@@ -317,6 +314,8 @@ export async function unbundle({
   const { repo, fs, gitdir: effectiveGitdir, cache: effectiveCache } = await normalizeCommandArgs({
     repo: _repo,
     fs: _fs,
+    gitBackend,
+    worktree,
     dir,
     gitdir,
     cache,
@@ -369,11 +368,14 @@ export async function unbundle({
   const { indexPack } = await import('./indexPack.ts')
   // indexPack expects filepath relative to dir
   // Since we're writing to gitdir/objects/pack/, we need to use a path relative to gitdir
-  // Don't pass repo to avoid normalizeCommandArgs overriding dir with repo.getDir()
+  // For bare repositories, pass gitBackend if available, otherwise use dir/gitdir
   const relativePackPath = join('objects', 'pack', `${packfileName}.pack`)
+  // Try to get gitBackend from repo if available (for bare repos, dir should equal gitdir)
+  const repoGitBackend = repo ? (repo as any)._gitBackend : undefined
   await indexPack({
     fs,
-    dir: effectiveGitdir, // Use gitdir as the base directory
+    gitBackend: repoGitBackend,
+    dir: effectiveGitdir, // Use gitdir as the base directory (bare repo)
     gitdir: effectiveGitdir,
     filepath: relativePackPath,
     cache: effectiveCache,

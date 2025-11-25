@@ -1,4 +1,4 @@
-import type { GitAuth } from "../git/remote/GitRemoteHTTP.ts"
+import type { GitAuth } from "../git/remote/types.ts"
 
 export function extractAuthFromUrl(url: string): { url: string; auth: GitAuth } {
   // For whatever reason, the `fetch` API does not convert credentials embedded in the URL

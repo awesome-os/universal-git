@@ -10,10 +10,60 @@ import {
   readCommit,
 } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture, resetToCommit } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
+import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
+import { ConfigAccess } from '@awesome-os/universal-git-src/utils/configAccess.ts'
+import { join } from '@awesome-os/universal-git-src/utils/join.ts'
 
 const addUserConfig = async (repo: any) => {
   await setConfig({ repo, path: 'user.name', value: 'stash tester' })
   await setConfig({ repo, path: 'user.email', value: 'test@stash.com' })
+}
+
+const clearUserConfig = async (repo: any) => {
+  const gitdir = await repo.getGitdir()
+  const access = new ConfigAccess(repo.fs, gitdir)
+  await access.deleteConfigValue('user.name', 'local')
+  await access.deleteConfigValue('user.email', 'local')
+  // Ensure config file no longer contains stale user entries
+  const configPath = join(gitdir, 'config')
+  const configContent = await repo.fs.read(configPath, 'utf8')
+  if (typeof configContent === 'string') {
+    const lines = configContent.split('\n')
+    const cleanedLines: string[] = []
+    let skipUserSection = false
+    for (const line of lines) {
+      const trimmed = line.trim().toLowerCase()
+      if (trimmed.startsWith('[user')) {
+        skipUserSection = true
+        continue
+      }
+      if (skipUserSection && trimmed.startsWith('[')) {
+        skipUserSection = false
+      }
+      if (skipUserSection) {
+        continue
+      }
+      if (trimmed.includes('user.name') || trimmed.includes('user.email')) {
+        continue
+      }
+      cleanedLines.push(line)
+    }
+    await repo.fs.write(configPath, cleanedLines.join('\n'))
+  }
+}
+
+const reopenRepoWithoutSystemConfig = async (repo: any) => {
+  const fs = repo.fs
+  const gitdir = await repo.getGitdir()
+  const dir = (await repo.getDir()) || undefined
+  return Repository.open({
+    fs,
+    dir,
+    gitdir,
+    cache: repo.cache,
+    autoDetectConfig: false,
+    ignoreSystemConfig: true,
+  })
 }
 
 const stashChanges = async (
@@ -88,10 +138,16 @@ describe('stash', () => {
   describe('abort stash', () => {
     it('error:stash-without-user', async () => {
       const { repo } = await makeFixture('test-stash')
+      const isolatedRepo = await reopenRepoWithoutSystemConfig(repo)
+      await clearUserConfig(isolatedRepo)
+      // Note: repo from makeFixture already has proper config isolation
+      const dir = await isolatedRepo.getDir()
+      await isolatedRepo.fs.write(`${dir}/temp.txt`, 'temp')
+      await add({ repo: isolatedRepo, filepath: ['temp.txt'] })
 
       let error: unknown = null
       try {
-        await stash({ repo, autoDetectConfig: false })
+        await stash({ repo: isolatedRepo })
       } catch (e) {
         error = e
       }
@@ -103,14 +159,14 @@ describe('stash', () => {
     })
 
     it('error:stash-no-changes', async () => {
-      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
+      const { repo } = await makeFixture('test-stash')
 
       // add user to config
       await addUserConfig(repo)
 
       // CRITICAL: Reset to HEAD to ensure a clean state (index and workdir match HEAD)
       // Use hard mode to ensure complete clean state
-      await resetToCommit(fs, dir, gitdir, 'HEAD', repo.cache, 'hard')
+      await resetToCommit(repo, 'HEAD', 'hard')
 
       let error: unknown = null
       try {
@@ -146,10 +202,16 @@ describe('stash', () => {
   describe('stash create', () => {
     it('error:stash-create-without-user', async () => {
       const { repo } = await makeFixture('test-stash')
+      const isolatedRepo = await reopenRepoWithoutSystemConfig(repo)
+      await clearUserConfig(isolatedRepo)
+      // Note: repo from makeFixture already has proper config isolation
+      const dir = await isolatedRepo.getDir()
+      await isolatedRepo.fs.write(`${dir}/temp.txt`, 'temp')
+      await add({ repo: isolatedRepo, filepath: ['temp.txt'] })
 
       let error: unknown = null
       try {
-        await stash({ repo, op: 'create', autoDetectConfig: false })
+        await stash({ repo: isolatedRepo, op: 'create' })
       } catch (e) {
         error = e
       }
@@ -1047,7 +1109,8 @@ describe('stash', () => {
     const { getStashAuthor } = await import('@awesome-os/universal-git-src/git/refs/stash.ts')
     const { fs, gitdir } = await makeFixture('test-empty')
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const repo = await Repository.open({ fs, gitdir, autoDetectConfig: false })
+    // Create repo with ignoreSystemConfig to ensure no global config is used
+    const repo = await Repository.open({ fs, gitdir, cache: {}, autoDetectConfig: false, ignoreSystemConfig: true })
     let error: unknown = null
     try {
       await getStashAuthor({ fs, gitdir, repo })
@@ -1055,8 +1118,8 @@ describe('stash', () => {
       error = err
     }
     // Should throw MissingNameError when author config is missing
-    // Note: If autoDetectConfig finds system/global config, it might succeed
-    // So we disable autoDetectConfig to ensure we test the error path
+    // Note: If ignoreSystemConfig is false, system/global config might provide author
+    // So we use ignoreSystemConfig: true to ensure we test the error path
     assert.notStrictEqual(error, null)
     const { MissingNameError } = await import('@awesome-os/universal-git-src/errors/MissingNameError.ts')
     assert.ok(error instanceof MissingNameError)

@@ -1,4 +1,4 @@
-import { RefManager } from "../core-utils/refs/RefManager.ts"
+import { resolveRef } from "../git/refs/readRef.ts"
 import { readObject } from "../git/objects/readObject.ts"
 import { parse as parseCommit } from "../core-utils/parsers/Commit.ts"
 import { parse as parseTree } from "../core-utils/parsers/Tree.ts"
@@ -60,7 +60,7 @@ export async function show({
     // Resolve ref to OID
     let oid: string
     try {
-      oid = await RefManager.resolve({ fs, gitdir, ref })
+      oid = await resolveRef({ fs, gitdir, ref })
     } catch (err) {
       // If ref resolution fails, try treating it as an OID directly
       if (ref.length === 40 && /^[0-9a-f]{40}$/i.test(ref)) {

@@ -329,16 +329,18 @@ test('Repository', async (t) => {
     assert.strictEqual(isBare, false)
   })
 
-  await t.test('getConfig returns cached config', async () => {
+  await t.test('getConfig returns functional helper across calls', async () => {
     const { fs, dir, gitdir } = await makeFixture('test-empty')
     
     const repo = await Repository.open({ fs, dir, gitdir })
     
     const config1 = await repo.getConfig()
-    const config2 = await repo.getConfig()
+    await config1.set('user.name', 'cached-user', 'local')
     
-    // Should return same instance (cached)
-    assert.strictEqual(config1, config2)
+    const config2 = await repo.getConfig()
+    const value = await config2.get('user.name')
+    
+    assert.strictEqual(value, 'cached-user')
   })
 
   await t.test('getConfig creates new config service when not cached', async () => {

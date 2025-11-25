@@ -70,7 +70,12 @@ export class GitWalkerFs {
 
   async readdir(entry: WorkdirEntry): Promise<string[] | null> {
     const filepath = entry._fullpath
-    const dir = this.repo.dir!
+    // CRITICAL: Use repo.getDir() instead of repo.dir to ensure we get the correct workdir
+    // repo.dir is a private property and may not be initialized correctly
+    const dir = await this.repo.getDir()
+    if (!dir) {
+      throw new Error('Cannot readdir in bare repository')
+    }
     const normalizedFs = createFileSystem(this.repo.fs)
     const names = await normalizedFs.readdir(join(dir, filepath))
     if (names === null) return null
@@ -106,7 +111,11 @@ export class GitWalkerFs {
 
   async stat(entry: WorkdirEntry): Promise<Stat | undefined> {
     if (entry._stat === false) {
-      const dir = this.repo.dir!
+      // CRITICAL: Use repo.getDir() instead of repo.dir to ensure we get the correct workdir
+      const dir = await this.repo.getDir()
+      if (!dir) {
+        throw new Error('Cannot stat in bare repository')
+      }
       const normalizedFs = createFileSystem(this.repo.fs)
       let stat = await normalizedFs.lstat(`${dir}/${entry._fullpath}`)
       if (!stat) {
@@ -135,7 +144,11 @@ export class GitWalkerFs {
 
   async content(entry: WorkdirEntry): Promise<Uint8Array | undefined> {
     if (entry._content === false) {
-      const dir = this.repo.dir!
+      // CRITICAL: Use repo.getDir() instead of repo.dir to ensure we get the correct workdir
+      const dir = await this.repo.getDir()
+      if (!dir) {
+        throw new Error('Cannot read content in bare repository')
+      }
       const gitdir = await this.repo.getGitdir()
       const fs = this.repo.fs
       const normalizedFs = createFileSystem(fs)

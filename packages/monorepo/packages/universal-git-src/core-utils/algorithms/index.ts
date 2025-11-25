@@ -1,4 +1,4 @@
 export * from './CommitGraphWalker.ts'
-export * from './MergeManager.ts'
+// MergeManager removed - use mergeBlobs/mergeTrees from git/merge/ instead
 export * from './SequencerManager.ts'
 

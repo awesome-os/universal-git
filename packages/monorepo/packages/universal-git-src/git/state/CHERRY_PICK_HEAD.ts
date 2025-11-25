@@ -13,6 +13,9 @@ export const readCherryPickHead = async ({
 }): Promise<string | null> => {
   try {
     const content = await fs.read(join(gitdir, 'CHERRY_PICK_HEAD'), 'utf8')
+    if (content === null || content === undefined) {
+      return null
+    }
     return (content as string).trim()
   } catch (err) {
     if ((err as { code?: string }).code === 'NOENT') {

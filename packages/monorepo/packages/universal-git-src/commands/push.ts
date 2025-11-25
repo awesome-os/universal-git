@@ -10,7 +10,10 @@ import { ParseError } from "../errors/ParseError.ts"
 import { PushRejectedError } from "../errors/PushRejectedError.ts"
 import { UserCanceledError } from "../errors/UserCanceledError.ts"
 import { ConfigAccess } from "../utils/configAccess.ts"
-import { RefManager } from "../core-utils/refs/RefManager.ts"
+import { expandRef, expandRefAgainstMap, resolveRefAgainstMap } from "../git/refs/expandRef.ts"
+import { resolveRef } from "../git/refs/readRef.ts"
+import { writeRef } from "../git/refs/writeRef.ts"
+import { deleteRef } from "../git/refs/deleteRef.ts"
 import { Repository } from "../core-utils/Repository.ts"
 import { findMergeBase } from "../core-utils/algorithms/CommitGraphWalker.ts"
 import { getRemoteHelperFor } from "../git/remote/getRemoteHelper.ts"
@@ -34,7 +37,7 @@ import type {
   AuthCallback,
   AuthFailureCallback,
   AuthSuccessCallback,
-} from "../git/remote/GitRemoteHTTP.ts"
+} from "../git/remote/types.ts"
 import type { TcpClient, TcpProgressCallback } from "../daemon/TcpClient.ts"
 import type { SshClient, SshProgressCallback } from "../ssh/SshClient.ts"
 import { GitRemoteDaemon } from "../git/remote/GitRemoteDaemon.ts"
@@ -229,7 +232,7 @@ async function _push({
   corsProxy?: string
   headers?: Record<string, string>
 }): Promise<PushResult> {
-  const ref = _ref || (await _currentBranch({ fs, gitdir }))
+  const ref = _ref || (await _currentBranch({ repo }))
   if (typeof ref === 'undefined') {
     throw new MissingParameterError('ref')
   }
@@ -305,11 +308,11 @@ async function _push({
   // Get remote helper - this will throw UnknownTransportError for unsupported protocols
   const RemoteHelper = getRemoteHelperFor({ url })
 
-  // Use RefManager for basic ref operations
-  const fullRef = await RefManager.expand({ fs, gitdir, ref })
+  // Use capability modules for basic ref operations
+  const fullRef = await expandRef({ fs, gitdir, ref })
   const oid = _delete
     ? '0000000000000000000000000000000000000000'
-    : await RefManager.resolve({ fs, gitdir, ref: fullRef })
+    : await resolveRef({ fs, gitdir, ref: fullRef })
 
   // Call discover with appropriate parameters based on protocol
   let remoteInfo: any
@@ -361,7 +364,7 @@ async function _push({
     fullRemoteRef = fullRef
   } else {
     try {
-      fullRemoteRef = RefManager.expandAgainstMap({
+      fullRemoteRef = expandRefAgainstMap({
         ref: remoteRef,
         map: remoteInfo.refs,
       })
@@ -469,13 +472,13 @@ async function _push({
     if (thinPack) {
       // If there's a default branch for the remote lets skip those objects too
       try {
-        const ref = await RefManager.resolve({
+        const ref = await resolveRef({
           fs,
           gitdir,
           ref: `refs/remotes/${remote}/HEAD`,
           depth: 2,
         })
-        const { oid } = RefManager.resolveAgainstMap({
+        const { oid } = resolveRefAgainstMap({
           ref: ref.replace(`refs/remotes/${remote}/`, ''),
           fullref: ref,
           map: remoteInfo.refs,
@@ -692,14 +695,14 @@ async function _push({
     // Read old remote ref OID for reflog before updating
     let oldRemoteRefOid: string | undefined
     try {
-      oldRemoteRefOid = await RefManager.resolve({ fs, gitdir, ref })
+      oldRemoteRefOid = await resolveRef({ fs, gitdir, ref })
     } catch {
       // Remote ref doesn't exist yet
       oldRemoteRefOid = undefined
     }
     
     if (_delete) {
-      await RefManager.deleteRef({ fs, gitdir, ref })
+      await deleteRef({ fs, gitdir, ref })
       
       // Add descriptive reflog entry for remote ref deletion
       if (oldRemoteRefOid) {
@@ -717,7 +720,7 @@ async function _push({
         })
       }
     } else {
-      await RefManager.writeRef({ fs, gitdir, ref, value: oid })
+      await writeRef({ fs, gitdir, ref, value: oid })
       
       // Add descriptive reflog entry for remote ref update
       if (oldRemoteRefOid !== oid) {

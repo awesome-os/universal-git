@@ -3,8 +3,9 @@ export * from './Zlib.ts'
 export { parse as parseConfig, serialize as serializeConfig } from './ConfigParser.ts'
 export * from './GitPath.ts'
 export * from './Signing.ts'
-export * from './UnifiedConfigService.ts'
-export * from './StateManager.ts'
+// UnifiedConfigService refactored to capability modules in git/config/
+// Use git/config/loader.ts, git/config/merge.ts, git/config/discover.ts instead
+// StateManager export removed - use git/state/ functions directly
 export * from './Repository.ts'
 export * from './Worktree.ts'
 export * from './MergeStream.ts'

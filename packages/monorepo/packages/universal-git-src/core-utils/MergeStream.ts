@@ -168,7 +168,7 @@ export class MergeStream extends ReadableStream<MergeStreamEvent> {
     }
 
     // Use the existing mergeTree function - it's already well-tested
-    const { mergeTree } = await import('../utils/mergeTree.ts')
+    const { mergeTree } = await import('../git/merge/mergeTree.ts')
     
     await this.emit({ type: 'merge-start', data: {} })
 

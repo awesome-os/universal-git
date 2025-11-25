@@ -7,7 +7,7 @@ import { assertParameter } from "../utils/assertParameter.ts"
 import { join } from "../utils/join.ts"
 import { Repository } from "../core-utils/Repository.ts"
 import type { FileSystemProvider } from "../models/FileSystem.ts"
-import type { ProgressCallback } from "../git/remote/GitRemoteHTTP.ts"
+import type { ProgressCallback } from "../git/remote/types.ts"
 import type { CommandWithFilepathOptions } from "../types/commandOptions.ts"
 
 /**
@@ -46,6 +46,8 @@ export type IndexPackOptions = CommandWithFilepathOptions & {
 export async function indexPack({
   repo: _repo,
   fs: _fs,
+  gitBackend,
+  worktree,
   onProgress,
   dir,
   gitdir = dir ? join(dir, '.git') : undefined,
@@ -56,6 +58,8 @@ export async function indexPack({
     const { repo, fs, dir: effectiveDir, gitdir: effectiveGitdir, cache: effectiveCache } = await normalizeCommandArgs({
       repo: _repo,
       fs: _fs,
+      gitBackend,
+      worktree,
       dir,
       gitdir,
       cache,

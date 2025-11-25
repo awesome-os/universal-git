@@ -10,7 +10,7 @@ import { Repository } from "../core-utils/Repository.ts"
 import { _fetch } from "./fetch.ts"
 import { _merge } from "./merge.ts"
 import { _currentBranch } from "./currentBranch.ts"
-import { RefManager } from "../core-utils/refs/RefManager.ts"
+import { resolveRef } from "../git/refs/readRef.ts"
 import type { FileSystemProvider } from "../models/FileSystem.ts"
 import type {
   HttpClient,
@@ -18,7 +18,7 @@ import type {
   AuthCallback,
   AuthFailureCallback,
   AuthSuccessCallback,
-} from "../git/remote/GitRemoteHTTP.ts"
+} from "../git/remote/types.ts"
 import type { MessageCallback } from './push.ts'
 import type { Author } from "../models/GitCommit.ts"
 import type { TcpClient } from "../daemon/TcpClient.ts"
@@ -269,7 +269,7 @@ export async function _pull({
   pruneTags?: boolean
   protocolVersion?: 1 | 2
 }): Promise<void> {
-  const ref = _ref || (await _currentBranch({ fs, gitdir }))
+  const ref = _ref || (await _currentBranch({ repo }))
   if (typeof ref === 'undefined') {
     throw new MissingParameterError('ref')
   }
@@ -304,7 +304,7 @@ export async function _pull({
   const remoteTrackingRef = remoteRef || `refs/remotes/${remote || 'origin'}/${ref.replace('refs/heads/', '')}`
   
   // Resolve the remote tracking branch OID
-  const theirOid = await RefManager.resolve({ fs, gitdir, ref: remoteTrackingRef })
+  const theirOid = await resolveRef({ fs, gitdir, ref: remoteTrackingRef })
   
   // Step 3: Merge the fetched changes
   await _merge({

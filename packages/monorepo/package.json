@@ -2,7 +2,6 @@
   "name": "@awesome-os/universal-git-monorepo",
   "version": "0.0.0-development",
   "workspaces": [
-    "website",
     "packages/*",
     "src",
     "."

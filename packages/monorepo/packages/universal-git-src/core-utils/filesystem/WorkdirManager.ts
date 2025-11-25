@@ -10,7 +10,7 @@ import { normalizeStats } from "../../utils/normalizeStats.ts"
 import { createFileSystem } from '../../utils/createFileSystem.ts'
 import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
 import type { FileSystemProvider } from "../../models/FileSystem.ts"
-import type { ProgressCallback } from "../../git/remote/GitRemoteHTTP.ts"
+import type { ProgressCallback } from "../../git/remote/types.ts"
 
 type CheckoutOperation = ['create' | 'update' | 'delete' | 'delete-index' | 'mkdir' | 'conflict' | 'keep', string, ...unknown[]]
 
@@ -40,9 +40,13 @@ export const analyzeCheckout = async ({
 }): Promise<CheckoutOperation[]> => {
   // CRITICAL: Use the Repository's fs (which is already normalized) for all file operations
   // This ensures we're using the exact same fs instance that the Repository uses
-  // Get the Repository instance to access normalized fs
+  // CRITICAL: Always pass both dir and gitdir to prevent Repository.open() from calling findRoot
+  // which could find the wrong repository (e.g., the workspace repo instead of the test fixture)
+  if (!dir || !gitdir) {
+    throw new Error('analyzeCheckout requires both dir and gitdir to be provided to prevent auto-detection of wrong repository')
+  }
   const { Repository } = await import('../Repository.ts')
-  const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
+  const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true, ignoreSystemConfig: false })
   const normalizedFs = repo.fs
   
   // Check sparse checkout patterns FIRST (before building tree map for optimization)
@@ -346,7 +350,12 @@ export const executeCheckout = async ({
   // This ensures we're using the exact same fs instance that the Repository uses
   // Get the Repository instance to access normalized fs
   const { Repository } = await import('../Repository.ts')
-  const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
+  // CRITICAL: Always pass both dir and gitdir to prevent Repository.open() from calling findRoot
+  // which could find the wrong repository (e.g., the workspace repo instead of the test fixture)
+  if (!dir || !gitdir) {
+    throw new Error('executeCheckout requires both dir and gitdir to be provided to prevent auto-detection of wrong repository')
+  }
+  const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true, ignoreSystemConfig: false })
   const normalizedFs = repo.fs
   
   // --- START OF THE FIX ---
@@ -712,8 +721,13 @@ export const checkout = async ({
   // Read the index ONCE and pass it to both analyzeCheckout and executeCheckout.
   // This ensures both functions operate on the same index object, and changes made
   // by executeCheckout are persisted when we write it back.
+  // CRITICAL: Always pass both dir and gitdir to prevent Repository.open() from calling findRoot
+  // which could find the wrong repository (e.g., the workspace repo instead of the test fixture)
+  if (!dir || !gitdir) {
+    throw new Error('WorkdirManager.checkout requires both dir and gitdir to be provided to prevent auto-detection of wrong repository')
+  }
   const { Repository } = await import('../Repository.ts')
-  const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
+  const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true, ignoreSystemConfig: false })
   const gitIndex = await repo.readIndexDirect(false) // Force fresh read
   
   // Analyze the checkout. Pass the live index object to it.

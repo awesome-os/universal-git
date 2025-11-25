@@ -1,6 +1,7 @@
 import { AlreadyExistsError } from "../errors/AlreadyExistsError.ts"
 import { MissingParameterError } from "../errors/MissingParameterError.ts"
-import { RefManager } from "../core-utils/refs/RefManager.ts"
+import { resolveRef } from "../git/refs/readRef.ts"
+import { writeRef } from "../git/refs/writeRef.ts"
 import { Repository } from "../core-utils/Repository.ts"
 import { normalizeCommandArgs } from '../utils/commandHelpers.ts'
 import { createFileSystem } from '../utils/createFileSystem.ts'
@@ -58,7 +59,7 @@ export async function tag({
     ref = ref.startsWith('refs/tags/') ? ref : `refs/tags/${ref}`
 
     // Resolve passed object
-    const value = await RefManager.resolve({
+    const value = await resolveRef({
       fs,
       gitdir: effectiveGitdir,
       ref: object || 'HEAD',
@@ -66,7 +67,7 @@ export async function tag({
 
     if (!force) {
       try {
-        await RefManager.resolve({ fs, gitdir: effectiveGitdir, ref })
+        await resolveRef({ fs, gitdir: effectiveGitdir, ref })
         // Tag exists
         throw new AlreadyExistsError('tag', ref)
       } catch (e) {
@@ -78,13 +79,13 @@ export async function tag({
     // Read old tag OID for reflog before updating (if tag exists)
     let oldTagOid: string | undefined
     try {
-      oldTagOid = await RefManager.resolve({ fs, gitdir: effectiveGitdir, ref })
+      oldTagOid = await resolveRef({ fs, gitdir: effectiveGitdir, ref })
     } catch {
       // Tag doesn't exist yet, use zero OID
       oldTagOid = undefined
     }
     
-    await RefManager.writeRef({ fs, gitdir: effectiveGitdir, ref, value })
+    await writeRef({ fs, gitdir: effectiveGitdir, ref, value })
     
     // Add descriptive reflog entry for tag creation/update
     // Note: Tags don't typically have reflog in Git, but we'll add it for consistency

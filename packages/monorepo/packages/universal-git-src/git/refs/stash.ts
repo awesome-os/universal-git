@@ -58,27 +58,42 @@ export async function getStashAuthor({
     throw new Error('Repository instance is required for getStashAuthor')
   }
   
-  // CRITICAL: Use the Repository's config service to ensure state consistency
-  // This ensures that setConfig() and getStashAuthor() use the same UnifiedConfigService instance
+  // CRITICAL: Check that user.name exists in LOCAL config (not system/global)
+  // This ensures we throw MissingNameError before calling normalizeAuthorObject
+  // which might return an author from other sources (commit, system config, etc.)
+  // Stash requires local user config - system/global config is not sufficient
+  // We use repo.getConfig().getAll() to check the scope of the config value
+  // This respects Repository's ignoreSystemConfig setting
+  const config = await repo.getConfig()
+  const userNameEntries = await config.getAll('user.name')
+  
+  // Find user.name in local config (or worktree config, which is also local)
+  const localUserName = userNameEntries.find(
+    entry => entry.scope === 'local' || entry.scope === 'worktree'
+  )?.value as string | undefined
+  
+  // If user.name is missing from LOCAL config, null, or empty, throw MissingNameError immediately
+  // This matches git's behavior where stash requires local user config
+  // (system/global config is not sufficient for stash operations)
+  if (!localUserName || (typeof localUserName === 'string' && localUserName.trim() === '')) {
+    const error = new MissingNameError('author')
+    ;(error as any).data = { role: 'author' }
+    throw error
+  }
+  
+  // Now use normalizeAuthorObject to get the full author object
+  // This will use the config we just verified exists
   let author: Author | undefined
   try {
     author = await normalizeAuthorObject({ repo, author: {} })
   } catch (err) {
-    // If normalizeAuthorObject throws an error (e.g., from getConfig()),
-    // convert it to MissingNameError since the author is effectively missing
-    const { NotFoundError } = await import('../../errors/NotFoundError.ts')
-    if (err instanceof NotFoundError || err instanceof Error) {
-      // If we can't access the config, the author is effectively missing
-      // Throw MissingNameError to match the expected error type
-      const error = new MissingNameError('author')
-      ;(error as any).data = { role: 'author' }
-      throw error
-    }
+    // If normalizeAuthorObject throws an error, re-throw it
+    // (we already checked config above, so this shouldn't happen for missing config)
     throw err
   }
   
-  // Check if author is missing (name is undefined)
-  if (!author || !author.name) {
+  // Final safety check - should not be needed since we checked config above
+  if (!author || !author.name || (typeof author.name === 'string' && author.name.trim() === '')) {
     const error = new MissingNameError('author')
     ;(error as any).data = { role: 'author' }
     throw error

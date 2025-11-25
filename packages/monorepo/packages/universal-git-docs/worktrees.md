@@ -64,6 +64,32 @@ await worktree({
 })
 ```
 
+## Opening a Repository with a Worktree
+
+When working with linked worktrees, you can use `Repository.open()` with both `dir` and `gitdir` parameters:
+
+```typescript
+import { Repository } from 'universal-git'
+
+// Open a linked worktree
+// gitdir points to the main repository's .git directory
+// dir points to the worktree checkout directory
+const repo = await Repository.open({
+  fs,
+  dir: '/path/to/worktree',           // Worktree checkout directory
+  gitdir: '/path/to/main-repo/.git', // Main repository gitdir
+  cache: {},
+})
+```
+
+**Important**: When both `dir` and `gitdir` are provided, `Repository.open()` treats this as a linked worktree scenario:
+- **`gitdir`** === bare repository (or main repository) - the path to the `.git` directory
+- **`dir`** === linked worktree checkout - the working directory
+
+The worktree's `.git` is typically a **file** (not a directory) pointing to the gitdir. The implementation treats the gitdir as a bare repository and uses the dir as the working directory. No inference is performed - the provided paths are used as-is.
+
+For more details, see [Repository.open() Behavior](./repository.md#linked-worktree-pattern) and [dir vs gitdir](./dir-vs-gitdir.md#linked-worktree-pattern).
+
 ## Examples
 
 ### Example 1: Working on Multiple Branches
@@ -402,9 +428,143 @@ const worktrees = await worktree({
 console.log(worktrees) // Check if path is in the list
 ```
 
+## Worktree Architecture
+
+### GitWorktreeBackend Interface
+
+The worktree system is built on the `GitWorktreeBackend` interface, which provides a unified API for all worktree operations. This enables:
+
+- **Backend-Agnostic Operations**: Work with any backend (filesystem, S3, SQL, etc.)
+- **Optimized Implementations**: Each backend can provide optimized versions of operations
+- **Consistent API**: All worktree operations follow the same pattern
+- **Chainable Operations**: Enable fluent API patterns for common workflows
+
+### Worktree Operations
+
+All worktree-related operations are unified in the `GitWorktreeBackend` interface:
+
+- **File Operations**: `add()`, `remove()`
+- **Commit Operations**: `commit()`
+- **Branch/Checkout Operations**: `checkout()`, `switch()`
+- **Status Operations**: `status()`, `statusMatrix()`
+- **Reset Operations**: `reset()`
+- **Diff Operations**: `diff()`
+- **Sparse Checkout**: `sparseCheckoutInit()`, `sparseCheckoutSet()`, `sparseCheckoutList()`
+- **Merge Operations**: `mergeTree()` (with index management and worktree file writing)
+
+### Chainable API Pattern
+
+The `Worktree` class provides a thin wrapper that delegates to `GitWorktreeBackend`, enabling chainable operations:
+
+```typescript
+import { Repository } from 'universal-git'
+
+const repo = await Repository.open({ fs, dir: '/path/to/repo' })
+const worktree = await repo.worktree()
+
+// Chainable workflow: checkout -> add -> commit
+await worktree
+  .checkout('feature-branch', { create: true })
+  .then(wt => wt.add(['file1.txt', 'file2.txt']))
+  .then(wt => wt.commit('Add new files'))
+
+// Or with async/await for better readability
+const wt = await repo.worktree()
+await wt.checkout('feature-branch', { create: true })
+await wt.add(['file1.txt'])
+await wt.commit('Add file1.txt')
+
+// Switch branches and check status
+await wt.switch('main')
+const status = await wt.status()
+
+// Reset and sparse checkout
+await wt.reset('HEAD', 'hard')
+await wt.sparseCheckoutSet(['src/'], true)
+```
+
+### Merge Operations in Worktree
+
+**Important**: `mergeTree()` is a worktree-level operation, not a pure algorithm. It belongs in `GitWorktreeBackend` because it:
+
+- **Manages the worktree index**: Stages conflicts, updates index
+- **Writes conflicted files**: Writes conflicted files to the worktree
+- **Uses worktree directory**: Performs file operations in the worktree's directory
+
+**Usage**:
+
+```typescript
+const repo = await Repository.open({ fs, dir: '/path/to/repo' })
+const worktree = await repo.worktree()
+
+// Merge trees with index management
+const mergedTreeOid = await worktree.mergeTree(
+  ourOid,
+  baseOid,
+  theirOid,
+  {
+    abortOnConflict: false,
+    ourName: 'main',
+    theirName: 'feature'
+  }
+)
+
+if (typeof mergedTreeOid === 'string') {
+  console.log('Merge successful:', mergedTreeOid)
+} else {
+  // Handle MergeConflictError
+  console.log('Conflicts in:', mergedTreeOid.filepaths)
+}
+```
+
+**Note**: Pure merge algorithms (`mergeBlobs()`, `mergeTrees()`) stay in `git/merge/` as capability modules. They are stateless and don't interact with the worktree. Only `mergeTree()` with index management belongs in `GitWorktreeBackend`.
+
+### Relationship to GitBackend
+
+The architecture distinguishes between two types of backends:
+
+- **`GitBackend`**: Repository data (objects, refs, config, index) + remote operations
+- **`GitWorktreeBackend`**: Working directory files + worktree operations (checkout, commit, add, mergeTree, status, reset, diff, etc.)
+
+Both follow the same pattern: interface defines operations, implementations provide storage-specific optimizations.
+
+### Backend Implementations
+
+**Current Implementations**:
+- `GitWorktreeFs` - Filesystem implementation (default for most use cases)
+
+**Future Implementations** (planned):
+- `GitWorktreeMemory` - In-memory storage
+- `GitWorktreeIndexedDb` - Browser IndexedDB storage
+- `GitWorktreeS3` - S3 storage (AWS S3, compatible services)
+- `GitWorktreeSql` - SQL database storage
+- `GitWorktreeBlob` - Blob storage (Azure Blob, GCS, etc.)
+
+Each backend can provide optimized implementations. For example:
+- S3 backend can batch operations
+- SQL backend can use transactions
+- Memory backend can provide fast in-memory operations
+
+### Migration Path
+
+The unified worktree API is being gradually introduced:
+
+1. **Current State**: Commands (`checkout`, `commit`, `add`, `status`, `reset`, `mergeTree`, etc.) work standalone
+2. **Future State**: Commands will internally delegate to `Worktree` methods
+3. **Preferred API**: Use `worktree().*()` methods for chainable, context-aware operations
+
+**Backward Compatibility**: All existing commands remain available. The new API is additive, not a replacement.
+
+For more details, see:
+- [Merge Architecture](./merge.md#merge-architecture) - Merge capability modules vs. worktree operations
+- [Architecture](./architecture.md#5-merge-capability-modules) - Merge capability modules
+- [Repository](./repository.md) - Repository class and worktree integration
+
 ## See Also
 
 - [Checkout](./checkout.md) - Checkout operations
 - [Branch](./branch.md) - Branch management
 - [Repository](./repository.md) - Repository class
+- [Merge](./merge.md) - Merge operations and architecture
+- [Architecture](./architecture.md#5-merge-capability-modules) - Merge capability modules
 

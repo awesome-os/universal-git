@@ -5,14 +5,14 @@ import { MergeConflictError } from "../errors/MergeConflictError.ts"
 import { MergeNotSupportedError } from "../errors/MergeNotSupportedError.ts"
 import { NotFoundError } from "../errors/NotFoundError.ts"
 import { UnmergedPathsError } from "../errors/UnmergedPathsError.ts"
-import { RefManager } from "../core-utils/refs/RefManager.ts"
+import { expandRef } from "../git/refs/expandRef.ts"
 import { findMergeBase } from "../core-utils/algorithms/CommitGraphWalker.ts"
 // mergeTree is now used via MergeStream
 import { parse as parseCommit } from "../core-utils/parsers/Commit.ts"
 import { readObject } from "../git/objects/readObject.ts"
 import { detectObjectFormat } from "../utils/detectObjectFormat.ts"
 import { Repository } from "../core-utils/Repository.ts"
-import { UnifiedConfigService } from "../core-utils/UnifiedConfigService.ts"
+// UnifiedConfigService refactored to capability modules in git/config/
 import { abbreviateRef } from "../utils/abbreviateRef.ts"
 import { MissingNameError } from "../errors/MissingNameError.ts"
 import { MissingParameterError } from "../errors/MissingParameterError.ts"
@@ -222,7 +222,7 @@ export async function _merge({
   signingKey?: string
   onSign?: SignCallback
   allowUnrelatedHistories?: boolean
-  mergeDriver?: import('../core-utils/algorithms/MergeManager.ts').MergeDriverCallback
+  mergeDriver?: import('../git/merge/types.ts').MergeDriverCallback
 }): Promise<MergeResult> {
   // Extract components from Repository for consistent state
   const fs = repo.fs
@@ -256,7 +256,7 @@ export async function _merge({
   const configService = await repo.getConfig()
   
   if (ours === undefined) {
-    ours = await _currentBranch({ fs, gitdir, fullname: true })
+    ours = await _currentBranch({ repo, fullname: true })
     if (ours === undefined) {
       throw new Error('Cannot merge: no current branch (detached HEAD state)')
     }
@@ -288,12 +288,10 @@ export async function _merge({
     }
   }
   
-  // Expand refs - use RefManager.expand() for now (it delegates to new functions)
-  // TODO: Consider adding expand() to Repository or src/git/refs/
-  const { RefManager } = await import('../core-utils/refs/RefManager.ts')
+  // Expand refs using capability modules
   // At this point, ours is guaranteed to be defined
-  ours = await RefManager.expand({ fs, gitdir, ref: ours! })
-  theirs = await RefManager.expand({ fs, gitdir, ref: theirs })
+  ours = await expandRef({ fs, gitdir, ref: ours! })
+  theirs = await expandRef({ fs, gitdir, ref: theirs })
   
   // Use Repository.resolveRef() for consistency
   const ourOid = await repo.resolveRef(ours)

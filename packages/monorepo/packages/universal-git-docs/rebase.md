@@ -248,6 +248,26 @@ If you need to recover commits:
    await resetToCommit({ fs, dir, ref: origHead })
    ```
 
+## Internal Merge Architecture
+
+Rebase uses the `mergeTrees()` capability module internally to merge each commit's tree with the upstream branch's tree. This is a pure algorithm capability module that:
+
+- **Location**: `src/git/merge/mergeTrees.ts`
+- **Purpose**: Performs recursive three-way merge on tree structures
+- **Input**: Tree OIDs (base, ours, theirs)
+- **Output**: `{ mergedTree: TreeEntry[], mergedTreeOid: string, conflicts: string[] }`
+- **No index or worktree operations** - only reads/writes Git objects
+
+The `mergeTrees()` capability module uses `mergeBlobs()` internally for merging individual files, ensuring consistent merge behavior across all operations.
+
+**Why `mergeTrees()` instead of `mergeTree()`?**
+- Rebase needs a pure algorithm without index management
+- It creates new commits for each rebased commit rather than updating the worktree directly
+- It uses the merged tree result to create new commit objects
+- It needs to handle multiple commits in sequence without side effects
+
+For more details on merge capability modules, see [Merge Architecture](./merge.md#merge-architecture) and [Architecture](./architecture.md#5-merge-capability-modules).
+
 ## See Also
 
 - [Cherry Pick](./cherry-pick.md) - Apply individual commits

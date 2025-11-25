@@ -26,9 +26,22 @@ export async function normalizeAuthorObject({
 }): Promise<Author | undefined> {
   // CRITICAL: Use the Repository's config service to ensure state consistency
   // This ensures that setConfig() and getAuthor() use the same UnifiedConfigService instance
-  const config = await repo.getConfig()
-  const nameConfig = (await config.get('user.name')) as string | undefined
-  const emailConfig = ((await config.get('user.email')) as string | undefined) || ''
+  let nameConfig: string | undefined
+  let emailConfig: string | undefined
+  try {
+    const config = await repo.getConfig()
+    nameConfig = (await config.get('user.name')) as string | undefined
+    emailConfig = ((await config.get('user.email')) as string | undefined) || ''
+    // Ensure nameConfig is truly undefined (not empty string) if config is missing
+    if (nameConfig === '' || nameConfig === null) {
+      nameConfig = undefined
+    }
+  } catch {
+    // If config access fails (e.g., repository doesn't exist), return undefined
+    // This will be handled by the caller (e.g., getStashAuthor) to throw MissingNameError
+    nameConfig = undefined
+    emailConfig = undefined
+  }
   
   // CRITICAL: Only use current timestamp if no timestamp is provided in author or commit
   // This ensures tests that provide specific timestamps get those exact timestamps
@@ -59,12 +72,15 @@ export async function normalizeAuthorObject({
     defaultAuthor,
     commit ? commit.author : undefined,
     author
-  ) as Author
+  ) as Partial<Author>
 
-  if (normalizedAuthor.name === undefined) {
+  // Check if name is missing - this must be checked before returning
+  // name can be undefined if it's not a property of the object, or if it's explicitly undefined
+  if (normalizedAuthor.name === undefined || normalizedAuthor.name === null || normalizedAuthor.name === '') {
     return undefined
   }
 
-  return normalizedAuthor
+  // TypeScript assertion: we know name exists at this point
+  return normalizedAuthor as Author
 }
 

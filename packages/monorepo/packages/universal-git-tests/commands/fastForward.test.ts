@@ -18,7 +18,7 @@ test('fastForward', async (t) => {
   if (!sharedFixture && !SKIP_HTTP_TESTS) {
     sharedFixture = await makeFixture('test-pull')
     // Ensure there's a current branch for tests that need it
-    await _currentBranch({ fs: sharedFixture.fs, gitdir: await sharedFixture.repo.getGitdir(), fullname: true })
+    await _currentBranch({ repo: sharedFixture.repo, fullname: true })
   }
   await t.test('param:fs-missing', async () => {
     try {
@@ -93,13 +93,11 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return // Skip test if network access is not available
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
         singleBranch: true,
@@ -116,13 +114,11 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -139,13 +135,11 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         ref: 'master',
         remote: 'origin', // 'origin' is configured in test-pull fixture
         singleBranch: true,
@@ -163,16 +157,15 @@ test('fastForward', async (t) => {
     }
     // Optimized: Use test-empty fixture - minimal setup, error thrown when reading config
     // The error happens in _fetch when trying to get remote URL from config
-    const { fs, dir, gitdir, _fs } = await makeFixture('test-empty')
+    const { repo, _fs } = await makeFixture('test-empty')
+    const gitdir = await repo.getGitdir()
     // Write minimal config without remote - this is all we need for the test
     const configPath = `${gitdir}/config`
     await _fs.promises.writeFile(configPath, '[core]\n\trepositoryformatversion = 0\n')
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         ref: 'master',
         remote: 'nonexistent-remote', // This remote does not exist in config
         singleBranch: true,
@@ -188,16 +181,14 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     try {
       // fastForward should always use fastForward: true and fastForwardOnly: true
       // This means it will only perform fast-forward merges and throw FastForwardError
       // if a merge commit would be required
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -275,13 +266,11 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -298,13 +287,11 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -321,13 +308,11 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -344,13 +329,11 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -367,14 +350,12 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     let progressCalled = false
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -394,14 +375,12 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     let messageCalled = false
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -421,14 +400,12 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     let authCalled = false
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -449,12 +426,11 @@ test('fastForward', async (t) => {
     if (!sharedFixture) {
       return
     }
-    const { fs, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -473,13 +449,11 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir: '',
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -496,13 +470,11 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir: undefined,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -519,13 +491,11 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -542,13 +512,11 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -565,14 +533,12 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     let authSuccessCalled = false
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -592,14 +558,12 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     let authFailureCalled = false
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -619,13 +583,11 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         // ref not provided, should default to 'HEAD'
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -642,13 +604,11 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -665,13 +625,11 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -688,7 +646,7 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     let progressCalled = false
     let messageCalled = false
     let authCalled = false
@@ -697,10 +655,8 @@ test('fastForward', async (t) => {
     
     try {
       await fastForward({
-        fs,
+        repo,
         http,
-        dir,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
@@ -733,7 +689,7 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
+    const { repo } = sharedFixture
     // Use a mock HTTP client that fails immediately to validate URL parameter usage
     // without doing a full network fetch (much faster)
     const mockHttp = {
@@ -745,10 +701,8 @@ test('fastForward', async (t) => {
     } as any
     try {
       await fastForward({
-        fs,
+        repo,
         http: mockHttp,
-        dir,
-        gitdir,
         ref: 'master',
         url: 'https://github.com/octocat/Hello-World.git',
         // remote not provided, should use url directly

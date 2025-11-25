@@ -23,7 +23,7 @@ export type {
   AuthCallback,
   AuthFailureCallback,
   AuthSuccessCallback,
-} from "./git/remote/GitRemoteHTTP.ts"
+} from "./git/remote/types.ts"
 
 // Git Object types
 export type { ObjectType } from "./models/GitObject.ts"
@@ -48,7 +48,7 @@ export type {
 export type { SignParams, SignCallback } from "./core-utils/Signing.ts"
 
 // Merge driver types
-export type { MergeDriverParams, MergeDriverCallback } from "./core-utils/algorithms/MergeManager.ts"
+export type { MergeDriverParams, MergeDriverCallback } from "./git/merge/types.ts"
 
 // API operation result types
 export type { MessageCallback, PrePushParams, PrePushCallback, PushResult } from './commands/push.ts'

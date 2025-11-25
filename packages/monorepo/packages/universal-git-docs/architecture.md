@@ -89,7 +89,12 @@ src/git/
 ├── bundle/              # Git bundle format
 ├── lfs/                 # Git LFS operations
 ├── remote/              # Remote operations
-└── forge/               # Git forge adapters (GitHub, GitLab, etc.)
+├── forge/               # Git forge adapters (GitHub, GitLab, etc.)
+├── merge/               # Merge capability modules
+│   ├── mergeBlobs.ts   # Pure algorithm for merging blob content
+│   ├── mergeTrees.ts   # Pure algorithm for merging tree structures
+│   ├── mergeTree.ts    # Higher-level utility with index management (TO BE MOVED TO GitWorktreeBackend)
+│   └── mergeFile.ts    # Merge driver callback
 ```
 
 **Example:**
@@ -128,14 +133,52 @@ The **models layer** contains data structures and parsers:
 
 ### Backends Layer (`src/backends/`)
 
-The **backends layer** provides storage abstractions:
+The **backends layer** provides storage abstractions for Git repository data:
 
-- `GitBackend.ts` - Backend interface
+- `GitBackend.ts` - Complete Git repository backend interface (storage + operations)
 - `FilesystemBackend.ts` - Filesystem implementation
 - `SQLiteBackend.ts` - SQLite implementation
 - `InMemoryBackend.ts` - In-memory implementation
 
 See [Backends](./backends.md) for more information.
+
+### Worktree Layer (`src/git/worktree/`)
+
+The **worktree layer** provides working directory abstractions and operations:
+
+```
+src/git/worktree/
+├── GitWorktreeBackend.ts      # Interface for working directory operations
+├── Worktree.ts                 # Thin wrapper class that delegates to backend
+├── fs/
+│   └── GitWorktreeFs.ts       # Filesystem implementation
+├── memory/
+│   └── GitWorktreeMemory.ts    # In-memory storage (future)
+├── indexeddb/
+│   └── GitWorktreeIndexedDb.ts # Browser IndexedDB storage (future)
+├── s3/
+│   └── GitWorktreeS3.ts        # S3 storage (future)
+├── sql/
+│   └── GitWorktreeSql.ts       # SQL database storage (future)
+└── blob/
+    └── GitWorktreeBlob.ts      # Blob storage (future)
+```
+
+**Purpose**: Complete working directory abstraction (storage + operations)
+
+**Operations**: All worktree-related operations are unified in `GitWorktreeBackend`:
+- File operations: `add()`, `remove()`
+- Commit operations: `commit()`
+- Branch/checkout: `checkout()`, `switch()`
+- Status: `status()`, `statusMatrix()`
+- Reset: `reset()`
+- Diff: `diff()`
+- Sparse checkout: `sparseCheckoutInit()`, `sparseCheckoutSet()`, `sparseCheckoutList()`
+- Merge: `mergeTree()` (with index management and worktree file writing)
+
+**Architecture**: `Worktree` class is a thin wrapper that delegates to `GitWorktreeBackend` implementations, enabling chainable API patterns.
+
+See [Worktrees](./worktrees.md) for more information.
 
 ## Mapping: Code to `.git` Directory
 
@@ -220,7 +263,72 @@ See [Ref Writing Architecture](./ARCHITECTURE_REF_WRITING.md) for details.
 
 ### 4. Backend Abstraction
 
-Backends abstract storage, but ref operations still go through centralized functions. See [Backends](./backends.md) for details.
+The codebase uses a unified backend architecture with three types of backends:
+
+**1. `GitBackend`** (`src/backends/GitBackend.ts`)
+- **Purpose**: Complete Git repository backend (storage + operations)
+- **Storage**: Git repository data (objects, refs, config, index, reflogs, hooks, etc.)
+- **Operations**: Repository operations (read/write objects, refs, config, etc.)
+- **Remote Operations**: `clone()`, `fetch()`, `push()`, `discover()`, `connect()` (Git protocol)
+- **REST API Operations**: `createPullRequest()`, `getIssue()`, `createRelease()`, etc. (optional, for forges)
+- **Implementations**: `FilesystemBackend`, `SQLiteBackend`, `InMemoryBackend`, `GitBackendS3` (future), etc.
+
+**2. `GitWorktreeBackend`** (`src/git/worktree/GitWorktreeBackend.ts`)
+- **Purpose**: Complete working directory abstraction (storage + operations)
+- **Storage**: Working directory files (project files, not Git repository data)
+- **Operations**: All worktree-related operations (checkout, commit, add, status, reset, diff, sparseCheckout, mergeTree, etc.)
+- **Index Management**: All operations that modify the worktree index (staging area) belong here
+- **Implementations**: `GitWorktreeFs`, `GitWorktreeMemory` (future), `GitWorktreeS3` (future), etc.
+- **Architecture**: `Worktree` class is a thin wrapper that delegates to `GitWorktreeBackend` implementations
+
+**3. Remote Backends** (future)
+- **Purpose**: Git protocol and REST API operations
+- **Protocol Support**: HTTP, SSH, file://, git://, REST API
+- **Implementations**: `GitProtocolHttp`, `GitProtocolSsh`, `GitForgeHttpApiGithub`, etc.
+
+**Key Distinctions**:
+- `GitBackend` = Repository data (objects, refs, config, index) + remote operations
+- `GitWorktreeBackend` = Working directory files + worktree operations (checkout, commit, add, mergeTree, status, reset, diff, etc.)
+- Both follow the same pattern: interface defines operations, implementations provide storage-specific optimizations
+- **Important**: `mergeTree()` with index management belongs in `GitWorktreeBackend` (worktree operation), while pure merge algorithms (`mergeBlobs`, `mergeTrees`) stay in `src/git/merge/` (capability modules)
+
+**Benefits**:
+- **Backend-Agnostic**: Operations work with any backend (filesystem, S3, SQL, etc.)
+- **Optimization Opportunities**: Each backend can optimize operations (e.g., S3 batching, SQL transactions)
+- **Testability**: Easy to mock backends for testing
+- **Extensibility**: New backends can provide custom implementations
+- **Separation of Concerns**: Clear distinction between repository data and working directory operations
+
+See [Backends](./backends.md) and [Worktrees](./worktrees.md) for more information.
+
+### 5. Merge Capability Modules
+
+The merge system is organized into capability modules (pure algorithms) and higher-level utilities:
+
+**Pure Algorithm Capability Modules** (`src/git/merge/`):
+- `mergeBlobs()` - Pure algorithm for merging blob content (strings/buffers)
+  - **Use when:** You have raw content to merge, need a pure algorithm, or are implementing merge operations in `cherryPick`/`rebase`
+  - **No file system operations** - works with raw content only
+- `mergeTrees()` - Pure algorithm for merging tree structures
+  - **Use when:** You have tree OIDs and need a merged tree without index management
+  - **No index or worktree operations** - only reads/writes Git objects
+
+**Higher-Level Utilities**:
+- `mergeTree()` - Higher-level utility with index management and worktree operations
+  - **Use when:** You need to merge trees with index management, write conflicted files to worktree, or work with `Repository` and `GitIndex`
+  - **Note:** Will be moved to `GitWorktreeBackend` in Phase 0A.1 as it's a worktree-level operation
+  - **Why worktree operation?** It manages the worktree index (stages conflicts, updates index), writes conflicted files to the worktree, and uses the worktree's directory for file operations
+  - **Future API:** `worktree.mergeTree(ourOid, baseOid, theirOid, options)` will be the preferred API
+- `mergeFile()` - **Adapter function** that bridges the `MergeDriverCallback` interface to the `mergeBlobs()` capability module
+  - **Use when:** You need a `MergeDriverCallback` for `mergeTree()` operations
+  - **Purpose:** Adapter that converts between `MergeDriverCallback` format (`{ branches, contents, path }`) and `mergeBlobs()` format (`{ base, ours, theirs, ourName, theirName }`)
+  - **Interface Bridging:** Converts array-based parameters to individual parameters and converts return format from `{ hasConflict }` to `{ cleanMerge }`
+
+**Architecture Benefits:**
+- **Single Source of Truth**: Merge algorithm logic lives in `mergeBlobs()` capability module
+- **Clear Separation**: Pure algorithms vs. higher-level utilities with file system operations
+- **Easier Maintenance**: Changes to merge algorithm only need to be made in one place
+- **Better Test Coverage**: Algorithm tests are separate from utility tests
 
 ## Finding Code
 
@@ -238,7 +346,22 @@ Look in `src/git/objects/readCommit.ts` or `src/commands/readCommit.ts`
 
 ### "Where is the merge logic?"
 
-Look in `src/commands/merge.ts` (high-level) and `src/core-utils/MergeStream.ts` (low-level)
+Look in:
+- `src/commands/merge.ts` - High-level merge command
+- `src/core-utils/MergeStream.ts` - Merge operation stream
+- `src/git/merge/mergeBlobs.ts` - Pure algorithm for merging blob content (capability module)
+- `src/git/merge/mergeTrees.ts` - Pure algorithm for merging tree structures (capability module)
+- `src/git/merge/mergeTree.ts` - Higher-level utility with index management (TO BE MOVED TO GitWorktreeBackend)
+- `src/git/worktree/GitWorktreeBackend.ts` - Future location for `mergeTree()` (worktree operation)
+
+### "Where are worktree operations?"
+
+Look in:
+- `src/git/worktree/GitWorktreeBackend.ts` - Interface for all worktree operations
+- `src/git/worktree/Worktree.ts` - Thin wrapper class that delegates to backend
+- `src/git/worktree/fs/GitWorktreeFs.ts` - Filesystem implementation
+- `src/core-utils/Repository.ts` - Repository class with `worktree()` method
+- `src/commands/` - Commands that delegate to worktree operations (checkout, commit, add, status, reset, diff, etc.)
 
 ### "Where is the clone command?"
 
@@ -253,10 +376,88 @@ Look in `src/commands/clone.ts`
 5. **Better Debugging**: Can trace code to specific `.git` files
 6. **Maintainable**: Structure matches Git's organization
 
+## Unified Worktree API
+
+The worktree system provides a unified, chainable API for all worktree operations through the `GitWorktreeBackend` interface and `Worktree` class.
+
+### Chainable API Pattern
+
+The `Worktree` class enables fluent, chainable operations:
+
+```typescript
+import { Repository } from 'universal-git'
+
+const repo = await Repository.open({ fs, dir: '/path/to/repo' })
+const worktree = await repo.worktree()
+
+// Chainable workflow: checkout -> add -> commit
+await worktree
+  .checkout('feature-branch', { create: true })
+  .then(wt => wt.add(['file1.txt', 'file2.txt']))
+  .then(wt => wt.commit('Add new files'))
+
+// Or with async/await
+const wt = await repo.worktree()
+await wt.checkout('feature-branch', { create: true })
+await wt.add(['file1.txt'])
+await wt.commit('Add file1.txt')
+```
+
+### Worktree Operations
+
+All worktree-related operations are unified in `GitWorktreeBackend`:
+
+- **File Operations**: `add()`, `remove()`
+- **Commit Operations**: `commit()`
+- **Branch/Checkout**: `checkout()`, `switch()`
+- **Status**: `status()`, `statusMatrix()`
+- **Reset**: `reset()`
+- **Diff**: `diff()`
+- **Sparse Checkout**: `sparseCheckoutInit()`, `sparseCheckoutSet()`, `sparseCheckoutList()`
+- **Merge**: `mergeTree()` (with index management and worktree file writing)
+
+### Why `mergeTree()` is a Worktree Operation
+
+`mergeTree()` belongs in `GitWorktreeBackend` (not in `git/merge/`) because it:
+
+1. **Manages the worktree index**: Stages conflicts, updates index
+2. **Writes conflicted files**: Writes conflicted files to the worktree
+3. **Uses worktree directory**: Performs file operations in the worktree's directory
+
+**Distinction**:
+- **Pure algorithms** (`mergeBlobs()`, `mergeTrees()`) stay in `git/merge/` as capability modules
+- **Worktree operations** (`mergeTree()` with index management) belong in `GitWorktreeBackend`
+
+### Backend Implementations
+
+**Current**:
+- `GitWorktreeFs` - Filesystem implementation (default)
+
+**Future** (planned):
+- `GitWorktreeMemory` - In-memory storage
+- `GitWorktreeIndexedDb` - Browser IndexedDB storage
+- `GitWorktreeS3` - S3 storage (AWS S3, compatible services)
+- `GitWorktreeSql` - SQL database storage
+- `GitWorktreeBlob` - Blob storage (Azure Blob, GCS, etc.)
+
+Each backend can provide optimized implementations (e.g., S3 batching, SQL transactions).
+
+### Architecture Benefits
+
+- **Backend-Agnostic**: Operations work with any backend
+- **Optimization Opportunities**: Each backend can optimize operations
+- **Testability**: Easy to mock backends for testing
+- **Extensibility**: New backends can provide custom implementations
+- **Separation of Concerns**: `Worktree` is a thin wrapper, backend handles implementation
+- **Consistency**: Matches the pattern used by `GitBackend` (storage + operations in one interface)
+
+For more details, see [Worktrees](./worktrees.md#worktree-architecture).
+
 ## See Also
 
 - [Ref Writing Architecture](./ARCHITECTURE_REF_WRITING.md) - How refs work
 - [Backends](./backends.md) - Storage backends
 - [Repository Class](./repository.md) - Repository context
+- [Worktrees](./worktrees.md) - Worktree operations and architecture
 - [dir vs gitdir](./dir-vs-gitdir.md) - Working tree vs git directory
 

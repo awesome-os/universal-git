@@ -8,7 +8,7 @@ import type {
   AuthFailureCallback,
   AuthSuccessCallback,
   GitAuth,
-} from "../git/remote/GitRemoteHTTP.ts"
+} from "../git/remote/types.ts"
 import type { ServerRef } from "../git/refs/types.ts"
 import type { TcpClient, TcpProgressCallback } from "../daemon/TcpClient.ts"
 

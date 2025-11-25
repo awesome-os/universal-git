@@ -1,8 +1,9 @@
-import { RefManager } from "../core-utils/refs/RefManager.ts"
+import { resolveRef } from "../git/refs/readRef.ts"
+import { writeRef } from "../git/refs/writeRef.ts"
 import { readObject } from "../git/objects/readObject.ts"
 import { writeCommit } from "./writeCommit.ts"
 import { parse as parseCommit, serialize as serializeCommit } from "../core-utils/parsers/Commit.ts"
-import { mergeTrees } from "../core-utils/algorithms/MergeManager.ts"
+import { mergeTrees } from "../git/merge/mergeTrees.ts"
 import { findMergeBase } from "../core-utils/algorithms/CommitGraphWalker.ts"
 import { topologicalSort } from "../core-utils/algorithms/CommitGraphWalker.ts"
 import {
@@ -94,7 +95,7 @@ export async function rebase({
       const headRef = await repo.resolveRef('HEAD')
       // Check if HEAD is a symbolic ref
       try {
-        const headRefValue = await RefManager.resolve({ fs, gitdir: effectiveGitdir, ref: 'HEAD', depth: 2 })
+        const headRefValue = await resolveRef({ fs, gitdir: effectiveGitdir, ref: 'HEAD', depth: 2 })
         if (headRefValue.startsWith('ref: ')) {
           currentBranch = headRefValue.slice('ref: '.length)
           currentHead = await repo.resolveRef(currentBranch)
@@ -376,8 +377,7 @@ async function continueRebase({
   }
 
   // Get current HEAD
-  const { RefManager } = await import("../core-utils/refs/RefManager.ts")
-  const currentHead = await RefManager.resolve({ fs, gitdir, ref: 'HEAD' })
+  const currentHead = await resolveRef({ fs, gitdir, ref: 'HEAD' })
 
   // Continue with next command
   const command = await nextRebaseCommand({ fs, gitdir })
@@ -413,7 +413,7 @@ async function continueRebase({
   }
 
   // Update HEAD
-  await RefManager.writeRef({ fs, gitdir, ref: 'HEAD', value: result.oid })
+  await writeRef({ fs, gitdir, ref: 'HEAD', value: result.oid })
 
   // Continue with next commit
   return await continueRebase({ fs, gitdir, cache })

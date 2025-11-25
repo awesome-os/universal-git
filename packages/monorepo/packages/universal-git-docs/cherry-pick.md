@@ -246,6 +246,25 @@ If conflicts occur:
    await commit({ fs, dir, message: 'Resolve cherry-pick conflicts' })
    ```
 
+## Internal Merge Architecture
+
+Cherry-pick uses the `mergeTrees()` capability module internally to merge the commit's tree with the current branch's tree. This is a pure algorithm capability module that:
+
+- **Location**: `src/git/merge/mergeTrees.ts`
+- **Purpose**: Performs recursive three-way merge on tree structures
+- **Input**: Tree OIDs (base, ours, theirs)
+- **Output**: `{ mergedTree: TreeEntry[], mergedTreeOid: string, conflicts: string[] }`
+- **No index or worktree operations** - only reads/writes Git objects
+
+The `mergeTrees()` capability module uses `mergeBlobs()` internally for merging individual files, ensuring consistent merge behavior across all operations.
+
+**Why `mergeTrees()` instead of `mergeTree()`?**
+- Cherry-pick needs a pure algorithm without index management
+- It creates new commits rather than updating the worktree directly
+- It uses the merged tree result to create a new commit object
+
+For more details on merge capability modules, see [Merge Architecture](./merge.md#merge-architecture) and [Architecture](./architecture.md#5-merge-capability-modules).
+
 ## See Also
 
 - [Rebase](./rebase.md) - Rebase branches

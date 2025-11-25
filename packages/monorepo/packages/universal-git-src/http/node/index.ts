@@ -3,7 +3,7 @@ import get from 'simple-get'
 import { asyncIteratorToStream } from "../../utils/asyncIteratorToStream.ts"
 import { collect } from "../../utils/collect.ts"
 import { UniversalBuffer } from "../../utils/UniversalBuffer.ts"
-import type { GitHttpRequest, GitHttpResponse } from "../../git/remote/GitRemoteHTTP.ts"
+import type { GitHttpRequest, GitHttpResponse } from "../../git/remote/types.ts"
 
 const HTTP_DEBUG_ENABLED =
   process.env.UNIVERSAL_GIT_DEBUG_HTTP === '1' ||

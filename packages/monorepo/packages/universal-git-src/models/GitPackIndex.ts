@@ -9,7 +9,7 @@ import { inflate } from "../utils/inflate.ts"
 import { streamingInflate } from "../utils/pako-stream.ts"
 import { shasum } from "../utils/shasum.ts"
 import { getOidLength, type ObjectFormat } from "../utils/detectObjectFormat.ts"
-import type { ProgressCallback } from "../git/remote/GitRemoteHTTP.ts"
+import type { ProgressCallback } from "../git/remote/types.ts"
 import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
 
 function decodeVarInt(reader: BufferCursor): number {

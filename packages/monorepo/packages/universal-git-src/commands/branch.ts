@@ -3,7 +3,8 @@ import cleanGitRef from 'clean-git-ref'
 import { AlreadyExistsError } from '../errors/AlreadyExistsError.ts'
 import { InvalidRefNameError } from '../errors/InvalidRefNameError.ts'
 import { MissingParameterError } from '../errors/MissingParameterError.ts'
-import { RefManager } from "../core-utils/refs/RefManager.ts"
+import { resolveRef } from "../git/refs/readRef.ts"
+import { writeRef, writeSymbolicRef } from "../git/refs/writeRef.ts"
 import { logRefUpdate } from "../git/logs/logRefUpdate.ts"
 import { REFLOG_MESSAGES } from "../git/logs/messages.ts"
 import { createFileSystem } from '../utils/createFileSystem.ts'
@@ -106,7 +107,7 @@ export async function _branch({
 
   if (!force) {
     try {
-      await RefManager.resolve({ fs, gitdir, ref: fullref })
+      await resolveRef({ fs, gitdir, ref: fullref })
       // Branch exists
       throw new AlreadyExistsError('branch', ref, false)
     } catch (e) {
@@ -118,7 +119,7 @@ export async function _branch({
   // Get current HEAD tree oid
   let oid: string | undefined
   try {
-    oid = await RefManager.resolve({ fs, gitdir, ref: object || 'HEAD' })
+    oid = await resolveRef({ fs, gitdir, ref: object || 'HEAD' })
   } catch (e) {
     // Probably an empty repo
   }
@@ -126,7 +127,7 @@ export async function _branch({
   // Create a new ref that points at the current commit
   if (oid) {
     const oldOid = '0000000000000000000000000000000000000000' // New branch
-    await RefManager.writeRef({ fs, gitdir, ref: fullref, value: oid })
+    await writeRef({ fs, gitdir, ref: fullref, value: oid })
     
     // Write reflog entry
     await logRefUpdate({
@@ -143,7 +144,7 @@ export async function _branch({
 
   if (checkout) {
     // Update HEAD
-    await RefManager.writeSymbolicRef({
+    await writeSymbolicRef({
       fs,
       gitdir,
       ref: 'HEAD',

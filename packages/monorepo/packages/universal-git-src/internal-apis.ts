@@ -7,8 +7,9 @@ export * from './commands/pack.ts'
 export * from './commands/uploadPack.ts'
 
 // Manager classes removed - use src/git/ functions directly
-// RefManager export - GitRefManager alias for compatibility
-export { RefManager as GitRefManager } from './core-utils/refs/RefManager.ts'
+// RefManager export removed - use capability modules from git/refs/ directly
+// For backward compatibility, import functions directly:
+// import { resolveRef } from '@awesome-os/universal-git-src/git/refs/readRef.ts'
 
 export * from './models/FileSystem.ts'
 export * from './models/GitAnnotatedTag.ts'
@@ -33,8 +34,7 @@ export * from './utils/comparePath.ts'
 export * from './utils/flatFileListToDirectoryStructure.ts'
 export * from './utils/isBinary.ts'
 export * from './utils/join.ts'
-export * from './utils/mergeFile.ts'
-export * from './utils/mergeTree.ts'
+export * from './git/merge/index.ts'
 export * from './utils/modified.ts'
 export * from './utils/normalizeAuthorObject.ts'
 export * from './utils/normalizeCommitterObject.ts'

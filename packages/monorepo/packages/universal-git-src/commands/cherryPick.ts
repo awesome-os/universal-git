@@ -1,8 +1,8 @@
-import { RefManager } from "../core-utils/refs/RefManager.ts"
+// RefManager import removed - not used in this file
 import { readObject } from "../git/objects/readObject.ts"
 import { writeCommit } from "./writeCommit.ts"
 import { parse as parseCommit, serialize as serializeCommit } from "../core-utils/parsers/Commit.ts"
-import { mergeTrees } from "../core-utils/algorithms/MergeManager.ts"
+import { mergeTrees } from "../git/merge/mergeTrees.ts"
 import { writeCherryPickHead, deleteCherryPickHead } from "../git/state/index.ts"
 import { MissingParameterError } from "../errors/MissingParameterError.ts"
 import { normalizeCommandArgs } from '../utils/commandHelpers.ts'

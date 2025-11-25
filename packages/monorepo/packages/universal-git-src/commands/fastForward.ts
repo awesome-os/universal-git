@@ -14,7 +14,7 @@ import type {
   AuthCallback,
   AuthFailureCallback,
   AuthSuccessCallback,
-} from "../git/remote/GitRemoteHTTP.ts"
+} from "../git/remote/types.ts"
 import type { MessageCallback } from './push.ts'
 import type { Author } from "../models/GitCommit.ts"
 

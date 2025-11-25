@@ -4,6 +4,7 @@ import { indexPack } from '@awesome-os/universal-git-src/commands/indexPack.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { MissingParameterError } from '@awesome-os/universal-git-src/errors/MissingParameterError.ts'
 import { join } from '@awesome-os/universal-git-src/utils/join.ts'
+import { createBackend } from '@awesome-os/universal-git-src/backends/index.ts'
 
 test('indexPack', async (t) => {
   await t.test('param:fs-missing', async () => {
@@ -137,11 +138,17 @@ test('indexPack', async (t) => {
       // Index might not exist, that's okay
     }
     
+    // Create backend for bare repo (no worktree)
+    const gitBackend = createBackend({
+      type: 'filesystem',
+      fs,
+      gitdir,
+    })
+    
     const cache: Record<string, unknown> = {}
     const { oids } = await indexPack({
-      fs,
-      dir,
-      gitdir,
+      gitBackend,
+      dir, // dir === gitdir for bare repos
       filepath: packfilePath,
       cache,
     })
@@ -169,11 +176,17 @@ test('indexPack', async (t) => {
       // Index might not exist, that's okay
     }
     
+    // Create backend for bare repo (no worktree)
+    const gitBackend = createBackend({
+      type: 'filesystem',
+      fs,
+      gitdir,
+    })
+    
     const cache: Record<string, unknown> = {}
     const { oids } = await indexPack({
-      fs,
-      dir,
-      gitdir,
+      gitBackend,
+      dir, // dir === gitdir for bare repos
       filepath: packfilePath,
       cache,
     })
@@ -203,11 +216,17 @@ test('indexPack', async (t) => {
       // Index might not exist, that's okay
     }
     
+    // Create backend for bare repo (no worktree)
+    const gitBackend = createBackend({
+      type: 'filesystem',
+      fs,
+      gitdir,
+    })
+    
     const cache: Record<string, unknown> = {}
     await indexPack({
-      fs,
-      dir,
-      gitdir,
+      gitBackend,
+      dir, // dir === gitdir for bare repos
       filepath: packfilePath,
       cache,
     })
@@ -231,11 +250,17 @@ test('indexPack', async (t) => {
       // Index might not exist, that's okay
     }
     
+    // Create backend for bare repo (no worktree)
+    const gitBackend = createBackend({
+      type: 'filesystem',
+      fs,
+      gitdir,
+    })
+    
     const cache: Record<string, unknown> = {}
     const { oids: oids1 } = await indexPack({
-      fs,
-      dir,
-      gitdir,
+      gitBackend,
+      dir, // dir === gitdir for bare repos
       filepath: packfilePath,
       cache,
     })
@@ -246,9 +271,8 @@ test('indexPack', async (t) => {
     } catch {}
     
     const { oids: oids2 } = await indexPack({
-      fs,
-      dir,
-      gitdir,
+      gitBackend,
+      dir, // dir === gitdir for bare repos
       filepath: packfilePath,
       cache,
     })
@@ -271,13 +295,19 @@ test('indexPack', async (t) => {
       // Index might not exist, that's okay
     }
     
+    // Create backend for bare repo (no worktree)
+    const gitBackend = createBackend({
+      type: 'filesystem',
+      fs,
+      gitdir,
+    })
+    
     const progressEvents: Array<{ phase: string; loaded: number; total?: number }> = []
     const cache: Record<string, unknown> = {}
     
     const { oids } = await indexPack({
-      fs,
-      dir,
-      gitdir,
+      gitBackend,
+      dir, // dir === gitdir for bare repos
       filepath: packfilePath,
       cache,
       onProgress: (evt) => {
@@ -305,13 +335,19 @@ test('indexPack', async (t) => {
       // Index might not exist, that's okay
     }
     
+    // Create backend for bare repo (no worktree)
+    const gitBackend = createBackend({
+      type: 'filesystem',
+      fs,
+      gitdir,
+    })
+    
     const cache: Record<string, unknown> = {}
     
-    // Test with explicit gitdir
+    // Test with explicit gitBackend
     const { oids: oids1 } = await indexPack({
-      fs,
-      dir,
-      gitdir,
+      gitBackend,
+      dir, // dir === gitdir for bare repos
       filepath: packfilePath,
       cache,
     })
@@ -321,11 +357,11 @@ test('indexPack', async (t) => {
       await fs.rm(indexFullPath)
     } catch {}
     
-    // Test with gitdir derived from dir
+    // Test with legacy fs/gitdir (should auto-create backend)
     const { oids: oids2 } = await indexPack({
       fs,
       dir,
-      // gitdir not provided, should default to join(dir, '.git')
+      gitdir, // Explicit gitdir for bare repo
       filepath: packfilePath,
       cache,
     })

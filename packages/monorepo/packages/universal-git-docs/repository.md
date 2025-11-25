@@ -34,6 +34,38 @@ The `Repository` class is the central abstraction for Git repository operations 
 
 ### Opening a Repository
 
+#### Using Backends (New Advanced API - Recommended)
+
+```typescript
+import { Repository } from 'universal-git'
+import { createBackend } from 'universal-git/backends'
+import { createGitWorktreeBackend } from 'universal-git/git/worktree'
+import * as fs from 'fs'
+
+// Create backends
+const gitBackend = createBackend({
+  type: 'filesystem',
+  fs,
+  gitdir: '/path/to/repo/.git'
+})
+
+const worktree = createGitWorktreeBackend({
+  fs,
+  dir: '/path/to/repo'
+})
+
+// Open repository with backends
+const repo = await Repository.open({
+  gitBackend,
+  worktree,
+  cache: {}
+})
+```
+
+**Note**: When `gitBackend` is provided, the `gitdir` parameter has no effect (gitdir is already set in the backend). When `worktree` is provided, the `dir` parameter has no effect (dir is already set in the worktree backend).
+
+#### Using Legacy Parameters (Backward Compatible)
+
 ```typescript
 import { Repository } from 'universal-git'
 import * as fs from 'fs'
@@ -50,6 +82,119 @@ const repo = await Repository.open({
   gitdir: '/path/to/repo/.git'
 })
 ```
+
+**Deprecation**: The `gitdir` and `dir` parameters are deprecated. Use `gitBackend` and `worktree` instead for better control and consistency.
+
+#### Linked Worktree Pattern
+
+When both `dir` and `gitdir` are provided, `Repository.open()` treats this as a **linked worktree** scenario:
+
+- **`gitdir`** === bare repository (or main repository)
+- **`dir`** === linked worktree checkout
+
+This matches Git's standard worktree pattern where:
+- The worktree's `.git` is a **file** (not a directory) pointing to the gitdir
+- The gitdir contains the repository data (objects, refs, config, etc.)
+- The dir contains the working directory files
+
+**Important**: All implementations must pass the path to the `.git` directory (which needs to be treated as bare) when both `dir` and `gitdir` are provided. No inference is performed - the provided parameters are trusted.
+
+```typescript
+// Linked worktree scenario
+const repo = await Repository.open({
+  fs,
+  dir: '/path/to/worktree',           // Worktree checkout directory
+  gitdir: '/path/to/bare-repo/.git', // Bare repository gitdir
+  cache: {},
+})
+
+// The Repository will:
+// - Use dir as the working directory
+// - Use gitdir as the repository gitdir (treated as bare)
+// - No inference or path resolution is performed
+```
+
+**Behavior when only one parameter is provided:**
+
+- **Only `gitdir`**: 
+  - If gitdir has a `config` file directly → treated as bare repository (workingDir = null)
+  - If gitdir doesn't have a `config` file → treated as `.git` subdirectory (workingDir = parent of gitdir)
+
+- **Only `dir`**: 
+  - Finds `.git` directory by walking up from dir
+  - If dir itself has `config` file → treated as bare repository
+  - Otherwise → finds `.git` subdirectory and uses parent as workingDir
+
+### Configuration Options
+
+`Repository.open()` supports several configuration options:
+
+```typescript
+const repo = await Repository.open({
+  fs,
+  dir: '/path/to/repo',
+  
+  // Cache object for performance
+  cache: {},
+  
+  // Auto-detect system and global git config (default: true)
+  autoDetectConfig: true,
+  
+  // Ignore system and global config (only use local repo config)
+  // When true, skips auto-detection but still respects explicitly provided paths
+  ignoreSystemConfig: false,
+  
+  // Explicitly provide system config path
+  systemConfigPath: '/etc/gitconfig',
+  
+  // Explicitly provide global config path
+  globalConfigPath: '~/.gitconfig'
+})
+```
+
+#### Config Path Behavior
+
+The configuration system follows Git's precedence: **worktree > local > global > system**
+
+- **`autoDetectConfig: true`** (default): Automatically detects system and global config paths from environment variables and platform defaults
+- **`ignoreSystemConfig: true`**: Skips auto-detection of system/global config, but still uses explicitly provided `systemConfigPath` and `globalConfigPath` if specified
+- **Explicit paths**: Always take precedence over auto-detection
+
+**Examples:**
+
+```typescript
+// Default: Auto-detect system/global config
+const repo1 = await Repository.open({ fs, dir: '/path/to/repo' })
+
+// Ignore system/global config (only local repo config)
+const repo2 = await Repository.open({ 
+  fs, 
+  dir: '/path/to/repo',
+  ignoreSystemConfig: true 
+})
+
+// Use custom system config path (even with ignoreSystemConfig: true)
+const repo3 = await Repository.open({ 
+  fs, 
+  dir: '/path/to/repo',
+  ignoreSystemConfig: true,
+  systemConfigPath: '/custom/system/config' // Still used
+})
+
+// Disable auto-detection but allow explicit paths
+const repo4 = await Repository.open({ 
+  fs, 
+  dir: '/path/to/repo',
+  autoDetectConfig: false,
+  globalConfigPath: '~/.gitconfig' // Explicitly provided
+})
+```
+
+**Use Cases:**
+
+- **Testing**: Use `ignoreSystemConfig: true` to ensure tests only read from local repository config, avoiding interference from system/global git config
+- **Isolated environments**: When you want to ensure only repository-specific configuration is used
+- **Custom config paths**: When you need to use non-standard config file locations
 
 ### Using Repository Methods
 
@@ -209,21 +354,37 @@ const worktree = await repo.worktree()
 
 ## Backend Integration
 
-`Repository` can work with different backends:
+`Repository` can work with different backends using the new backend-first API:
 
 ```typescript
 import { createBackend } from 'universal-git/backends'
+import { createGitWorktreeBackend } from 'universal-git/git/worktree'
+import * as fs from 'fs'
 
-const backend = createBackend({
+// Create backends
+const gitBackend = createBackend({
   type: 'sqlite',
   dbPath: '/path/to/repo.db'
 })
 
-// Repository will use the backend for storage
-// (Backend integration is in progress)
+const worktree = createGitWorktreeBackend({
+  fs,
+  dir: '/path/to/worktree'
+})
+
+// Open repository with backends
+const repo = await Repository.open({
+  gitBackend,
+  worktree,
+  cache: {}
+})
 ```
 
-**Note**: Full backend integration is planned. Currently, `Repository` uses `FileSystemProvider` directly. See [Backend Integration Plan](../../plans/REPOSITORY_BACKEND_INTEGRATION_PLAN.md).
+**Universal Backend Methods**: All backends provide universal interface methods that work regardless of implementation:
+- `getFileSystem()` - Returns the filesystem instance if available, or `null` if not
+- This allows consumers to access the filesystem without knowing the backend implementation
+
+**Note**: `Repository.open()` now accepts `gitBackend` and `worktree` parameters. The `fs` parameter is derived from backends automatically when using filesystem backends. See [Backends Documentation](./backends.md) for more details.
 
 ## Using Repository with Commands
 

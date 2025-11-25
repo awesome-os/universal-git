@@ -1,7 +1,9 @@
 import { _currentBranch } from "./currentBranch.ts"
 import { MissingParameterError } from "../errors/MissingParameterError.ts"
 import { NotFoundError } from '../errors/NotFoundError.ts'
-import { RefManager } from "../core-utils/refs/RefManager.ts"
+import { resolveRef } from "../git/refs/readRef.ts"
+import { writeRef } from "../git/refs/writeRef.ts"
+import { deleteRef } from "../git/refs/deleteRef.ts"
 import { Repository } from "../core-utils/Repository.ts"
 import { normalizeCommandArgs } from '../utils/commandHelpers.ts'
 import { parse as parseConfig, serialize as serializeConfig } from "../core-utils/ConfigParser.ts"
@@ -91,7 +93,7 @@ export async function _deleteBranch({
 
   ref = ref.startsWith('refs/heads/') ? ref : `refs/heads/${ref}`
   try {
-    await RefManager.resolve({ fs, gitdir, ref })
+    await resolveRef({ fs, gitdir, ref })
   } catch (e) {
     throw new NotFoundError(ref)
   }
@@ -99,12 +101,12 @@ export async function _deleteBranch({
   const currentRef = await _currentBranch({ fs, gitdir, fullname: true })
   if (ref === currentRef) {
     // detach HEAD
-    const value = await RefManager.resolve({ fs, gitdir, ref })
-    await RefManager.writeRef({ fs, gitdir, ref: 'HEAD', value })
+    const value = await resolveRef({ fs, gitdir, ref })
+    await writeRef({ fs, gitdir, ref: 'HEAD', value })
   }
 
   // Delete a specified branch
-  await RefManager.deleteRef({ fs, gitdir, ref })
+  await deleteRef({ fs, gitdir, ref })
 
   // Delete branch config entries
   const abbrevRef = abbreviateRef(ref)

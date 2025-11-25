@@ -1,4 +1,4 @@
-import { RefManager } from "../core-utils/refs/RefManager.ts"
+import { resolveRef } from "../git/refs/readRef.ts"
 import { Repository } from "../core-utils/Repository.ts"
 import { MissingParameterError } from "../errors/MissingParameterError.ts"
 import { readObject } from "../git/objects/readObject.ts"
@@ -90,8 +90,8 @@ export async function diff({
     // Early return if comparing same refs (unless filepath filter is provided)
     if (refA && refB && refA === refB && !filepath && !staged) {
       try {
-        const resolvedA = await RefManager.resolve({ fs, gitdir: resolvedGitdir, ref: refA })
-        const resolvedB = await RefManager.resolve({ fs, gitdir: resolvedGitdir, ref: refB })
+        const resolvedA = await resolveRef({ fs, gitdir: resolvedGitdir, ref: refA })
+        const resolvedB = await resolveRef({ fs, gitdir: resolvedGitdir, ref: refB })
         if (resolvedA === resolvedB) {
           // Same refs resolve to same commit = no diff
           return { entries: [] }
@@ -103,7 +103,7 @@ export async function diff({
 
     // Resolve refA (default to HEAD)
     if (refA) {
-      oidA = await RefManager.resolve({ fs, gitdir: resolvedGitdir, ref: refA })
+      oidA = await resolveRef({ fs, gitdir: resolvedGitdir, ref: refA })
       const commitResult = await readObject({ fs, cache: effectiveCache, gitdir: resolvedGitdir, oid: oidA, format: 'content' })
       if (commitResult.type === 'commit') {
         const commit = parseCommit(commitResult.object)
@@ -116,7 +116,7 @@ export async function diff({
     } else if (staged) {
       // Compare index with HEAD
       try {
-        oidA = await RefManager.resolve({ fs, gitdir: resolvedGitdir, ref: 'HEAD' })
+        oidA = await resolveRef({ fs, gitdir: resolvedGitdir, ref: 'HEAD' })
         const commitResult = await readObject({ fs, cache: effectiveCache, gitdir: resolvedGitdir, oid: oidA, format: 'content' })
         if (commitResult.type === 'commit') {
           const commit = parseCommit(commitResult.object)
@@ -155,7 +155,7 @@ export async function diff({
     } else {
       // Compare working directory with HEAD
       try {
-        oidA = await RefManager.resolve({ fs, gitdir: resolvedGitdir, ref: 'HEAD' })
+        oidA = await resolveRef({ fs, gitdir: resolvedGitdir, ref: 'HEAD' })
         const commitResult = await readObject({ fs, cache: effectiveCache, gitdir: resolvedGitdir, oid: oidA, format: 'content' })
         if (commitResult.type === 'commit') {
           const commit = parseCommit(commitResult.object)
@@ -183,7 +183,7 @@ export async function diff({
 
     // Resolve refB if provided
     if (refB) {
-      oidB = await RefManager.resolve({ fs, gitdir: resolvedGitdir, ref: refB })
+      oidB = await resolveRef({ fs, gitdir: resolvedGitdir, ref: refB })
       const commitResult = await readObject({ fs, cache, gitdir: resolvedGitdir, oid: oidB, format: 'content' })
       if (commitResult.type === 'commit') {
         const commit = parseCommit(commitResult.object)

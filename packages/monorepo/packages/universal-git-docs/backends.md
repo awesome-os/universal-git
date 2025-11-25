@@ -161,6 +161,23 @@ const backend = createBackend({
 
 All backends implement the `GitBackend` interface, which provides methods for:
 
+### Universal Methods
+
+All backends provide universal interface methods that work regardless of implementation:
+
+- `getFileSystem()` - Returns the filesystem instance if the backend uses a filesystem, or `null` if not
+  - **Purpose**: Allows consumers to access the filesystem without knowing the backend implementation
+  - **Filesystem backends**: Return the `FileSystemProvider` instance
+  - **Non-filesystem backends**: Return `null`
+  - **Example**:
+    ```typescript
+    const backend = createBackend({ type: 'filesystem', fs, gitdir })
+    const fs = backend.getFileSystem() // Returns FileSystemProvider
+    
+    const sqliteBackend = createBackend({ type: 'sqlite', dbPath: '/path/to/repo.db' })
+    const fs = sqliteBackend.getFileSystem() // Returns null
+    ```
+
 ### Core Metadata
 - `readHEAD()` / `writeHEAD()` - HEAD pointer
 - `readConfig()` / `writeConfig()` - Repository config
@@ -200,23 +217,49 @@ All backends implement the `GitBackend` interface, which provides methods for:
 
 ## Using Backends with Commands
 
-Most commands accept a `backend` parameter:
+Most commands accept `gitBackend` and `worktree` parameters (new advanced API):
 
 ```typescript
-import { init } from 'universal-git'
+import { commit } from 'universal-git'
 import { createBackend } from 'universal-git/backends'
+import { createGitWorktreeBackend } from 'universal-git/git/worktree'
+import * as fs from 'fs'
 
-const backend = createBackend({
+// Create backends
+const gitBackend = createBackend({
   type: 'sqlite',
   dbPath: '/path/to/repo.db'
 })
 
-await init({
+const worktree = createGitWorktreeBackend({
   fs,
-  dir: '/path/to/repo',
-  backend
+  dir: '/path/to/worktree'
+})
+
+// Use with commands
+await commit({
+  gitBackend,
+  worktree,
+  message: 'My commit'
 })
 ```
+
+**Note**: When `gitBackend` is provided, the `gitdir` parameter has no effect (gitdir is already set in the backend). Similarly, when `worktree` is provided, the `dir` parameter has no effect (dir is already set in the worktree backend).
+
+### Legacy API (Auto-creates Backends)
+
+For backward compatibility, commands still accept the legacy `fs`/`gitdir`/`dir` parameters. These are automatically converted to backends internally:
+
+```typescript
+// Legacy API - backends are auto-created internally
+await commit({
+  fs,
+  dir: '/path/to/repo',
+  message: 'My commit'
+})
+```
+
+**Deprecation**: The `gitdir` and `dir` parameters are deprecated. Use `gitBackend` and `worktree` instead for better control and consistency.
 
 ## Backend Registry
 
@@ -240,6 +283,13 @@ const backend = createBackend({
 ## Git Worktree Backends
 
 **Note**: Git worktree backends are separate from Git backends. They handle working directory files, not Git repository data.
+
+Like `GitBackend`, `GitWorktreeBackend` also provides universal interface methods:
+
+- `getFileSystem()` - Returns the filesystem instance if the backend uses a filesystem, or `null` if not
+  - **Purpose**: Allows consumers to access the filesystem without knowing the backend implementation
+  - **Filesystem backends**: Return the `FileSystemProvider` instance
+  - **Non-filesystem backends**: Return `null`
 
 For information about Git worktree backends, see the [Backend Integration Plan](../../plans/REPOSITORY_BACKEND_INTEGRATION_PLAN.md).
 

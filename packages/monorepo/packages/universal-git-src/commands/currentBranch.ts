@@ -102,9 +102,10 @@ export async function _currentBranch({
 
   // First, try to read HEAD as a symbolic ref
   // This will return the target (e.g., 'refs/heads/master') if HEAD is symbolic
-  // Use direct readSymbolicRef function (Repository doesn't have a readSymbolicRef method)
-  // but get gitdir from repo if available to ensure worktree context is handled
-  let ref: string | null = await readSymbolicRef({ fs, gitdir, ref: 'HEAD' })
+  // Use repo.readSymbolicRef() if available, otherwise use direct readSymbolicRef()
+  let ref: string | null = repo
+    ? await repo.readSymbolicRef('HEAD')
+    : await readSymbolicRef({ fs, gitdir, ref: 'HEAD' })
   
   // If HEAD is not symbolic (detached HEAD), try to resolve it to an OID
   // If it resolves to an OID, we're in detached HEAD state

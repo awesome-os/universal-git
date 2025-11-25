@@ -5,8 +5,7 @@
  * This file maintains backward compatibility by re-exporting from git/refs/.
  */
 
-// Re-export RefManager (deprecated, but still functional)
-export * from './RefManager.ts'
+// RefManager export removed - use capability modules from git/refs/ directly
 
 // Re-export RefParser functions from git/refs
 export {
@@ -18,5 +17,4 @@ export {
   type LooseRef,
 } from '../../git/refs/packedRefs.ts'
 
-// Re-export ShallowManager (this might stay in core-utils as it's not strictly a ref operation)
-export * from './ShallowManager.ts'
+// ShallowManager removed - use readShallow/writeShallow from git/shallow.ts instead

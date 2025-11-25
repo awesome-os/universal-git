@@ -98,8 +98,8 @@ export async function _deleteTag({
   // Read old tag OID for reflog before deleting
   let oldTagOid: string | undefined
   try {
-    const { RefManager } = await import('../core-utils/refs/RefManager.ts')
-    oldTagOid = await RefManager.resolve({ fs, gitdir, ref })
+    const { resolveRef } = await import('../git/refs/readRef.ts')
+    oldTagOid = await resolveRef({ fs, gitdir, ref })
   } catch {
     // Tag doesn't exist, that's fine
     oldTagOid = undefined

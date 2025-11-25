@@ -111,10 +111,12 @@ describe('normalizeAuthorObject', () => {
     // Setup
     const { fs, gitdir } = await makeFixture('test-normalizeAuthorObject')
 
-    // Disable auto-detection of global/system config to ensure no config values are found
-    const repo = await Repository.open({ fs, gitdir, cache: {}, autoDetectConfig: false })
+    // Disable auto-detection and ignore system/global config to ensure no config values are found
+    const repo = await Repository.open({ fs, gitdir, cache: {}, autoDetectConfig: false, ignoreSystemConfig: true })
 
     // Test
+    // With ignoreSystemConfig: true, only local config is read, so if no local config is set,
+    // normalizeAuthorObject should return undefined
     assert.strictEqual(await normalizeAuthorObject({ repo }), undefined)
   })
 })

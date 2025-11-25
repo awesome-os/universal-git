@@ -8,6 +8,8 @@ import * as os from 'os'
 import * as path from 'path'
 import { promises as nodeFs } from 'fs'
 import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { createBackend } from '@awesome-os/universal-git-src/backends/index.ts'
+import { createGitWorktreeBackend } from '@awesome-os/universal-git-src/git/worktree/index.ts'
 
 test('bundle', async (t) => {
   await t.test('creates bundle with specific refs', async () => {
@@ -332,11 +334,21 @@ test('unbundle', async (t) => {
       try {
         await init({ fs: sourceFs, dir: destDir })
         
-        // Unbundle into destination
-        const result = await unbundle({
+        // Create backends for destination repo
+        const destGitBackend = createBackend({
+          type: 'filesystem',
+          fs: sourceFs,
+          gitdir: destGitdir,
+        })
+        const destWorktree = createGitWorktreeBackend({
           fs: sourceFs,
           dir: destDir,
-          gitdir: destGitdir,
+        })
+        
+        // Unbundle into destination
+        const result = await unbundle({
+          gitBackend: destGitBackend,
+          worktree: destWorktree,
           filepath: bundlePath,
         })
         
@@ -412,11 +424,21 @@ test('unbundle', async (t) => {
       try {
         await init({ fs: sourceFs, dir: destDir })
         
-        // Unbundle only master
-        const result = await unbundle({
+        // Create backends for destination repo
+        const destGitBackend = createBackend({
+          type: 'filesystem',
+          fs: sourceFs,
+          gitdir: destGitdir,
+        })
+        const destWorktree = createGitWorktreeBackend({
           fs: sourceFs,
           dir: destDir,
-          gitdir: destGitdir,
+        })
+        
+        // Unbundle only master
+        const result = await unbundle({
+          gitBackend: destGitBackend,
+          worktree: destWorktree,
           filepath: bundlePath,
           refs: ['refs/heads/master'],
         })
@@ -482,11 +504,21 @@ test('unbundle', async (t) => {
           author: { name: 'Test', email: 'test@example.com' },
         })
         
-        // Try to unbundle (should reject master since it exists with different OID)
-        const result = await unbundle({
+        // Create backends for destination repo
+        const destGitBackend = createBackend({
+          type: 'filesystem',
+          fs: sourceFs,
+          gitdir: destGitdir,
+        })
+        const destWorktree = createGitWorktreeBackend({
           fs: sourceFs,
           dir: destDir,
-          gitdir: destGitdir,
+        })
+        
+        // Try to unbundle (should reject master since it exists with different OID)
+        const result = await unbundle({
+          gitBackend: destGitBackend,
+          worktree: destWorktree,
           filepath: bundlePath,
         })
         

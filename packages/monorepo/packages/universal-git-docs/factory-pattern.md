@@ -2,7 +2,7 @@
 
 **Status**: ✅ **ACTIVE**  
 **Purpose**: Document the factory function pattern for creating FileSystem instances  
-**Related**: [Refactoring Plan](../REFACTORING_PLAN.md), [FileSystem Model](@awesome-os/universal-git-src/models/FileSystem.ts)
+**Related**: [Repository Unification Plan — DONE Archive](../plans/REPOSITORY_UNIFICATION_PLAN_DONE.md#refactoring-plan-archive-structural-typing--tests), [FileSystem Model](@awesome-os/universal-git-src/models/FileSystem.ts)
 
 ---
 
@@ -88,7 +88,7 @@ Within the codebase, `createFileSystem` is used in:
 - **Capability Modules**: Low-level operations are stateless functions
 - **Context Objects**: Repository provides unified access to all dependencies
 - **Backend Factory Pattern**: `createBackend` for GitBackend instances (should use `createFileSystem` internally)
-- See [Refactoring Plan](../REFACTORING_PLAN.md) for complete architectural patterns
+- See [Repository Unification Plan — DONE Archive](../plans/REPOSITORY_UNIFICATION_PLAN_DONE.md#refactoring-plan-archive-structural-typing--tests) for complete architectural patterns
 
 ---
 

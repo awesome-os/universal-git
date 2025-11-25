@@ -1,5 +1,7 @@
 import type { Repository } from '../core-utils/Repository.ts'
 import type { FileSystemProvider } from '../models/FileSystem.ts'
+import type { GitBackend } from '../backends/GitBackend.ts'
+import type { GitWorktreeBackend } from '../git/worktree/GitWorktreeBackend.ts'
 
 /**
  * Base command options that are common to most Git commands
@@ -13,17 +15,33 @@ export interface BaseCommandOptions {
   repo?: Repository
 
   /**
-   * File system client (required if repo is not provided)
+   * Git backend instance (new advanced API - preferred over gitdir)
+   * If provided, gitdir is derived from it
+   * @see GitBackend
+   */
+  gitBackend?: GitBackend
+
+  /**
+   * Worktree backend instance (new advanced API - preferred over dir)
+   * If provided, dir is derived from it
+   * @see GitWorktreeBackend
+   */
+  worktree?: GitWorktreeBackend
+
+  /**
+   * File system client (required if repo/gitBackend/worktree are not provided)
    */
   fs?: FileSystemProvider
 
   /**
-   * Working directory path (optional, can be derived from repo)
+   * Working directory path (optional, can be derived from repo or worktree)
+   * @deprecated Use `worktree: GitWorktreeBackend` instead
    */
   dir?: string
 
   /**
    * Git directory path (optional, can be derived from dir or repo)
+   * @deprecated Use `gitBackend: GitBackend` instead
    */
   gitdir?: string
 
@@ -93,6 +111,6 @@ export interface CommandWithRemoteOptions extends BaseCommandOptions {
  */
 export type CommandSpecificOptions<T> = Omit<
   T,
-  'repo' | 'fs' | 'dir' | 'gitdir' | 'cache' | 'autoDetectConfig'
+  'repo' | 'gitBackend' | 'worktree' | 'fs' | 'dir' | 'gitdir' | 'cache' | 'autoDetectConfig'
 >
 

@@ -676,7 +676,8 @@ describe('merge', () => {
         ours: 'delete-first-half',
         theirs: 'delete-second-half',
         dryRun: true,
-        autoDetectConfig: false, // Disable auto-detection to ensure no user.name is found
+        autoDetectConfig: false,
+        ignoreSystemConfig: true, // Ignore system/global config to ensure no user.name is found
       })
     } catch (e) {
       error = e
@@ -2487,7 +2488,8 @@ describe('merge', () => {
           ours: 'a',
           theirs: 'c',
           fastForward: false,
-          autoDetectConfig: false, // Disable auto-detection to ensure no author
+          autoDetectConfig: false,
+          ignoreSystemConfig: true, // Ignore system/global config to ensure no author
         })
       } catch (e) {
         error = e
