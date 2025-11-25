@@ -298,7 +298,6 @@ export async function statusMatrix({
           stageType !== 'blob'
         ) {
           // We don't actually NEED the sha. Any sha will do
-          // TODO: update this logic to handle N trees instead of just 3.
           workdirOid = '42'
         } else if (workdirType === 'blob') {
           try {

@@ -18,7 +18,7 @@ test('fastForward', async (t) => {
   if (!sharedFixture && !SKIP_HTTP_TESTS) {
     sharedFixture = await makeFixture('test-pull')
     // Ensure there's a current branch for tests that need it
-    await _currentBranch({ fs: sharedFixture.fs, gitdir: sharedFixture.gitdir, fullname: true })
+    await _currentBranch({ fs: sharedFixture.fs, gitdir: await sharedFixture.repo.getGitdir(), fullname: true })
   }
   await t.test('param:fs-missing', async () => {
     try {
@@ -230,11 +230,11 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir } = sharedFixture
+    const { repo, dir } = sharedFixture
     // gitdir should be derived from dir
     try {
       await fastForward({
-        fs,
+        repo,
         http,
         dir,
         // gitdir not provided, should default to join(dir, '.git')
@@ -254,18 +254,15 @@ test('fastForward', async (t) => {
     if (SKIP_HTTP_TESTS || !sharedFixture) {
       return
     }
-    const { fs, dir, gitdir } = sharedFixture
-    const cache: Record<string, unknown> = {}
+    const { repo, dir } = sharedFixture
     try {
       await fastForward({
-        fs,
+        repo,
         http,
         dir,
-        gitdir,
         ref: 'master',
         remote: 'origin',
         url: 'https://github.com/octocat/Hello-World.git',
-        cache,
       })
       assert.ok(true)
     } catch (error) {

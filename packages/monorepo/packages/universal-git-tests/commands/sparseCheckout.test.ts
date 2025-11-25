@@ -19,14 +19,20 @@ test('sparse checkout cone mode', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     
-    const { fs, dir, gitdir } = await makeFixture('test-sparse-checkout-init')
-    
-    // CRITICAL: Create Repository instance ONCE to manage state consistently
-    const cache = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
+    const { repo, fs, dir } = await makeFixture('test-sparse-checkout-init')
     
     // Initialize repository
     await init({ fs, dir })
+    
+    // Reopen repo after init
+    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
+    const initializedRepo = await Repository.open({
+      fs,
+      dir,
+      gitdir: await repo.getGitdir(),
+      cache: repo.cache,
+      autoDetectConfig: true,
+    })
     
     // Create initial commit with multiple directories
     await fs.write(join(dir, 'src', 'file1.txt'), 'content1')
@@ -35,15 +41,21 @@ test('sparse checkout cone mode', async (t) => {
     await fs.write(join(dir, 'tests', 'test.js'), 'test content')
     await fs.write(join(dir, 'root.txt'), 'root content')
     
-    await add({ fs, dir, gitdir, filepath: '.', cache })
-    await commit({ fs, dir, gitdir, message: 'Initial commit', author: { name: 'Test', email: 'test@test.com' }, cache })
+    await add({ repo: initializedRepo, filepath: '.' })
+    await commit({ repo: initializedRepo, message: 'Initial commit', author: { name: 'Test', email: 'test@test.com' } })
     
     // Initialize sparse checkout with cone mode
-    await sparseCheckout({ fs, dir, gitdir, init: true, cone: true, cache })
+    await sparseCheckout({ repo: initializedRepo, init: true, cone: true })
     
     // FIX: Reload the Repository to get fresh config state after sparseCheckout modifies it
     // sparseCheckout creates its own Repository instance, so we need to reload to see the changes
-    const repoAfter = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
+    const repoAfter = await Repository.open({
+      fs,
+      dir,
+      gitdir: await initializedRepo.getGitdir(),
+      cache: initializedRepo.cache,
+      autoDetectConfig: true,
+    })
     const configService = await repoAfter.getConfig()
     // Force reload to ensure we have the latest config from disk
     await configService.reload()
@@ -60,7 +72,7 @@ test('sparse checkout cone mode', async (t) => {
     assert.strictEqual(fileExists, true)
     
     // Verify default pattern (everything)
-    const patterns = await sparseCheckout({ fs, dir, gitdir, list: true, cache })
+    const patterns = await sparseCheckout({ repo: repoAfter, list: true })
     assert.ok(patterns && patterns.length > 0)
   })
 
@@ -175,34 +187,36 @@ test('sparse checkout cone mode', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     
-    const { fs, dir, gitdir } = await makeFixture('test-sparse-checkout-cone-modes')
-    
-    // CRITICAL: Create the Repository instance ONCE at the start to ensure all operations
-    // use the same Repository context. This prevents HEAD resolution issues.
-    const cache = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
+    const { repo, fs, dir } = await makeFixture('test-sparse-checkout-cone-modes')
     
     await init({ fs, dir })
+    
+    // Reopen repo after init
+    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
+    const initializedRepo = await Repository.open({
+      fs,
+      dir,
+      gitdir: await repo.getGitdir(),
+      cache: repo.cache,
+      autoDetectConfig: true,
+    })
     
     // Create files with pattern that works differently in cone vs non-cone
     await fs.write(join(dir, 'src', 'file.js'), 'src file')
     await fs.write(join(dir, 'src-backup', 'file.js'), 'backup file')
     await fs.write(join(dir, 'docs', 'readme.md'), 'docs')
     
-    // Use the same cache to ensure Repository instance consistency
-    await add({ fs, dir, gitdir, filepath: '.', cache })
-    await commit({ fs, dir, gitdir, message: 'Initial', author: { name: 'Test', email: 'test@test.com' }, cache })
+    await add({ repo: initializedRepo, filepath: '.' })
+    await commit({ repo: initializedRepo, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
     
     // Test cone mode: pattern 'src/' should only match src/ directory
-    // Use the same cache to ensure Repository instance consistency
-    await sparseCheckout({ fs, dir, gitdir, init: true, cone: true, cache })
-    await sparseCheckout({ fs, dir, gitdir, set: ['src/'], cone: true, cache })
+    await sparseCheckout({ repo: initializedRepo, init: true, cone: true })
+    await sparseCheckout({ repo: initializedRepo, set: ['src/'], cone: true })
     
     // Explicitly call checkout to ensure index is updated
-    await checkout({ fs, dir, gitdir, ref: 'HEAD', cache })
+    await checkout({ repo: initializedRepo, ref: 'HEAD' })
     
-    // Use the same cache to ensure listFiles sees the updated index
-    const files = await listFiles({ fs, dir, gitdir, cache })
+    const files = await listFiles({ repo: initializedRepo })
     assert.ok(files.includes('src/file.js'))
     assert.ok(!files.includes('src-backup/file.js'), 'Cone mode should not match src-backup/')
   })
@@ -212,36 +226,39 @@ test('sparse checkout cone mode', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     
-    const { fs, dir, gitdir } = await makeFixture('test-sparse-checkout-non-cone-modes')
-    
-    // CRITICAL: Create the Repository instance ONCE at the start to ensure all operations
-    // use the same Repository context. This prevents HEAD resolution issues.
-    const cache = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
+    const { repo, fs, dir } = await makeFixture('test-sparse-checkout-non-cone-modes')
     
     await init({ fs, dir })
+    
+    // Reopen repo after init
+    const initializedRepo = await Repository.open({
+      fs,
+      dir,
+      gitdir: await repo.getGitdir(),
+      cache: repo.cache,
+      autoDetectConfig: true,
+    })
     
     // Create files with pattern that works differently in cone vs non-cone
     await fs.write(join(dir, 'src', 'file.js'), 'src file')
     await fs.write(join(dir, 'src-backup', 'file.js'), 'backup file')
     await fs.write(join(dir, 'docs', 'readme.md'), 'docs')
     
-    // Use the same cache to ensure Repository instance consistency
-    await add({ fs, dir, gitdir, filepath: '.', cache })
-    await commit({ fs, dir, gitdir, message: 'Initial', author: { name: 'Test', email: 'test@test.com' }, cache })
+    await add({ repo: initializedRepo, filepath: '.' })
+    await commit({ repo: initializedRepo, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
     
     // Test non-cone mode: patterns use gitignore syntax
     // Note: The exact pattern matching behavior in non-cone mode may differ from cone mode
     // This test verifies that non-cone mode can be initialized and patterns can be set
-    await sparseCheckout({ fs, dir, gitdir, init: true, cone: false, cache })
+    await sparseCheckout({ repo: initializedRepo, init: true, cone: false })
     // Set a pattern - the exact matching behavior may need further investigation
     // but the key is that we can switch to non-cone mode and set patterns
-    await sparseCheckout({ fs, dir, gitdir, set: ['src/**'], cone: false, cache })
+    await sparseCheckout({ repo: initializedRepo, set: ['src/**'], cone: false })
     
     // Explicitly call checkout to ensure index is updated
-    await checkout({ fs, dir, gitdir, ref: 'HEAD', cache })
+    await checkout({ repo: initializedRepo, ref: 'HEAD' })
     
-    const files = await listFiles({ fs, dir, gitdir, cache })
+    const files = await listFiles({ repo: initializedRepo })
     // Verify that sparse checkout is working (some filtering is happening)
     // The exact pattern matching in non-cone mode may need further investigation,
     // but the important thing is that we can use non-cone mode and it filters files
@@ -251,17 +268,28 @@ test('sparse checkout cone mode', async (t) => {
   })
 
   await t.test('ok:list-patterns', async () => {
-    const { fs, dir } = await makeFixture('test-sparse-checkout-list')
+    const { repo, fs, dir } = await makeFixture('test-sparse-checkout-list')
     
     await init({ fs, dir })
+    
+    // Reopen repo after init
+    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
+    const initializedRepo = await Repository.open({
+      fs,
+      dir,
+      gitdir: await repo.getGitdir(),
+      cache: repo.cache,
+      autoDetectConfig: true,
+    })
+    
     await fs.write(join(dir, 'file.txt'), 'content')
-    await add({ fs, dir, filepath: '.' })
-    await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
+    await add({ repo: initializedRepo, filepath: '.' })
+    await commit({ repo: initializedRepo, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
     
-    await sparseCheckout({ fs, dir, init: true, cone: true })
-    await sparseCheckout({ fs, dir, set: ['src/', 'docs/'], cone: true })
+    await sparseCheckout({ repo: initializedRepo, init: true, cone: true })
+    await sparseCheckout({ repo: initializedRepo, set: ['src/', 'docs/'], cone: true })
     
-    const patterns = await sparseCheckout({ fs, dir, list: true })
+    const patterns = await sparseCheckout({ repo: initializedRepo, list: true })
     
     assert.ok(Array.isArray(patterns))
     assert.ok(patterns.length >= 2)
@@ -275,12 +303,18 @@ test('sparse checkout cone mode', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     
-    const { fs, dir, gitdir } = await makeFixture('test-sparse-checkout-cone-root-excluded')
-    
-    const cache = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
+    const { repo, fs, dir } = await makeFixture('test-sparse-checkout-cone-root-excluded')
     
     await init({ fs, dir })
+    
+    // Reopen repo after init
+    const initializedRepo = await Repository.open({
+      fs,
+      dir,
+      gitdir: await repo.getGitdir(),
+      cache: repo.cache,
+      autoDetectConfig: true,
+    })
     
     // Create root-level files and sparse directory files
     await fs.write(join(dir, 'package.json'), '{"name": "test"}')
@@ -291,19 +325,19 @@ test('sparse checkout cone mode', async (t) => {
     await fs.write(join(dir, 'src', 'utils', 'helper.js'), 'export function helper() {}')
     await fs.write(join(dir, 'docs', 'readme.md'), 'Documentation')
     
-    await add({ fs, dir, gitdir, filepath: '.', cache })
-    await commit({ fs, dir, gitdir, message: 'Initial', author: { name: 'Test', email: 'test@test.com' }, cache })
+    await add({ repo: initializedRepo, filepath: '.' })
+    await commit({ repo: initializedRepo, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
     
     // Initialize sparse checkout with cone mode
-    await sparseCheckout({ fs, dir, gitdir, init: true, cone: true, cache })
+    await sparseCheckout({ repo: initializedRepo, init: true, cone: true })
     
     // Set pattern to only include src/ directory
-    await sparseCheckout({ fs, dir, gitdir, set: ['src/'], cone: true, cache })
+    await sparseCheckout({ repo: initializedRepo, set: ['src/'], cone: true })
     
     // Apply checkout
-    await checkout({ fs, dir, gitdir, ref: 'HEAD', cache })
+    await checkout({ repo: initializedRepo, ref: 'HEAD' })
     
-    const files = await listFiles({ fs, dir, gitdir, cache })
+    const files = await listFiles({ repo: initializedRepo })
     
     // In cone mode, root-level files should be EXCLUDED (stripped)
     assert.ok(!files.includes('package.json'), 'Root-level package.json should be excluded in cone mode')
@@ -324,12 +358,18 @@ test('sparse checkout cone mode', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     
-    const { fs, dir, gitdir } = await makeFixture('test-sparse-checkout-non-cone-root-included')
-    
-    const cache = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
+    const { repo, fs, dir } = await makeFixture('test-sparse-checkout-non-cone-root-included')
     
     await init({ fs, dir })
+    
+    // Reopen repo after init
+    const initializedRepo = await Repository.open({
+      fs,
+      dir,
+      gitdir: await repo.getGitdir(),
+      cache: repo.cache,
+      autoDetectConfig: true,
+    })
     
     // Create root-level files and sparse directory files
     await fs.write(join(dir, 'package.json'), '{"name": "test"}')
@@ -340,20 +380,20 @@ test('sparse checkout cone mode', async (t) => {
     await fs.write(join(dir, 'src', 'utils', 'helper.js'), 'export function helper() {}')
     await fs.write(join(dir, 'docs', 'readme.md'), 'Documentation')
     
-    await add({ fs, dir, gitdir, filepath: '.', cache })
-    await commit({ fs, dir, gitdir, message: 'Initial', author: { name: 'Test', email: 'test@test.com' }, cache })
+    await add({ repo: initializedRepo, filepath: '.' })
+    await commit({ repo: initializedRepo, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
     
     // Initialize sparse checkout with non-cone mode
-    await sparseCheckout({ fs, dir, gitdir, init: true, cone: false, cache })
+    await sparseCheckout({ repo: initializedRepo, init: true, cone: false })
     
     // Set pattern to only include src/ directory (using gitignore-style pattern)
     // In non-cone mode, patterns are inclusion patterns - the code will handle inversion
-    await sparseCheckout({ fs, dir, gitdir, set: ['src/'], cone: false, cache })
+    await sparseCheckout({ repo: initializedRepo, set: ['src/'], cone: false })
     
     // Apply checkout
-    await checkout({ fs, dir, gitdir, ref: 'HEAD', cache })
+    await checkout({ repo: initializedRepo, ref: 'HEAD' })
     
-    const files = await listFiles({ fs, dir, gitdir, cache })
+    const files = await listFiles({ repo: initializedRepo })
     
     // In non-cone mode, root-level files should be INCLUDED
     assert.ok(files.includes('package.json'), 'Root-level package.json should be included in non-cone mode')
@@ -375,40 +415,36 @@ test('sparse checkout cone mode', async (t) => {
     Repository.clearInstanceCache()
     
     // Test cone mode
-    const { fs: fsCone, dir: dirCone, gitdir: gitdirCone } = await makeFixture('test-sparse-checkout-cone-comparison')
-    const cacheCone = {}
-    await Repository.open({ fs: fsCone, dir: dirCone, gitdir: gitdirCone, cache: cacheCone, autoDetectConfig: true })
+    const { fs: fsCone, dir: dirCone, repo: repoCone } = await makeFixture('test-sparse-checkout-cone-comparison')
     
     await init({ fs: fsCone, dir: dirCone })
     await fsCone.write(join(dirCone, 'root.txt'), 'root content')
     await fsCone.write(join(dirCone, 'src', 'file.js'), 'src content')
-    await add({ fs: fsCone, dir: dirCone, gitdir: gitdirCone, filepath: '.', cache: cacheCone })
-    await commit({ fs: fsCone, dir: dirCone, gitdir: gitdirCone, message: 'Initial', author: { name: 'Test', email: 'test@test.com' }, cache: cacheCone })
+    await add({ repo: repoCone, filepath: '.' })
+    await commit({ repo: repoCone, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
     
-    await sparseCheckout({ fs: fsCone, dir: dirCone, gitdir: gitdirCone, init: true, cone: true, cache: cacheCone })
-    await sparseCheckout({ fs: fsCone, dir: dirCone, gitdir: gitdirCone, set: ['src/'], cone: true, cache: cacheCone })
-    await checkout({ fs: fsCone, dir: dirCone, gitdir: gitdirCone, ref: 'HEAD', cache: cacheCone })
+    await sparseCheckout({ repo: repoCone, init: true, cone: true })
+    await sparseCheckout({ repo: repoCone, set: ['src/'], cone: true })
+    await checkout({ repo: repoCone, ref: 'HEAD' })
     
-    const filesCone = await listFiles({ fs: fsCone, dir: dirCone, gitdir: gitdirCone, cache: cacheCone })
+    const filesCone = await listFiles({ repo: repoCone })
     
     // Test non-cone mode
     Repository.clearInstanceCache()
-    const { fs: fsNonCone, dir: dirNonCone, gitdir: gitdirNonCone } = await makeFixture('test-sparse-checkout-non-cone-comparison')
-    const cacheNonCone = {}
-    await Repository.open({ fs: fsNonCone, dir: dirNonCone, gitdir: gitdirNonCone, cache: cacheNonCone, autoDetectConfig: true })
+    const { fs: fsNonCone, dir: dirNonCone, repo: repoNonCone } = await makeFixture('test-sparse-checkout-non-cone-comparison')
     
     await init({ fs: fsNonCone, dir: dirNonCone })
     await fsNonCone.write(join(dirNonCone, 'root.txt'), 'root content')
     await fsNonCone.write(join(dirNonCone, 'src', 'file.js'), 'src content')
-    await add({ fs: fsNonCone, dir: dirNonCone, gitdir: gitdirNonCone, filepath: '.', cache: cacheNonCone })
-    await commit({ fs: fsNonCone, dir: dirNonCone, gitdir: gitdirNonCone, message: 'Initial', author: { name: 'Test', email: 'test@test.com' }, cache: cacheNonCone })
+    await add({ repo: repoNonCone, filepath: '.' })
+    await commit({ repo: repoNonCone, message: 'Initial', author: { name: 'Test', email: 'test@test.com' } })
     
-    await sparseCheckout({ fs: fsNonCone, dir: dirNonCone, gitdir: gitdirNonCone, init: true, cone: false, cache: cacheNonCone })
+    await sparseCheckout({ repo: repoNonCone, init: true, cone: false })
     // In non-cone mode, patterns are inclusion patterns
-    await sparseCheckout({ fs: fsNonCone, dir: dirNonCone, gitdir: gitdirNonCone, set: ['src/'], cone: false, cache: cacheNonCone })
-    await checkout({ fs: fsNonCone, dir: dirNonCone, gitdir: gitdirNonCone, ref: 'HEAD', cache: cacheNonCone })
+    await sparseCheckout({ repo: repoNonCone, set: ['src/'], cone: false })
+    await checkout({ repo: repoNonCone, ref: 'HEAD' })
     
-    const filesNonCone = await listFiles({ fs: fsNonCone, dir: dirNonCone, gitdir: gitdirNonCone, cache: cacheNonCone })
+    const filesNonCone = await listFiles({ repo: repoNonCone })
     
     // Verify the difference: cone mode excludes root files, non-cone mode includes them
     assert.ok(!filesCone.includes('root.txt'), 'Cone mode should exclude root.txt')

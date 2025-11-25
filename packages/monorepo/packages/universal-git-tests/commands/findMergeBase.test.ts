@@ -182,8 +182,7 @@ describe('findMergeBase', () => {
     assert.strictEqual(base, '21605c3fda133ae46f000a375c92c889fa0688ba')
 
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         '423489657e9529ecf285637eb21f40c8657ece3f', // M
         '423489657e9529ecf285637eb21f40c8657ece3f', // M
@@ -192,8 +191,7 @@ describe('findMergeBase', () => {
     assert.strictEqual(base, '423489657e9529ecf285637eb21f40c8657ece3f')
 
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         '423489657e9529ecf285637eb21f40c8657ece3f', // M
         '8a7e4628451951581c6ce84850bd474e107ee750', // D
@@ -202,8 +200,7 @@ describe('findMergeBase', () => {
     assert.strictEqual(base, '592ad92519d993cc44c77663d85bb7e0f961a840')
 
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         '423489657e9529ecf285637eb21f40c8657ece3f', // M
         '8d01f1824e6818db3461c06f09a0965810396a45', // G
@@ -212,8 +209,7 @@ describe('findMergeBase', () => {
     assert.strictEqual(base, '21605c3fda133ae46f000a375c92c889fa0688ba')
 
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         '423489657e9529ecf285637eb21f40c8657ece3f', // M
         '8d01f1824e6818db3461c06f09a0965810396a45', // G
@@ -225,11 +221,10 @@ describe('findMergeBase', () => {
   
   it('recursive merge base scenarios', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-findMergeBase')
+    const { repo } = await makeFixture('test-findMergeBase')
     // Test
     const base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         '85303393b9fd415d48913dfec47d42db184dc4d8', // Z1
         '4c658ff41121ddada50c47e4c72c092a9f7bf2be', // Z2
@@ -241,11 +236,10 @@ describe('findMergeBase', () => {
 
   it('fork & rejoin in one branch base scenarios', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-findMergeBase')
+    const { repo } = await makeFixture('test-findMergeBase')
     // Test
     const base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         '815474b6e581921cbe05825631decac922803d28', // issue819-upstream
         '83ad8e1ec6f21f8d0d74587b6a8021fec1a165e1', // isse819

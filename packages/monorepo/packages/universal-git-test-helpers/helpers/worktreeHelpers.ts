@@ -107,7 +107,6 @@ export async function commitInWorktree({
     cache: repo.cache,
     autoDetectConfig: true,
   })
-  const worktreeGitdir = await worktreeRepo.getGitdir()
 
   // Get branch name from worktree or use provided branch
   let branchName = branch
@@ -125,37 +124,23 @@ export async function commitInWorktree({
 
   // CRITICAL: Set HEAD as symbolic ref if committing in worktree
   if (branchName) {
-    const { writeSymbolicRef } = await import('@awesome-os/universal-git-src/git/refs/writeRef.ts')
-    const { resolveRef } = await import('@awesome-os/universal-git-src/git/refs/readRef.ts')
-    
     // Ensure branch name has refs/heads/ prefix
     const fullBranchRef = branchName.startsWith('refs/heads/') 
       ? branchName 
       : `refs/heads/${branchName}`
     
     try {
-      const branchOid = await resolveRef({
-        fs: repo.fs,
-        gitdir: mainGitdir,
-        ref: fullBranchRef,
-      })
+      // Resolve branch ref from main gitdir (branch refs are in main gitdir, not worktree gitdir)
+      // worktreeRepo.resolveRef() automatically handles this worktree context
+      const branchOid = await worktreeRepo.resolveRef(fullBranchRef)
       
-      await writeSymbolicRef({
-        fs: repo.fs,
-        gitdir: worktreeGitdir,
-        ref: 'HEAD',
-        value: fullBranchRef,
-        oldOid: branchOid,
-      })
+      // Write HEAD symbolic ref to worktree gitdir (HEAD is worktree-specific)
+      // worktreeRepo.writeSymbolicRefDirect() automatically handles this worktree context
+      await worktreeRepo.writeSymbolicRefDirect('HEAD', fullBranchRef, branchOid)
     } catch {
       // If branch doesn't exist yet, that's okay - it will be created by the commit
       // Still set the symbolic ref so the commit updates the branch
-      await writeSymbolicRef({
-        fs: repo.fs,
-        gitdir: worktreeGitdir,
-        ref: 'HEAD',
-        value: fullBranchRef,
-      })
+      await worktreeRepo.writeSymbolicRefDirect('HEAD', fullBranchRef)
     }
   }
 
@@ -168,12 +153,8 @@ export async function commitInWorktree({
   const { commit } = await import('@awesome-os/universal-git-src/commands/commit.ts')
   return await commit({
     repo: worktreeRepo,
-    fs: repo.fs,
-    dir: worktreePath,
-    gitdir: worktreeGitdir,
     message,
     author,
-    cache: repo.cache,
   })
 }
 

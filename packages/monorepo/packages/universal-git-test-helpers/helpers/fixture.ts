@@ -3,6 +3,8 @@ import { makeNodeFixture } from './makeNodeFixture.ts'
 import { resetToCommit as gitResetToCommit } from '@awesome-os/universal-git-src/commands/reset.ts'
 // FileSystemProvider is not exported as subpath, use relative path
 import type { FileSystemProvider } from '@awesome-os/universal-git-src/models/FileSystem.ts'
+// Repository is not exported as subpath, use relative path
+import type { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 import type * as fs from 'fs'
 
 export interface TestFixture {
@@ -10,6 +12,7 @@ export interface TestFixture {
   fs: FileSystemProvider
   dir: string
   gitdir: string
+  repo: Repository
 }
 
 /**

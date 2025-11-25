@@ -33,7 +33,8 @@ let indexLock: AsyncLock | undefined
  * Create a new commit
  */
 export async function commit({
-  fs,
+  repo: _repo,
+  fs: _fs,
   onSign,
   dir,
   gitdir = dir ? join(dir, '.git') : undefined,
@@ -50,7 +51,8 @@ export async function commit({
   cache = {},
   autoDetectConfig = true,
 }: {
-  fs: FileSystem
+  repo?: Repository
+  fs?: FileSystem
   onSign?: SignCallback
   dir?: string
   gitdir?: string
@@ -68,9 +70,9 @@ export async function commit({
   autoDetectConfig?: boolean
 }): Promise<string> {
   try {
-    // commit doesn't accept repo parameter, so we use normalizeCommandArgs without repo
     const { repo, fs: effectiveFs, gitdir: effectiveGitdir, cache: effectiveCache } = await normalizeCommandArgs({
-      fs,
+      repo: _repo,
+      fs: _fs,
       dir,
       gitdir,
       cache,

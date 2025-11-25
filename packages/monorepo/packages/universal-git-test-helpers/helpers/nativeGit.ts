@@ -13,10 +13,14 @@ import { tmpdir } from 'os'
 import { FileSystem } from '@awesome-os/universal-git-src/models/FileSystem.ts'
 import type { FileSystemProvider } from '@awesome-os/universal-git-src/models/FileSystem.ts'
 
+// Repository is not exported as subpath, use relative path
+import type { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
+
 export interface TestRepo {
   path: string
   gitdir: string
   fs: FileSystemProvider
+  repo: Repository
   systemConfigPath?: string
   globalConfigPath?: string
   cleanup: () => Promise<void>
@@ -123,10 +127,23 @@ export async function createTestRepo(objectFormat: 'sha1' | 'sha256' = 'sha1'): 
       // Global config might not exist
     }
 
+    // Create Repository instance for convenience
+    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
+    const repo = await Repository.open({
+      fs: fs as FileSystemProvider,
+      dir: repoPath,
+      gitdir,
+      cache: {},
+      autoDetectConfig: true,
+      systemConfigPath,
+      globalConfigPath,
+    })
+
     return {
       path: repoPath,
       gitdir,
       fs: fs as FileSystemProvider,
+      repo,
       systemConfigPath,
       globalConfigPath,
       cleanup: async () => {

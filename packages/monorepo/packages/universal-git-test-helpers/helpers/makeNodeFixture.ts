@@ -66,6 +66,17 @@ export async function makeNodeFixture(fixture: string) {
   const dir = await useTempDir(fixture)
   const gitdir = await useTempDir(`${fixture}.git`)
 
-  return { _fs, fs, dir, gitdir }
+  // Create Repository instance for convenience
+  // Repository is not exported as subpath, use relative path
+  const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
+  const repo = await Repository.open({
+    fs,
+    dir,
+    gitdir,
+    cache: {},
+    autoDetectConfig: true,
+  })
+
+  return { _fs, fs, dir, gitdir, repo }
 }
 
