@@ -9,19 +9,17 @@ import { join } from '@awesome-os/universal-git-src/utils/join.ts'
 describe('findMergeBase', () => {
   it('silly edge cases', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-findMergeBase')
+    const { repo } = await makeFixture('test-findMergeBase')
     let base
     // Test
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: ['9ec6646dd454e8f530c478c26f8b06e57f880bd6'],
     })
     assert.strictEqual(base, '9ec6646dd454e8f530c478c26f8b06e57f880bd6')
 
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         '9ec6646dd454e8f530c478c26f8b06e57f880bd6',
         '9ec6646dd454e8f530c478c26f8b06e57f880bd6',
@@ -32,11 +30,10 @@ describe('findMergeBase', () => {
   
   it('no common ancestor scenarios', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-findMergeBase')
+    const { repo } = await makeFixture('test-findMergeBase')
     // Test
     const base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         '9ec6646dd454e8f530c478c26f8b06e57f880bd6', // A
         '99cfd5bb4e412234162ac1eb46350ec6ccffb50d', // Z
@@ -47,14 +44,13 @@ describe('findMergeBase', () => {
   
   it('fast-forward scenarios', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-findMergeBase')
+    const { repo } = await makeFixture('test-findMergeBase')
     let base
     // Test
     // Note: These tests may fail if fixture doesn't have complete commit graph
     // The algorithm requires commits to be connected through parent relationships
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         '9ec6646dd454e8f530c478c26f8b06e57f880bd6', // A
         'f79577b91d302d87e310c8b5af8c274bbf45502f', // C
@@ -68,8 +64,7 @@ describe('findMergeBase', () => {
     assert.strictEqual(base, 'f79577b91d302d87e310c8b5af8c274bbf45502f')
 
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         '21605c3fda133ae46f000a375c92c889fa0688ba', // F
         '9ec6646dd454e8f530c478c26f8b06e57f880bd6', // A
@@ -78,8 +73,7 @@ describe('findMergeBase', () => {
     assert.strictEqual(base, '21605c3fda133ae46f000a375c92c889fa0688ba')
 
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         '21605c3fda133ae46f000a375c92c889fa0688ba', // F
         '8d01f1824e6818db3461c06f09a0965810396a45', // G
@@ -88,8 +82,7 @@ describe('findMergeBase', () => {
     assert.strictEqual(base, '21605c3fda133ae46f000a375c92c889fa0688ba')
 
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         '21605c3fda133ae46f000a375c92c889fa0688ba', // F
         '9ec6646dd454e8f530c478c26f8b06e57f880bd6', // A
@@ -101,13 +94,12 @@ describe('findMergeBase', () => {
   
   it('diverging scenarios', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-findMergeBase')
+    const { repo } = await makeFixture('test-findMergeBase')
     let base
     // Test
     // Note: These tests may fail if fixture doesn't have complete commit graph
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         'c91a8aab1f086c8cc8914558f035e718a8a5c503', // B
         'f79577b91d302d87e310c8b5af8c274bbf45502f', // C
@@ -121,8 +113,7 @@ describe('findMergeBase', () => {
     assert.strictEqual(base, '0526923cafece3d898dbe55ee2c2d69bfcc54c60')
 
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         '8d01f1824e6818db3461c06f09a0965810396a45', // G
         '9ec6646dd454e8f530c478c26f8b06e57f880bd6', // A
@@ -131,8 +122,7 @@ describe('findMergeBase', () => {
     assert.strictEqual(base, '21605c3fda133ae46f000a375c92c889fa0688ba')
 
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         '8a7e4628451951581c6ce84850bd474e107ee750', // D
         '9ec6646dd454e8f530c478c26f8b06e57f880bd6', // A
@@ -141,8 +131,7 @@ describe('findMergeBase', () => {
     assert.strictEqual(base, '592ad92519d993cc44c77663d85bb7e0f961a840')
 
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         '8a7e4628451951581c6ce84850bd474e107ee750', // D
         '8d0e46852781eed81d32b91517f5d5f0979575c4', // E
@@ -151,8 +140,7 @@ describe('findMergeBase', () => {
     assert.strictEqual(base, '592ad92519d993cc44c77663d85bb7e0f961a840')
 
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         '8a7e4628451951581c6ce84850bd474e107ee750', // D
         '8d0e46852781eed81d32b91517f5d5f0979575c4', // E
@@ -162,8 +150,7 @@ describe('findMergeBase', () => {
     assert.strictEqual(base, '592ad92519d993cc44c77663d85bb7e0f961a840')
 
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         '8a7e4628451951581c6ce84850bd474e107ee750', // D
         '8d0e46852781eed81d32b91517f5d5f0979575c4', // E
@@ -176,13 +163,12 @@ describe('findMergeBase', () => {
   
   it('merge commit scenarios', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-findMergeBase')
+    const { repo } = await makeFixture('test-findMergeBase')
     let base
     // Test
     // Note: These tests may fail if fixture doesn't have complete commit graph
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo,
       oids: [
         '423489657e9529ecf285637eb21f40c8657ece3f', // M
         '9ec6646dd454e8f530c478c26f8b06e57f880bd6', // A
@@ -270,68 +256,65 @@ describe('findMergeBase', () => {
 
   it('octopus merge scenarios', async () => {
     // Setup - create a test repository with an octopus merge
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    const { commit, writeCommit, readCommit, add, resolveRef, branch, checkout, init } = await import('@awesome-os/universal-git-src/index.ts')
-    const cache: Record<string, unknown> = {}
+    const { fs, dir, gitdir, repo } = await makeFixture('test-empty')
+    const { commit, writeCommit, readCommit, add, branch, init } = await import('@awesome-os/universal-git-src/index.ts')
     
     // Initialize repository
     await init({ fs, dir, defaultBranch: 'main' })
     
-    // Create initial commit
-    await fs.write(join(dir, 'file1.txt'), 'initial content\n')
-    await add({ fs, dir, gitdir, filepath: 'file1.txt', cache })
-    const initialCommit = await commit({
+    // Reopen repo after init to get updated instance
+    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
+    const initializedRepo = await Repository.open({
       fs,
       dir,
       gitdir,
+      cache: repo.cache,
+      autoDetectConfig: true,
+    })
+    
+    // Create initial commit
+    await fs.write(join(dir, 'file1.txt'), 'initial content\n')
+    await add({ repo: initializedRepo, filepath: 'file1.txt' })
+    const initialCommit = await commit({
+      repo: initializedRepo,
       message: 'Initial commit',
       author: { name: 'Test', email: 'test@example.com' },
-      cache,
     })
     
     // Create branch A and commit
-    await branch({ fs, dir, gitdir, ref: 'branch-a', checkout: true, cache })
+    await branch({ repo: initializedRepo, ref: 'branch-a', checkout: true })
     await fs.write(join(dir, 'file-a.txt'), 'content from branch A\n')
-    await add({ fs, dir, gitdir, filepath: 'file-a.txt', cache })
+    await add({ repo: initializedRepo, filepath: 'file-a.txt' })
     const commitA = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo: initializedRepo,
       message: 'Commit on branch A',
       author: { name: 'Test', email: 'test@example.com' },
-      cache,
     })
     
     // Create branch B from initial and commit
-    await branch({ fs, dir, gitdir, ref: 'branch-b', object: initialCommit, checkout: true, cache })
+    await branch({ repo: initializedRepo, ref: 'branch-b', object: initialCommit, checkout: true })
     await fs.write(join(dir, 'file-b.txt'), 'content from branch B\n')
-    await add({ fs, dir, gitdir, filepath: 'file-b.txt', cache })
+    await add({ repo: initializedRepo, filepath: 'file-b.txt' })
     const commitB = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo: initializedRepo,
       message: 'Commit on branch B',
       author: { name: 'Test', email: 'test@example.com' },
-      cache,
     })
     
     // Create branch C from initial and commit
-    await branch({ fs, dir, gitdir, ref: 'branch-c', object: initialCommit, checkout: true, cache })
+    await branch({ repo: initializedRepo, ref: 'branch-c', object: initialCommit, checkout: true })
     await fs.write(join(dir, 'file-c.txt'), 'content from branch C\n')
-    await add({ fs, dir, gitdir, filepath: 'file-c.txt', cache })
+    await add({ repo: initializedRepo, filepath: 'file-c.txt' })
     const commitC = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo: initializedRepo,
       message: 'Commit on branch C',
       author: { name: 'Test', email: 'test@example.com' },
-      cache,
     })
     
     // Create an octopus merge commit with 3 parents (A, B, C)
     // We need to manually create this commit since the commit() function typically only handles 2 parents
     // Read the tree from one of the commits (they should all have the same base tree structure)
-    const commitAObj = await readCommit({ fs, dir, gitdir, oid: commitA, cache })
+    const commitAObj = await readCommit({ repo: initializedRepo, oid: commitA })
     const treeOid = commitAObj.commit.tree
     
     // Create octopus merge commit manually
@@ -344,32 +327,26 @@ describe('findMergeBase', () => {
     }
     
     const octopusCommitOid = await writeCommit({
-      fs,
-      dir,
-      gitdir,
+      repo: initializedRepo,
       commit: octopusCommit,
-      cache,
     })
     
     // Test 1: Find merge base between octopus merge and one of its parents
     // Should return the parent commit itself
     let base = await findMergeBase({
-      fs,
-      gitdir,
+      repo: initializedRepo,
       oids: [octopusCommitOid, commitA],
     })
     assert.strictEqual(base, commitA, 'Octopus merge and its parent A should have parent A as merge base')
     
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo: initializedRepo,
       oids: [octopusCommitOid, commitB],
     })
     assert.strictEqual(base, commitB, 'Octopus merge and its parent B should have parent B as merge base')
     
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo: initializedRepo,
       oids: [octopusCommitOid, commitC],
     })
     assert.strictEqual(base, commitC, 'Octopus merge and its parent C should have parent C as merge base')
@@ -377,8 +354,7 @@ describe('findMergeBase', () => {
     // Test 2: Find merge base between octopus merge and initial commit
     // Should return initial commit (common ancestor of all branches)
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo: initializedRepo,
       oids: [octopusCommitOid, initialCommit],
     })
     assert.strictEqual(base, initialCommit, 'Octopus merge and initial commit should have initial commit as merge base')
@@ -386,8 +362,7 @@ describe('findMergeBase', () => {
     // Test 3: Find merge base between all three parent branches
     // Should return initial commit (their common ancestor)
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo: initializedRepo,
       oids: [commitA, commitB, commitC],
     })
     assert.strictEqual(base, initialCommit, 'All three parent branches should have initial commit as merge base')
@@ -395,16 +370,14 @@ describe('findMergeBase', () => {
     // Test 4: Find merge base between octopus merge and two of its parents
     // Should return initial commit (common ancestor of the two parents)
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo: initializedRepo,
       oids: [octopusCommitOid, commitA, commitB],
     })
     assert.strictEqual(base, initialCommit, 'Octopus merge with two of its parents should have initial commit as merge base')
     
     // Test 5: Octopus merge with itself should return itself
     base = await findMergeBase({
-      fs,
-      gitdir,
+      repo: initializedRepo,
       oids: [octopusCommitOid, octopusCommitOid],
     })
     assert.strictEqual(base, octopusCommitOid, 'Octopus merge with itself should return itself')
