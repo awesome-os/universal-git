@@ -409,7 +409,7 @@ export class Repository {
 
     // Step 6: Create new Repository instance and cache it in fs-specific cache
     // CRITICAL: Repository now always has backends - fs is only for system/global config
-    const repo = new Repository(fs, workingDir, finalGitdir, cache, finalSystemPath, finalGlobalPath, resolvedGitBackend, resolvedWorktreeBackend)
+    const repo = new Repository(fs, workingDir, finalGitdir, cache, finalSystemPath, finalGlobalPath, resolvedGitBackend, resolvedWorktreeBackend || undefined)
     fsCache.set(finalGitdir, repo)
     
     // Step 7: Initialize repository if requested
@@ -725,53 +725,88 @@ export class Repository {
    */
   async getObjectReader(): Promise<ObjectReaderWrapper> {
     if (!this._objectReader) {
-      const gitdir = await this.getGitdir()
-      const { readObject } = await import('../git/objects/readObject.ts')
-      // Use new readObject function from src/git/objects/
-      this._objectReader = {
-        read: async (params) => {
-          // Handle 'parsed' format separately - readObject doesn't support it
-          if (params.format === 'parsed') {
-            const result = await readObject({
-              oid: params.oid,
+      // Use backend if available, otherwise fall back to direct object functions
+      if (this._gitBackend) {
+        this._objectReader = {
+          read: async (params) => {
+            // Handle 'parsed' format separately - backend doesn't support it
+            if (params.format === 'parsed') {
+              const result = await this._gitBackend!.readObject(params.oid, 'content', this.cache)
+              // Parse the object based on its type
+              const commitModule = await import('../core-utils/parsers/Commit.ts')
+              const treeModule = await import('../core-utils/parsers/Tree.ts')
+              const tagModule = await import('../core-utils/parsers/Tag.ts')
+              const blobModule = await import('../core-utils/parsers/Blob.ts')
+              const parseCommit = commitModule.parse
+              const parseTree = treeModule.parse
+              const parseTag = tagModule.parse
+              const parseBlob = blobModule.parse
+              
+              if (result.type === 'commit') {
+                return { ...result, object: parseCommit(result.object) }
+              } else if (result.type === 'tree') {
+                return { ...result, object: parseTree(result.object) }
+              } else if (result.type === 'tag') {
+                return { ...result, object: parseTag(result.object) }
+              } else if (result.type === 'blob') {
+                return { ...result, object: parseBlob(result.object) }
+              }
+              return result
+            }
+            // For other formats, use backend
+            const validFormat = params.format || 'content'
+            return this._gitBackend!.readObject(params.oid, validFormat as 'content' | 'deflated' | 'wrapped', this.cache)
+          },
+        }
+      } else {
+        // Fallback to direct object functions
+        const gitdir = await this.getGitdir()
+        const { readObject } = await import('../git/objects/readObject.ts')
+        this._objectReader = {
+          read: async (params) => {
+            // Handle 'parsed' format separately - readObject doesn't support it
+            if (params.format === 'parsed') {
+              const result = await readObject({
+                oid: params.oid,
+                fs: this.fs,
+                gitdir,
+                cache: this.cache,
+                format: 'content',
+              })
+              // Parse the object based on its type
+              const commitModule = await import('../core-utils/parsers/Commit.ts')
+              const treeModule = await import('../core-utils/parsers/Tree.ts')
+              const tagModule = await import('../core-utils/parsers/Tag.ts')
+              const blobModule = await import('../core-utils/parsers/Blob.ts')
+              const parseCommit = commitModule.parse
+              const parseTree = treeModule.parse
+              const parseTag = tagModule.parse
+              const parseBlob = blobModule.parse
+              
+              if (result.type === 'commit') {
+                return { ...result, object: parseCommit(result.object) }
+              } else if (result.type === 'tree') {
+                return { ...result, object: parseTree(result.object) }
+              } else if (result.type === 'tag') {
+                return { ...result, object: parseTag(result.object) }
+              } else if (result.type === 'blob') {
+                return { ...result, object: parseBlob(result.object) }
+              }
+              return result
+            }
+            // For other formats, pass through to readObject (it will filter out 'parsed')
+            const { format, ...restParams } = params
+            // Handle 'parsed' format by converting to 'content' (readObject doesn't support 'parsed')
+            const validFormat = (format as string) === 'parsed' ? 'content' : format
+            return readObject({
+              ...restParams,
               fs: this.fs,
               gitdir,
               cache: this.cache,
-              format: 'content',
+              format: validFormat as 'content' | 'deflated' | 'wrapped' | undefined,
             })
-            // Parse the object based on its type
-            const commitModule = await import('../core-utils/parsers/Commit.ts')
-            const treeModule = await import('../core-utils/parsers/Tree.ts')
-            const tagModule = await import('../core-utils/parsers/Tag.ts')
-            const blobModule = await import('../core-utils/parsers/Blob.ts')
-            const parseCommit = commitModule.parse
-            const parseTree = treeModule.parse
-            const parseTag = tagModule.parse
-            const parseBlob = blobModule.parse
-            
-            if (result.type === 'commit') {
-              return { ...result, object: parseCommit(result.object) }
-            } else if (result.type === 'tree') {
-              return { ...result, object: parseTree(result.object) }
-            } else if (result.type === 'tag') {
-              return { ...result, object: parseTag(result.object) }
-            } else if (result.type === 'blob') {
-              return { ...result, object: parseBlob(result.object) }
-            }
-            return result
-          }
-          // For other formats, pass through to readObject (it will filter out 'parsed')
-          const { format, ...restParams } = params
-          // Handle 'parsed' format by converting to 'content' (readObject doesn't support 'parsed')
-          const validFormat = (format as string) === 'parsed' ? 'content' : format
-          return readObject({
-            ...restParams,
-            fs: this.fs,
-            gitdir,
-            cache: this.cache,
-            format: validFormat as 'content' | 'deflated' | 'wrapped' | undefined,
-          })
-        },
+          },
+        }
       }
     }
     return this._objectReader
@@ -782,17 +817,33 @@ export class Repository {
    */
   async getObjectWriter(): Promise<ObjectWriterWrapper> {
     if (!this._objectWriter) {
-      const gitdir = await this.getGitdir()
-      const { writeObject } = await import('../git/objects/writeObject.ts')
-      // Use new writeObject function from src/git/objects/
-      this._objectWriter = {
-        write: async (params) => {
-          return writeObject({
-            ...params,
-            fs: this.fs,
-            gitdir,
-          })
-        },
+      // Use backend if available, otherwise fall back to direct object functions
+      if (this._gitBackend) {
+        this._objectWriter = {
+          write: async (params) => {
+            return this._gitBackend!.writeObject(
+              params.type,
+              UniversalBuffer.from(params.object),
+              params.format || 'content',
+              undefined, // oid
+              false, // dryRun
+              this.cache
+            )
+          },
+        }
+      } else {
+        // Fallback to direct object functions
+        const gitdir = await this.getGitdir()
+        const { writeObject } = await import('../git/objects/writeObject.ts')
+        this._objectWriter = {
+          write: async (params) => {
+            return writeObject({
+              ...params,
+              fs: this.fs,
+              gitdir,
+            })
+          },
+        }
       }
     }
     return this._objectWriter
@@ -1104,23 +1155,36 @@ export class Repository {
    */
   async resolveRefDirect(ref: string, depth?: number): Promise<string> {
     const gitdir = await this.getGitdir()
-    const { resolveRef } = await import('../git/refs/index.ts')
     
-    // Use worktree-aware resolution if we're in a worktree
-    const { isWorktreeGitdir } = await import('../git/refs/worktreeRefs.ts')
-    if (isWorktreeGitdir(gitdir)) {
-      // For worktrees, we need to handle HEAD specially (it's in worktree gitdir)
-      // but other refs are in main gitdir. Use resolveRef which handles this correctly
-      // by checking worktree context internally
-      const { getMainGitdir } = await import('../git/refs/worktreeRefs.ts')
-      const mainGitdir = await getMainGitdir({ fs: this.fs, worktreeGitdir: gitdir })
+    // Use backend if available, otherwise fall back to direct ref functions
+    if (this._gitBackend) {
+      // Use worktree-aware resolution if we're in a worktree
+      const { isWorktreeGitdir } = await import('../git/refs/worktreeRefs.ts')
+      if (isWorktreeGitdir(gitdir)) {
+        // For worktrees, HEAD is in worktree gitdir, other refs are in main gitdir
+        // For now, we still need to use direct ref functions for worktree context
+        // TODO: Update backend interface to support worktree context
+        const { getMainGitdir } = await import('../git/refs/worktreeRefs.ts')
+        const mainGitdir = await getMainGitdir({ fs: this.fs, worktreeGitdir: gitdir })
+        const effectiveGitdir = (ref === 'HEAD' || ref === 'refs/HEAD') ? gitdir : mainGitdir
+        
+        // For worktrees, we need to create a backend for the effective gitdir
+        // For now, fall back to direct ref functions
+        const { resolveRef } = await import('../git/refs/index.ts')
+        return resolveRef({ fs: this.fs, gitdir: effectiveGitdir, ref, depth })
+      }
       
-      // HEAD is in worktree gitdir, other refs are in main gitdir
-      const effectiveGitdir = (ref === 'HEAD' || ref === 'refs/HEAD') ? gitdir : mainGitdir
-      return resolveRef({ fs: this.fs, gitdir: effectiveGitdir, ref, depth })
+      // Main worktree - use backend
+      const result = await this._gitBackend.readRef(ref, depth, this.cache)
+      if (result === null) {
+        const { NotFoundError } = await import('../errors/NotFoundError.ts')
+        throw new NotFoundError(`Ref '${ref}' not found`)
+      }
+      return result
     }
     
-    // Main worktree - use standard resolution
+    // Fallback to direct ref functions
+    const { resolveRef } = await import('../git/refs/index.ts')
     return resolveRef({ fs: this.fs, gitdir, ref, depth })
   }
 
@@ -1134,23 +1198,32 @@ export class Repository {
   }
 
   /**
-   * Reads a symbolic ref directly using src/git/refs/readSymbolicRef
+   * Reads a symbolic ref directly using backend or src/git/refs/readSymbolicRef
    * This is the single source of truth for reading symbolic refs
    * Handles worktree context correctly (HEAD in worktree gitdir, other refs in main gitdir)
    */
   async readSymbolicRefDirect(ref: string): Promise<string | null> {
     const gitdir = await this.getGitdir()
-    const { readSymbolicRef } = await import('../git/refs/readRef.ts')
     
-    // Use worktree-aware reading if we're in a worktree
-    const { isWorktreeGitdir, getMainGitdir, isWorktreeSpecificRef } = await import('../git/refs/worktreeRefs.ts')
-    if (isWorktreeGitdir(gitdir)) {
-      // HEAD is in worktree gitdir, other refs are in main gitdir
-      const effectiveGitdir = isWorktreeSpecificRef(ref) ? gitdir : await getMainGitdir({ fs: this.fs, worktreeGitdir: gitdir })
-      return readSymbolicRef({ fs: this.fs, gitdir: effectiveGitdir, ref })
+    // Use backend if available, otherwise fall back to direct ref functions
+    if (this._gitBackend) {
+      // Use worktree-aware reading if we're in a worktree
+      const { isWorktreeGitdir, getMainGitdir, isWorktreeSpecificRef } = await import('../git/refs/worktreeRefs.ts')
+      if (isWorktreeGitdir(gitdir)) {
+        // For worktrees, HEAD is in worktree gitdir, other refs are in main gitdir
+        // For now, we still need to use direct ref functions for worktree context
+        // TODO: Update backend interface to support worktree context
+        const effectiveGitdir = isWorktreeSpecificRef(ref) ? gitdir : await getMainGitdir({ fs: this.fs, worktreeGitdir: gitdir })
+        const { readSymbolicRef } = await import('../git/refs/readRef.ts')
+        return readSymbolicRef({ fs: this.fs, gitdir: effectiveGitdir, ref })
+      }
+      
+      // Main worktree - use backend
+      return this._gitBackend.readSymbolicRef(ref)
     }
     
-    // Main worktree - use standard reading
+    // Fallback to direct ref functions
+    const { readSymbolicRef } = await import('../git/refs/readRef.ts')
     return readSymbolicRef({ fs: this.fs, gitdir, ref })
   }
 
@@ -1163,20 +1236,38 @@ export class Repository {
   }
 
   /**
-   * Lists refs directly using src/git/refs/listRefs
+   * Lists refs directly using backend or src/git/refs/listRefs
    * This is the single source of truth for listing refs
    * Handles worktree context correctly (refs are in main gitdir, not worktree gitdir)
    */
   async listRefsDirect(filepath: string): Promise<string[]> {
     const gitdir = await this.getGitdir()
-    const { listRefs } = await import('../git/refs/listRefs.ts')
     
-    // Refs are always in the main repository gitdir, even in worktrees
+    // Use backend if available, otherwise fall back to direct ref functions
+    if (this._gitBackend) {
+      // Refs are always in the main repository gitdir, even in worktrees
+      // For main worktree, use backend directly
+      const { isWorktreeGitdir } = await import('../git/refs/worktreeRefs.ts')
+      if (!isWorktreeGitdir(gitdir)) {
+        // Main worktree - use backend
+        return this._gitBackend.listRefs(filepath)
+      }
+      
+      // For worktrees, refs are in main gitdir, not worktree gitdir
+      // For now, we still need to use direct ref functions for worktree context
+      // TODO: Update backend interface to support worktree context
+      const { getMainGitdir } = await import('../git/refs/worktreeRefs.ts')
+      const mainGitdir = await getMainGitdir({ fs: this.fs, worktreeGitdir: gitdir })
+      const { listRefs } = await import('../git/refs/listRefs.ts')
+      return listRefs({ fs: this.fs, gitdir: mainGitdir, filepath })
+    }
+    
+    // Fallback to direct ref functions
+    const { listRefs } = await import('../git/refs/listRefs.ts')
     const { isWorktreeGitdir, getMainGitdir } = await import('../git/refs/worktreeRefs.ts')
     const effectiveGitdir = isWorktreeGitdir(gitdir)
       ? await getMainGitdir({ fs: this.fs, worktreeGitdir: gitdir })
       : gitdir
-    
     return listRefs({ fs: this.fs, gitdir: effectiveGitdir, filepath })
   }
 
@@ -1189,7 +1280,7 @@ export class Repository {
   }
 
   /**
-   * Writes a ref directly using src/git/refs/writeRef
+   * Writes a ref directly using backend or src/git/refs/writeRef
    * This is the single source of truth for writing refs
    * Handles worktree context correctly (HEAD in worktree gitdir, other refs in main gitdir)
    */
@@ -1211,31 +1302,35 @@ export class Repository {
       )
     }
     
-    // Use worktree-aware writing if we're in a worktree
-    const { isWorktreeGitdir, writeRefInWorktree } = await import('../git/refs/worktreeRefs.ts')
-    if (isWorktreeGitdir(gitdir)) {
-      // writeRefInWorktree handles the gitdir routing internally
-      // but we need to pass objectFormat - let's use the standard writeRef with correct gitdir
-      const { getMainGitdir } = await import('../git/refs/worktreeRefs.ts')
-      const { isWorktreeSpecificRef } = await import('../git/refs/worktreeRefs.ts')
-      const { writeRef } = await import('../git/refs/writeRef.ts')
-      
-      // HEAD goes to worktree gitdir, other refs go to main gitdir
-      if (isWorktreeSpecificRef(ref)) {
-        return writeRef({ fs: this.fs, gitdir, ref, value: trimmedValue, objectFormat, skipReflog })
-      } else {
-        const mainGitdir = await getMainGitdir({ fs: this.fs, worktreeGitdir: gitdir })
-        return writeRef({ fs: this.fs, gitdir: mainGitdir, ref, value: trimmedValue, objectFormat, skipReflog })
+    // Use backend if available, otherwise fall back to direct ref functions
+    if (this._gitBackend) {
+      // Use worktree-aware writing if we're in a worktree
+      const { isWorktreeGitdir, getMainGitdir, isWorktreeSpecificRef } = await import('../git/refs/worktreeRefs.ts')
+      if (isWorktreeGitdir(gitdir)) {
+        // For worktrees, HEAD goes to worktree gitdir, other refs go to main gitdir
+        // For now, we still need to use direct ref functions for worktree context
+        // TODO: Update backend interface to support worktree context
+        if (isWorktreeSpecificRef(ref)) {
+          const { writeRef } = await import('../git/refs/writeRef.ts')
+          return writeRef({ fs: this.fs, gitdir, ref, value: trimmedValue, objectFormat, skipReflog })
+        } else {
+          const mainGitdir = await getMainGitdir({ fs: this.fs, worktreeGitdir: gitdir })
+          const { writeRef } = await import('../git/refs/writeRef.ts')
+          return writeRef({ fs: this.fs, gitdir: mainGitdir, ref, value: trimmedValue, objectFormat, skipReflog })
+        }
       }
+      
+      // Main worktree - use backend
+      return this._gitBackend.writeRef(ref, trimmedValue, skipReflog, this.cache)
     }
     
-    // Main worktree - use standard writing
+    // Fallback to direct ref functions
     const { writeRef } = await import('../git/refs/writeRef.ts')
     return writeRef({ fs: this.fs, gitdir, ref, value: trimmedValue, objectFormat, skipReflog })
   }
 
   /**
-   * Writes a symbolic ref directly using src/git/refs/writeSymbolicRef
+   * Writes a symbolic ref directly using backend or src/git/refs/writeSymbolicRef
    * This bypasses RefManager for direct file operations
    * Handles worktree context correctly (HEAD in worktree gitdir, other refs in main gitdir)
    */
@@ -1243,47 +1338,63 @@ export class Repository {
     const gitdir = await this.getGitdir()
     const objectFormat = await this.getObjectFormat()
     
-    // Use worktree-aware writing if we're in a worktree
-    const { isWorktreeGitdir, getMainGitdir, isWorktreeSpecificRef } = await import('../git/refs/worktreeRefs.ts')
-    if (isWorktreeGitdir(gitdir)) {
-      const { writeSymbolicRef } = await import('../git/refs/writeRef.ts')
-      
-      // HEAD goes to worktree gitdir, other refs go to main gitdir
-      if (isWorktreeSpecificRef(ref)) {
-        return writeSymbolicRef({ fs: this.fs, gitdir, ref, value, oldOid, objectFormat })
-      } else {
-        const mainGitdir = await getMainGitdir({ fs: this.fs, worktreeGitdir: gitdir })
-        return writeSymbolicRef({ fs: this.fs, gitdir: mainGitdir, ref, value, oldOid, objectFormat })
+    // Use backend if available, otherwise fall back to direct ref functions
+    if (this._gitBackend) {
+      // Use worktree-aware writing if we're in a worktree
+      const { isWorktreeGitdir, getMainGitdir, isWorktreeSpecificRef } = await import('../git/refs/worktreeRefs.ts')
+      if (isWorktreeGitdir(gitdir)) {
+        // For worktrees, HEAD goes to worktree gitdir, other refs go to main gitdir
+        // For now, we still need to use direct ref functions for worktree context
+        // TODO: Update backend interface to support worktree context
+        const { writeSymbolicRef } = await import('../git/refs/writeRef.ts')
+        if (isWorktreeSpecificRef(ref)) {
+          return writeSymbolicRef({ fs: this.fs, gitdir, ref, value, oldOid, objectFormat })
+        } else {
+          const mainGitdir = await getMainGitdir({ fs: this.fs, worktreeGitdir: gitdir })
+          return writeSymbolicRef({ fs: this.fs, gitdir: mainGitdir, ref, value, oldOid, objectFormat })
+        }
       }
+      
+      // Main worktree - use backend
+      return this._gitBackend.writeSymbolicRef(ref, value, oldOid, this.cache)
     }
     
-    // Main worktree - use standard writing
+    // Fallback to direct ref functions
     const { writeSymbolicRef } = await import('../git/refs/writeRef.ts')
     return writeSymbolicRef({ fs: this.fs, gitdir, ref, value, oldOid, objectFormat })
   }
 
   /**
-   * Deletes a ref directly using src/git/refs/deleteRef
+   * Deletes a ref directly using backend or src/git/refs/deleteRef
    * This bypasses RefManager for direct file operations
    * Handles worktree context correctly (HEAD in worktree gitdir, other refs in main gitdir)
    */
   async deleteRefDirect(ref: string): Promise<void> {
     const gitdir = await this.getGitdir()
-    const { deleteRef } = await import('../git/refs/deleteRef.ts')
     
-    // Use worktree-aware deletion if we're in a worktree
-    const { isWorktreeGitdir, getMainGitdir, isWorktreeSpecificRef } = await import('../git/refs/worktreeRefs.ts')
-    if (isWorktreeGitdir(gitdir)) {
-      // HEAD goes to worktree gitdir, other refs go to main gitdir
-      if (isWorktreeSpecificRef(ref)) {
-        return deleteRef({ fs: this.fs, gitdir, ref })
-      } else {
-        const mainGitdir = await getMainGitdir({ fs: this.fs, worktreeGitdir: gitdir })
-        return deleteRef({ fs: this.fs, gitdir: mainGitdir, ref })
+    // Use backend if available, otherwise fall back to direct ref functions
+    if (this._gitBackend) {
+      // Use worktree-aware deletion if we're in a worktree
+      const { isWorktreeGitdir, getMainGitdir, isWorktreeSpecificRef } = await import('../git/refs/worktreeRefs.ts')
+      if (isWorktreeGitdir(gitdir)) {
+        // For worktrees, HEAD goes to worktree gitdir, other refs go to main gitdir
+        // For now, we still need to use direct ref functions for worktree context
+        // TODO: Update backend interface to support worktree context
+        const { deleteRef } = await import('../git/refs/deleteRef.ts')
+        if (isWorktreeSpecificRef(ref)) {
+          return deleteRef({ fs: this.fs, gitdir, ref })
+        } else {
+          const mainGitdir = await getMainGitdir({ fs: this.fs, worktreeGitdir: gitdir })
+          return deleteRef({ fs: this.fs, gitdir: mainGitdir, ref })
+        }
       }
+      
+      // Main worktree - use backend
+      return this._gitBackend.deleteRef(ref, this.cache)
     }
     
-    // Main worktree - use standard deletion
+    // Fallback to direct ref functions
+    const { deleteRef } = await import('../git/refs/deleteRef.ts')
     return deleteRef({ fs: this.fs, gitdir, ref })
   }
 
@@ -1313,8 +1424,8 @@ export class Repository {
       // Create worktree with current dir and gitdir
       // Note: gitdir will be resolved when needed
       // If _dir is still null but _worktreeBackend exists, get it from the backend
-      const worktreeDir = this._dir || (this._worktreeBackend?.getDirectory?.() || null)
-      this._worktree = new Worktree(this, worktreeDir, this._gitdir, null, this._worktreeBackend || null)
+      const worktreeDir = this._dir || (this._worktreeBackend?.getDirectory?.() || '')
+      this._worktree = new Worktree(this, worktreeDir, this._gitdir, null, this._worktreeBackend || undefined)
     }
     return this._worktree
   }
@@ -1427,22 +1538,35 @@ export class Repository {
     const worktreeGitdirFile = join(worktreeGitdir, 'gitdir')
     await this.fs.write(worktreeGitdirFile, UniversalBuffer.from(normalizedWorktreeDir, 'utf8'))
     
-    // Resolve ref to commit OID using direct ref functions
-    const { resolveRef } = await import('../git/refs/readRef.ts')
+    // Resolve ref to commit OID using backend or direct ref functions
     let commitOid: string
     try {
-      commitOid = await resolveRef({ fs: this.fs, gitdir, ref })
+      if (this._gitBackend) {
+        const resolved = await this._gitBackend.readRef(ref, 5, this.cache)
+        if (!resolved) {
+          throw new Error(`Cannot resolve ref '${ref}'`)
+        }
+        commitOid = resolved
+      } else {
+        const { resolveRef } = await import('../git/refs/readRef.ts')
+        commitOid = await resolveRef({ fs: this.fs, gitdir, ref })
+      }
     } catch (err) {
       throw new Error(`Cannot resolve ref '${ref}': ${err}`)
     }
     
-    // Write HEAD in worktree gitdir using direct ref functions
+    // Write HEAD in worktree gitdir using backend or direct ref functions
+    // Note: For worktree gitdir, we need to use direct ref functions since
+    // the backend is for the main gitdir, not the worktree gitdir
     const { writeRef } = await import('../git/refs/writeRef.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const objectFormat = await detectObjectFormat(this.fs, worktreeGitdir, this.cache)
     await writeRef({
       fs: this.fs,
       gitdir: worktreeGitdir,
       ref: 'HEAD',
       value: commitOid,
+      objectFormat,
     })
     
     // Create empty index file for worktree

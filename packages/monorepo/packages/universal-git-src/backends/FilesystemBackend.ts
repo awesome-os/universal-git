@@ -424,76 +424,137 @@ export class FilesystemBackend implements GitBackend {
   }
 
   // ============================================================================
+  // High-Level Object Operations
+  // ============================================================================
+  // These methods delegate to src/git/objects/ functions to handle both
+  // loose and packed objects. Other backends (SQLite, InMemory) will implement
+  // these using their own storage.
+
+  async readObject(
+    oid: string,
+    format: 'deflated' | 'wrapped' | 'content' = 'content',
+    cache: Record<string, unknown> = {}
+  ): Promise<{
+    type: string
+    object: UniversalBuffer
+    format: string
+    source?: string
+    oid?: string
+  }> {
+    const { readObject } = await import('../git/objects/readObject.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const objectFormat = await detectObjectFormat(this.fs, this.gitdir, cache)
+    return readObject({
+      fs: this.fs,
+      cache,
+      gitdir: this.gitdir,
+      oid,
+      format,
+      objectFormat,
+    })
+  }
+
+  async writeObject(
+    type: string,
+    object: UniversalBuffer | Uint8Array,
+    format: 'wrapped' | 'deflated' | 'content' = 'content',
+    oid?: string,
+    dryRun: boolean = false,
+    cache: Record<string, unknown> = {}
+  ): Promise<string> {
+    const { writeObject } = await import('../git/objects/writeObject.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const objectFormat = await detectObjectFormat(this.fs, this.gitdir, cache)
+    return writeObject({
+      fs: this.fs,
+      gitdir: this.gitdir,
+      type,
+      object: UniversalBuffer.from(object),
+      format,
+      oid,
+      dryRun,
+      objectFormat,
+    })
+  }
+
+  // ============================================================================
   // References
   // ============================================================================
 
   // ============================================================================
-  // References - REMOVED
+  // High-Level Ref Operations
   // ============================================================================
-  // Ref operations have been removed from the backend interface.
-  // All ref operations must go through src/git/refs/ functions to ensure
+  // These methods delegate to src/git/refs/ functions to ensure
   // reflog, locking, validation, and state tracking work consistently.
-  //
-  // Use these functions instead:
-  // - src/git/refs/readRef.ts - readRef()
-  // - src/git/refs/writeRef.ts - writeRef(), writeSymbolicRef()
-  // - src/git/refs/deleteRef.ts - deleteRef()
-  // - src/git/refs/listRefs.ts - listRefs()
+  // Other backends (SQLite, InMemory) will implement these using their own storage.
 
-  async readRef(ref: string): Promise<string | null> {
-    throw new Error(
-      `FilesystemBackend.readRef() has been removed. ` +
-      `Use src/git/refs/readRef.ts instead. ` +
-      `This ensures reflog, locking, and validation work correctly.`
-    )
+  async readRef(ref: string, depth: number = 5, cache: Record<string, unknown> = {}): Promise<string | null> {
+    const { readRef } = await import('../git/refs/readRef.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const objectFormat = await detectObjectFormat(this.fs, this.gitdir, cache)
+    return readRef({
+      fs: this.fs,
+      gitdir: this.gitdir,
+      ref,
+      depth,
+      objectFormat,
+      cache,
+    })
   }
 
-  async writeRef(ref: string, value: string): Promise<void> {
-    throw new Error(
-      `FilesystemBackend.writeRef() has been removed. ` +
-      `Use src/git/refs/writeRef.ts instead. ` +
-      `This ensures reflog entries are created and locking works correctly.`
-    )
+  async writeRef(ref: string, value: string, skipReflog: boolean = false, cache: Record<string, unknown> = {}): Promise<void> {
+    const { writeRef } = await import('../git/refs/writeRef.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const objectFormat = await detectObjectFormat(this.fs, this.gitdir, cache)
+    return writeRef({
+      fs: this.fs,
+      gitdir: this.gitdir,
+      ref,
+      value,
+      objectFormat,
+      skipReflog,
+    })
   }
 
-  async deleteRef(ref: string): Promise<void> {
-    throw new Error(
-      `FilesystemBackend.deleteRef() has been removed. ` +
-      `Use src/git/refs/deleteRef.ts instead. ` +
-      `This ensures proper cleanup and state tracking.`
-    )
+  async writeSymbolicRef(ref: string, value: string, oldOid?: string, cache: Record<string, unknown> = {}): Promise<void> {
+    const { writeSymbolicRef } = await import('../git/refs/writeRef.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const objectFormat = await detectObjectFormat(this.fs, this.gitdir, cache)
+    return writeSymbolicRef({
+      fs: this.fs,
+      gitdir: this.gitdir,
+      ref,
+      value,
+      oldOid,
+      objectFormat,
+    })
   }
 
-  async listRefs(prefix: string): Promise<string[]> {
-    throw new Error(
-      `FilesystemBackend.listRefs() has been removed. ` +
-      `Use src/git/refs/listRefs.ts instead. ` +
-      `This ensures consistent ref listing across all storage backends.`
-    )
+  async readSymbolicRef(ref: string): Promise<string | null> {
+    const { readSymbolicRef } = await import('../git/refs/readRef.ts')
+    return readSymbolicRef({
+      fs: this.fs,
+      gitdir: this.gitdir,
+      ref,
+    })
   }
 
-  async hasRef(ref: string): Promise<boolean> {
-    throw new Error(
-      `FilesystemBackend.hasRef() has been removed. ` +
-      `Use src/git/refs/readRef.ts and check for null instead. ` +
-      `This ensures consistent ref existence checking.`
-    )
+  async deleteRef(ref: string, cache: Record<string, unknown> = {}): Promise<void> {
+    const { deleteRef } = await import('../git/refs/deleteRef.ts')
+    return deleteRef({
+      fs: this.fs,
+      gitdir: this.gitdir,
+      ref,
+    })
   }
 
-  async readPackedRefs(): Promise<string | null> {
-    throw new Error(
-      `FilesystemBackend.readPackedRefs() has been removed. ` +
-      `Use src/git/refs/readRef.ts which handles packed-refs automatically. ` +
-      `This ensures consistent ref reading across all storage backends.`
-    )
-  }
-
-  async writePackedRefs(data: string): Promise<void> {
-    throw new Error(
-      `FilesystemBackend.writePackedRefs() has been removed. ` +
-      `Use src/git/refs/writeRef.ts which handles packed-refs automatically. ` +
-      `This ensures consistent ref writing across all storage backends.`
-    )
+  async listRefs(filepath: string): Promise<string[]> {
+    const { listRefs } = await import('../git/refs/listRefs.ts')
+    return listRefs({
+      fs: this.fs,
+      gitdir: this.gitdir,
+      filepath,
+    })
   }
 
   // ============================================================================

@@ -136,6 +136,51 @@ export type GitBackend = {
    */
   hasLooseObject(oid: string): Promise<boolean>
 
+  // ============================================================================
+  // High-Level Object Operations
+  // ============================================================================
+  // High-level object operations that handle both loose and packed objects.
+  // FilesystemBackend delegates to src/git/objects/ functions.
+  // Other backends (SQLite, InMemory) implement these using their own storage.
+
+  /**
+   * Reads an object from the ODB (loose or packed)
+   * @param oid - Object ID (SHA-1 or SHA-256)
+   * @param format - Format to return object in ('deflated', 'wrapped', or 'content')
+   * @param cache - Optional cache for packfile indices
+   * @returns Object read result with type, object data, and format
+   */
+  readObject(
+    oid: string,
+    format?: 'deflated' | 'wrapped' | 'content',
+    cache?: Record<string, unknown>
+  ): Promise<{
+    type: string
+    object: UniversalBuffer
+    format: string
+    source?: string
+    oid?: string
+  }>
+
+  /**
+   * Writes an object to the ODB
+   * @param type - Object type ('blob', 'tree', 'commit', 'tag')
+   * @param object - Object data (content format)
+   * @param format - Format of input data ('wrapped', 'deflated', or 'content')
+   * @param oid - Optional OID (required if format is 'deflated')
+   * @param dryRun - If true, don't actually write to storage
+   * @param cache - Optional cache for packfile indices
+   * @returns The OID of the written object
+   */
+  writeObject(
+    type: string,
+    object: UniversalBuffer | Uint8Array,
+    format?: 'wrapped' | 'deflated' | 'content',
+    oid?: string,
+    dryRun?: boolean,
+    cache?: Record<string, unknown>
+  ): Promise<string>
+
   /**
    * Lists all loose object OIDs (for garbage collection)
    */
@@ -209,20 +254,59 @@ export type GitBackend = {
   // ============================================================================
   // References
   // ============================================================================
-  // NOTE: Ref operations (read, write, delete, list) have been removed from
-  // the backend interface. All ref operations must go through src/git/refs/
-  // functions to ensure reflog, locking, validation, and state tracking work
-  // consistently.
-  //
-  // IMPORTANT: This GitBackend interface is for Git repository data only
-  // (objects, refs, config, etc.). For worktree-specific data (working directory
-  // files, worktree config, etc.), use GitWorktreeBackend instead.
-  //
-  // Use these functions instead:
-  // - src/git/refs/readRef.ts - readRef()
-  // - src/git/refs/writeRef.ts - writeRef(), writeSymbolicRef()
-  // - src/git/refs/deleteRef.ts - deleteRef()
-  // - src/git/refs/listRefs.ts - listRefs()
+  // High-level ref operations that handle reflog, locking, validation, and state tracking.
+  // FilesystemBackend delegates to src/git/refs/ functions.
+  // Other backends (SQLite, InMemory) implement these using their own storage.
+
+  /**
+   * Reads a Git reference and resolves it to an OID
+   * Handles both direct refs and symbolic refs (like HEAD -> refs/heads/main)
+   * @param ref - Reference name (e.g., 'HEAD', 'refs/heads/main', 'main')
+   * @param depth - Maximum depth for symbolic ref resolution (default: 5)
+   * @param cache - Optional cache for packfile indices
+   * @returns The resolved OID or null if ref doesn't exist
+   */
+  readRef(ref: string, depth?: number, cache?: Record<string, unknown>): Promise<string | null>
+
+  /**
+   * Writes a direct ref (OID) to a ref file
+   * Handles reflog, locking, and validation
+   * @param ref - Reference name (e.g., 'refs/heads/main')
+   * @param value - OID to write
+   * @param skipReflog - Whether to skip reflog update (default: false)
+   * @param cache - Optional cache for packfile indices
+   */
+  writeRef(ref: string, value: string, skipReflog?: boolean, cache?: Record<string, unknown>): Promise<void>
+
+  /**
+   * Writes a symbolic ref (ref pointer)
+   * @param ref - Reference name (e.g., 'HEAD')
+   * @param value - Target ref (e.g., 'refs/heads/main')
+   * @param oldOid - Optional old OID for atomic updates
+   * @param cache - Optional cache for packfile indices
+   */
+  writeSymbolicRef(ref: string, value: string, oldOid?: string, cache?: Record<string, unknown>): Promise<void>
+
+  /**
+   * Reads a symbolic ref without resolving to OID
+   * @param ref - Reference name (e.g., 'HEAD')
+   * @returns The target ref or null if not found or not symbolic
+   */
+  readSymbolicRef(ref: string): Promise<string | null>
+
+  /**
+   * Deletes a ref
+   * @param ref - Reference name to delete
+   * @param cache - Optional cache for packfile indices
+   */
+  deleteRef(ref: string, cache?: Record<string, unknown>): Promise<void>
+
+  /**
+   * Lists refs matching a prefix
+   * @param filepath - Ref path prefix (e.g., 'refs/heads/')
+   * @returns Array of ref names
+   */
+  listRefs(filepath: string): Promise<string[]>
 
   // ============================================================================
   // Reflogs

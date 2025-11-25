@@ -228,72 +228,281 @@ export class InMemoryBackend implements GitBackend {
   // ============================================================================
 
   // ============================================================================
-  // References - REMOVED
+  // High-Level Ref Operations
   // ============================================================================
-  // Ref operations have been removed from the backend interface.
-  // All ref operations must go through src/git/refs/ functions to ensure
-  // reflog, locking, validation, and state tracking work consistently.
-  //
-  // Use these functions instead:
-  // - src/git/refs/readRef.ts - readRef()
-  // - src/git/refs/writeRef.ts - writeRef(), writeSymbolicRef()
-  // - src/git/refs/deleteRef.ts - deleteRef()
-  // - src/git/refs/listRefs.ts - listRefs()
+  // These methods implement high-level ref operations using in-memory storage.
+  // They handle symbolic ref resolution, reflog, and validation.
 
-  async readRef(ref: string): Promise<string | null> {
-    throw new Error(
-      `InMemoryBackend.readRef() has been removed. ` +
-      `Use src/git/refs/readRef.ts instead. ` +
-      `This ensures reflog, locking, and validation work correctly.`
-    )
+  async readRef(ref: string, depth: number = 5, cache: Record<string, unknown> = {}): Promise<string | null> {
+    if (depth <= 0) {
+      // Max depth reached - return the ref as-is (might be a symbolic ref)
+      if (ref.startsWith('ref: ')) {
+        return ref.slice('ref: '.length).trim()
+      }
+      return ref
+    }
+
+    // Check if it's a symbolic ref pointer
+    if (ref.startsWith('ref: ')) {
+      const targetRef = ref.slice('ref: '.length).trim()
+      if (depth === 1) {
+        return targetRef
+      }
+      return this.readRef(targetRef, depth - 1, cache)
+    }
+
+    // Check if it's already a valid OID (40 chars for SHA-1, 64 for SHA-256)
+    const { validateOid } = await import('../utils/detectObjectFormat.ts')
+    if (validateOid(ref, 'sha1') || validateOid(ref, 'sha256')) {
+      return ref
+    }
+
+    // Normalize ref name
+    let normalizedRef = ref
+    if (!ref.startsWith('refs/')) {
+      // Try common ref prefixes
+      const prefixes = ['refs/heads/', 'refs/tags/', 'refs/remotes/']
+      for (const prefix of prefixes) {
+        const candidate = prefix + ref
+        if (this.refs.has(candidate)) {
+          normalizedRef = candidate
+          break
+        }
+      }
+    }
+
+    // Check loose refs first
+    const looseValue = this.refs.get(normalizedRef)
+    if (looseValue !== undefined) {
+      // Check if it's a symbolic ref
+      if (looseValue.startsWith('ref: ')) {
+        const targetRef = looseValue.slice('ref: '.length).trim()
+        return this.readRef(targetRef, depth - 1, cache)
+      }
+      return looseValue
+    }
+
+    // Check packed refs
+    if (this.packedRefs) {
+      const lines = this.packedRefs.split('\n')
+      for (const line of lines) {
+        if (line.startsWith('#') || !line.trim()) continue
+        const [oid, packedRef] = line.split(' ', 2)
+        if (packedRef && packedRef.trim() === normalizedRef) {
+          return oid.trim()
+        }
+      }
+    }
+
+    // Check HEAD
+    if (ref === 'HEAD' || normalizedRef === 'HEAD') {
+      const headValue = this.head
+      if (headValue.startsWith('ref: ')) {
+        const targetRef = headValue.slice('ref: '.length).trim()
+        return this.readRef(targetRef, depth - 1, cache)
+      }
+      return headValue
+    }
+
+    return null
   }
 
-  async writeRef(ref: string, value: string): Promise<void> {
-    throw new Error(
-      `InMemoryBackend.writeRef() has been removed. ` +
-      `Use src/git/refs/writeRef.ts instead. ` +
-      `This ensures reflog entries are created and locking works correctly.`
-    )
+  async writeRef(ref: string, value: string, skipReflog: boolean = false, cache: Record<string, unknown> = {}): Promise<void> {
+    // Validate OID format
+    const { validateOid, detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const objectFormat = await detectObjectFormat(null, '', cache)
+    if (!validateOid(value.trim(), objectFormat)) {
+      throw new Error(`Invalid OID: ${value}`)
+    }
+
+    const trimmedValue = value.trim()
+    const oldValue = this.refs.get(ref) || null
+
+    // Write ref
+    this.refs.set(ref, trimmedValue)
+
+    // Update reflog if not skipped
+    if (!skipReflog) {
+      const { getOidLength } = await import('../utils/detectObjectFormat.ts')
+      const timestamp = Math.floor(Date.now() / 1000)
+      const oldOid = oldValue && !oldValue.startsWith('ref: ') ? oldValue : '0'.repeat(getOidLength(objectFormat))
+      const newOid = trimmedValue
+      const entry = `${oldOid} ${newOid} InMemoryBackend <inmemory@backend> ${timestamp} +0000\tupdate by push\n`
+      await this.appendReflog(ref, entry)
+    }
   }
 
-  async deleteRef(ref: string): Promise<void> {
-    throw new Error(
-      `InMemoryBackend.deleteRef() has been removed. ` +
-      `Use src/git/refs/deleteRef.ts instead. ` +
-      `This ensures proper cleanup and state tracking.`
-    )
+  async writeSymbolicRef(ref: string, value: string, oldOid?: string, cache: Record<string, unknown> = {}): Promise<void> {
+    // Write symbolic ref
+    this.refs.set(ref, `ref: ${value}`)
+    
+    // Update HEAD if this is HEAD
+    if (ref === 'HEAD') {
+      this.head = `ref: ${value}`
+    }
   }
 
-  async listRefs(prefix: string): Promise<string[]> {
-    throw new Error(
-      `InMemoryBackend.listRefs() has been removed. ` +
-      `Use src/git/refs/listRefs.ts instead. ` +
-      `This ensures consistent ref listing across all storage backends.`
-    )
+  async readSymbolicRef(ref: string): Promise<string | null> {
+    // Check HEAD first
+    if (ref === 'HEAD') {
+      const headValue = this.head
+      if (headValue.startsWith('ref: ')) {
+        return headValue.slice('ref: '.length).trim()
+      }
+      return null
+    }
+
+    // Check loose refs
+    const value = this.refs.get(ref)
+    if (value && value.startsWith('ref: ')) {
+      return value.slice('ref: '.length).trim()
+    }
+
+    return null
   }
 
-  async hasRef(ref: string): Promise<boolean> {
-    throw new Error(
-      `InMemoryBackend.hasRef() has been removed. ` +
-      `Use src/git/refs/readRef.ts and check for null instead. ` +
-      `This ensures consistent ref existence checking.`
-    )
+  async deleteRef(ref: string, cache: Record<string, unknown> = {}): Promise<void> {
+    this.refs.delete(ref)
+    
+    // Also delete reflog
+    this.reflogs.delete(ref)
   }
 
-  async readPackedRefs(): Promise<string | null> {
-    throw new Error(
-      `InMemoryBackend.readPackedRefs() has been removed. ` +
-      `Use src/git/refs/readRef.ts which handles packed-refs automatically. ` +
-      `This ensures consistent ref reading across all storage backends.`
-    )
+  async listRefs(filepath: string): Promise<string[]> {
+    const refs: string[] = []
+    
+    // List loose refs
+    for (const ref of this.refs.keys()) {
+      if (ref.startsWith(filepath)) {
+        // Remove the prefix
+        const suffix = ref.substring(filepath.length)
+        if (suffix && !suffix.startsWith('/')) {
+          refs.push(suffix)
+        } else if (suffix.startsWith('/')) {
+          refs.push(suffix.substring(1))
+        }
+      }
+    }
+
+    // List packed refs
+    if (this.packedRefs) {
+      const lines = this.packedRefs.split('\n')
+      for (const line of lines) {
+        if (line.startsWith('#') || !line.trim()) continue
+        const [, packedRef] = line.split(' ', 2)
+        if (packedRef && packedRef.trim().startsWith(filepath)) {
+          const suffix = packedRef.trim().substring(filepath.length)
+          if (suffix && !suffix.startsWith('/') && !refs.includes(suffix)) {
+            refs.push(suffix)
+          } else if (suffix.startsWith('/')) {
+            const cleanSuffix = suffix.substring(1)
+            if (!refs.includes(cleanSuffix)) {
+              refs.push(cleanSuffix)
+            }
+          }
+        }
+      }
+    }
+
+    return refs.sort()
   }
 
-  async writePackedRefs(data: string): Promise<void> {
-    throw new Error(
-      `InMemoryBackend.writePackedRefs() has been removed. ` +
-      `Use src/git/refs/writeRef.ts which handles packed-refs automatically. ` +
-      `This ensures consistent ref writing across all storage backends.`
-    )
+  // ============================================================================
+  // High-Level Object Operations
+  // ============================================================================
+  // These methods implement high-level object operations using in-memory storage.
+  // They handle both loose and packed objects.
+
+  async readObject(
+    oid: string,
+    format: 'deflated' | 'wrapped' | 'content' = 'content',
+    cache: Record<string, unknown> = {}
+  ): Promise<{
+    type: string
+    object: UniversalBuffer
+    format: string
+    source?: string
+    oid?: string
+  }> {
+    // Try loose objects first
+    const looseObject = this.looseObjects.get(oid)
+    if (looseObject) {
+      // Objects are stored in deflated format
+      const { inflate } = await import('../core-utils/Zlib.ts')
+      const { GitObject } = await import('../models/GitObject.ts')
+      
+      // Inflate (decompress) the object
+      const decompressed = await inflate(looseObject)
+      const unwrapped = GitObject.unwrap(decompressed)
+      
+      // Determine type from unwrapped object
+      const type = unwrapped.type
+      let objectData: UniversalBuffer
+      
+      if (format === 'deflated') {
+        objectData = looseObject
+      } else if (format === 'wrapped') {
+        objectData = decompressed
+      } else {
+        objectData = unwrapped.object
+      }
+      
+      return {
+        type,
+        object: objectData,
+        format,
+        source: 'loose',
+        oid,
+      }
+    }
+
+    // TODO: Check packfiles (requires packfile parsing)
+    // For now, throw error if not found in loose objects
+    const { NotFoundError } = await import('../errors/NotFoundError.ts')
+    throw new NotFoundError(`Object ${oid} not found`)
+  }
+
+  async writeObject(
+    type: string,
+    object: UniversalBuffer | Uint8Array,
+    format: 'wrapped' | 'deflated' | 'content' = 'content',
+    oid?: string,
+    dryRun: boolean = false,
+    cache: Record<string, unknown> = {}
+  ): Promise<string> {
+    const { GitObject } = await import('../models/GitObject.ts')
+    const { hashObject } = await import('../core-utils/ShaHasher.ts')
+    const { deflate } = await import('../core-utils/Zlib.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const objectFormat = await detectObjectFormat(null, '', cache)
+    
+    const objectBuffer = UniversalBuffer.from(object)
+    
+    // Convert to wrapped format if needed
+    let wrapped: UniversalBuffer
+    if (format === 'content') {
+      wrapped = UniversalBuffer.from(GitObject.wrap({ type, object: objectBuffer }))
+    } else if (format === 'wrapped') {
+      wrapped = objectBuffer
+    } else {
+      // deflated format - need to inflate to get wrapped, then recompress
+      const { inflate } = await import('../core-utils/Zlib.ts')
+      const decompressed = await inflate(objectBuffer)
+      wrapped = decompressed
+    }
+    
+    // Compute OID if not provided
+    const computedOid = oid || hashObject(wrapped, objectFormat)
+    
+    // Deflate the wrapped object
+    const deflated = await deflate(wrapped)
+    
+    if (!dryRun) {
+      // Store in loose objects
+      this.looseObjects.set(computedOid, deflated)
+    }
+    
+    return computedOid
   }
 
   // ============================================================================

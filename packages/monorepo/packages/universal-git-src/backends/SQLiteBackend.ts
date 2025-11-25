@@ -480,72 +480,307 @@ export class SQLiteBackend implements GitBackend {
   // ============================================================================
 
   // ============================================================================
-  // References - REMOVED
+  // High-Level Ref Operations
   // ============================================================================
-  // Ref operations have been removed from the backend interface.
-  // All ref operations must go through src/git/refs/ functions to ensure
-  // reflog, locking, validation, and state tracking work consistently.
-  //
-  // Use these functions instead:
-  // - src/git/refs/readRef.ts - readRef()
-  // - src/git/refs/writeRef.ts - writeRef(), writeSymbolicRef()
-  // - src/git/refs/deleteRef.ts - deleteRef()
-  // - src/git/refs/listRefs.ts - listRefs()
+  // These methods implement high-level ref operations using SQLite storage.
+  // They handle symbolic ref resolution, reflog, and validation.
 
-  async readRef(ref: string): Promise<string | null> {
-    throw new Error(
-      `SQLiteBackend.readRef() has been removed. ` +
-      `Use src/git/refs/readRef.ts instead. ` +
-      `This ensures reflog, locking, and validation work correctly.`
-    )
+  async readRef(ref: string, depth: number = 5, cache: Record<string, unknown> = {}): Promise<string | null> {
+    if (depth <= 0) {
+      // Max depth reached - return the ref as-is (might be a symbolic ref)
+      if (ref.startsWith('ref: ')) {
+        return ref.slice('ref: '.length).trim()
+      }
+      return ref
+    }
+
+    // Check if it's a symbolic ref pointer
+    if (ref.startsWith('ref: ')) {
+      const targetRef = ref.slice('ref: '.length).trim()
+      if (depth === 1) {
+        return targetRef
+      }
+      return this.readRef(targetRef, depth - 1, cache)
+    }
+
+    // Check if it's already a valid OID
+    const { validateOid } = await import('../utils/detectObjectFormat.ts')
+    if (validateOid(ref, 'sha1') || validateOid(ref, 'sha256')) {
+      return ref
+    }
+
+    // Normalize ref name
+    let normalizedRef = ref
+    if (!ref.startsWith('refs/')) {
+      // Try common ref prefixes
+      const db = await this._getDB()
+      const prefixes = ['refs/heads/', 'refs/tags/', 'refs/remotes/']
+      for (const prefix of prefixes) {
+        const candidate = prefix + ref
+        const row = db.prepare('SELECT value FROM refs WHERE ref = ?').get(candidate)
+        if (row) {
+          normalizedRef = candidate
+          break
+        }
+      }
+    }
+
+    const db = await this._getDB()
+
+    // Check loose refs first
+    const looseRow = db.prepare('SELECT value FROM refs WHERE ref = ?').get(normalizedRef)
+    if (looseRow) {
+      const value = (looseRow.value as string).trim()
+      // Check if it's a symbolic ref
+      if (value.startsWith('ref: ')) {
+        const targetRef = value.slice('ref: '.length).trim()
+        return this.readRef(targetRef, depth - 1, cache)
+      }
+      return value
+    }
+
+    // Check packed refs
+    const packedRow = db.prepare('SELECT data FROM packed_refs WHERE id = 1').get()
+    if (packedRow && packedRow.data) {
+      const packedRefs = packedRow.data as string
+      const lines = packedRefs.split('\n')
+      for (const line of lines) {
+        if (line.startsWith('#') || !line.trim()) continue
+        const [oid, packedRef] = line.split(' ', 2)
+        if (packedRef && packedRef.trim() === normalizedRef) {
+          return oid.trim()
+        }
+      }
+    }
+
+    // Check HEAD
+    if (ref === 'HEAD' || normalizedRef === 'HEAD') {
+      const headValue = await this.readHEAD()
+      if (headValue.startsWith('ref: ')) {
+        const targetRef = headValue.slice('ref: '.length).trim()
+        return this.readRef(targetRef, depth - 1, cache)
+      }
+      return headValue
+    }
+
+    return null
   }
 
-  async writeRef(ref: string, value: string): Promise<void> {
-    throw new Error(
-      `SQLiteBackend.writeRef() has been removed. ` +
-      `Use src/git/refs/writeRef.ts instead. ` +
-      `This ensures reflog entries are created and locking works correctly.`
-    )
+  async writeRef(ref: string, value: string, skipReflog: boolean = false, cache: Record<string, unknown> = {}): Promise<void> {
+    // Validate OID format
+    const { validateOid, detectObjectFormat, getOidLength } = await import('../utils/detectObjectFormat.ts')
+    const objectFormat = await detectObjectFormat(null, '', cache)
+    if (!validateOid(value.trim(), objectFormat)) {
+      throw new Error(`Invalid OID: ${value}`)
+    }
+
+    const trimmedValue = value.trim()
+    const db = await this._getDB()
+
+    // Get old value for reflog
+    const oldRow = db.prepare('SELECT value FROM refs WHERE ref = ?').get(ref)
+    const oldValue = oldRow ? (oldRow.value as string).trim() : null
+
+    // Write ref
+    db.prepare('INSERT OR REPLACE INTO refs (ref, value) VALUES (?, ?)').run(ref, trimmedValue)
+
+    // Update reflog if not skipped
+    if (!skipReflog) {
+      const timestamp = Math.floor(Date.now() / 1000)
+      const oldOid = oldValue && !oldValue.startsWith('ref: ') ? oldValue : '0'.repeat(getOidLength(objectFormat))
+      const newOid = trimmedValue
+      const entry = `${oldOid} ${newOid} SQLiteBackend <sqlite@backend> ${timestamp} +0000\tupdate by push\n`
+      await this.appendReflog(ref, entry)
+    }
   }
 
-  async deleteRef(ref: string): Promise<void> {
-    throw new Error(
-      `SQLiteBackend.deleteRef() has been removed. ` +
-      `Use src/git/refs/deleteRef.ts instead. ` +
-      `This ensures proper cleanup and state tracking.`
-    )
+  async writeSymbolicRef(ref: string, value: string, oldOid?: string, cache: Record<string, unknown> = {}): Promise<void> {
+    const db = await this._getDB()
+    // Write symbolic ref
+    db.prepare('INSERT OR REPLACE INTO refs (ref, value) VALUES (?, ?)').run(ref, `ref: ${value}`)
+    
+    // Update HEAD if this is HEAD
+    if (ref === 'HEAD') {
+      await this.writeHEAD(`ref: ${value}`)
+    }
   }
 
-  async listRefs(prefix: string): Promise<string[]> {
-    throw new Error(
-      `SQLiteBackend.listRefs() has been removed. ` +
-      `Use src/git/refs/listRefs.ts instead. ` +
-      `This ensures consistent ref listing across all storage backends.`
-    )
+  async readSymbolicRef(ref: string): Promise<string | null> {
+    // Check HEAD first
+    if (ref === 'HEAD') {
+      const headValue = await this.readHEAD()
+      if (headValue.startsWith('ref: ')) {
+        return headValue.slice('ref: '.length).trim()
+      }
+      return null
+    }
+
+    // Check loose refs
+    const db = await this._getDB()
+    const row = db.prepare('SELECT value FROM refs WHERE ref = ?').get(ref)
+    if (row) {
+      const value = (row.value as string).trim()
+      if (value.startsWith('ref: ')) {
+        return value.slice('ref: '.length).trim()
+      }
+    }
+
+    return null
   }
 
-  async hasRef(ref: string): Promise<boolean> {
-    throw new Error(
-      `SQLiteBackend.hasRef() has been removed. ` +
-      `Use src/git/refs/readRef.ts and check for null instead. ` +
-      `This ensures consistent ref existence checking.`
-    )
+  async deleteRef(ref: string, cache: Record<string, unknown> = {}): Promise<void> {
+    const db = await this._getDB()
+    db.prepare('DELETE FROM refs WHERE ref = ?').run(ref)
+    
+    // Also delete reflog
+    await this.deleteReflog(ref)
   }
 
-  async readPackedRefs(): Promise<string | null> {
-    throw new Error(
-      `SQLiteBackend.readPackedRefs() has been removed. ` +
-      `Use src/git/refs/readRef.ts which handles packed-refs automatically. ` +
-      `This ensures consistent ref reading across all storage backends.`
-    )
+  async listRefs(filepath: string): Promise<string[]> {
+    const db = await this._getDB()
+    const refs: string[] = []
+    
+    // List loose refs
+    const rows = db.prepare('SELECT ref FROM refs WHERE ref LIKE ?').all(filepath + '%')
+    for (const row of rows) {
+      const ref = (row.ref as string)
+      if (ref.startsWith(filepath)) {
+        // Remove the prefix
+        const suffix = ref.substring(filepath.length)
+        if (suffix && !suffix.startsWith('/')) {
+          refs.push(suffix)
+        } else if (suffix.startsWith('/')) {
+          refs.push(suffix.substring(1))
+        }
+      }
+    }
+
+    // List packed refs
+    const packedRow = db.prepare('SELECT data FROM packed_refs WHERE id = 1').get()
+    if (packedRow && packedRow.data) {
+      const packedRefs = packedRow.data as string
+      const lines = packedRefs.split('\n')
+      for (const line of lines) {
+        if (line.startsWith('#') || !line.trim()) continue
+        const [, packedRef] = line.split(' ', 2)
+        if (packedRef && packedRef.trim().startsWith(filepath)) {
+          const suffix = packedRef.trim().substring(filepath.length)
+          if (suffix && !suffix.startsWith('/') && !refs.includes(suffix)) {
+            refs.push(suffix)
+          } else if (suffix.startsWith('/')) {
+            const cleanSuffix = suffix.substring(1)
+            if (!refs.includes(cleanSuffix)) {
+              refs.push(cleanSuffix)
+            }
+          }
+        }
+      }
+    }
+
+    return refs.sort()
   }
 
-  async writePackedRefs(data: string): Promise<void> {
-    throw new Error(
-      `SQLiteBackend.writePackedRefs() has been removed. ` +
-      `Use src/git/refs/writeRef.ts which handles packed-refs automatically. ` +
-      `This ensures consistent ref writing across all storage backends.`
-    )
+  // ============================================================================
+  // High-Level Object Operations
+  // ============================================================================
+  // These methods implement high-level object operations using SQLite storage.
+  // They handle both loose and packed objects.
+
+  async readObject(
+    oid: string,
+    format: 'deflated' | 'wrapped' | 'content' = 'content',
+    cache: Record<string, unknown> = {}
+  ): Promise<{
+    type: string
+    object: UniversalBuffer
+    format: string
+    source?: string
+    oid?: string
+  }> {
+    const db = await this._getDB()
+    
+    // Try loose objects first
+    const looseRow = db.prepare('SELECT data FROM loose_objects WHERE oid = ?').get(oid)
+    if (looseRow) {
+      // Objects are stored in deflated format
+      const { inflate } = await import('../core-utils/Zlib.ts')
+      const { GitObject } = await import('../models/GitObject.ts')
+      
+      const deflated = UniversalBuffer.from(looseRow.data as Uint8Array)
+      
+      // Inflate (decompress) the object
+      const decompressed = await inflate(deflated)
+      const unwrapped = GitObject.unwrap(decompressed)
+      
+      // Determine type from unwrapped object
+      const type = unwrapped.type
+      let objectData: UniversalBuffer
+      
+      if (format === 'deflated') {
+        objectData = deflated
+      } else if (format === 'wrapped') {
+        objectData = UniversalBuffer.from(decompressed)
+      } else {
+        objectData = unwrapped.object
+      }
+      
+      return {
+        type,
+        object: objectData,
+        format,
+        source: 'loose',
+        oid,
+      }
+    }
+
+    // TODO: Check packfiles (requires packfile parsing)
+    // For now, throw error if not found in loose objects
+    const { NotFoundError } = await import('../errors/NotFoundError.ts')
+    throw new NotFoundError(`Object ${oid} not found`)
+  }
+
+  async writeObject(
+    type: string,
+    object: UniversalBuffer | Uint8Array,
+    format: 'wrapped' | 'deflated' | 'content' = 'content',
+    oid?: string,
+    dryRun: boolean = false,
+    cache: Record<string, unknown> = {}
+  ): Promise<string> {
+    const { GitObject } = await import('../models/GitObject.ts')
+    const { hashObject } = await import('../core-utils/ShaHasher.ts')
+    const { deflate } = await import('../core-utils/Zlib.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const objectFormat = await detectObjectFormat(null, '', cache)
+    
+    const objectBuffer = UniversalBuffer.from(object)
+    
+    // Convert to wrapped format if needed
+    let wrapped: UniversalBuffer
+    if (format === 'content') {
+      wrapped = UniversalBuffer.from(GitObject.wrap({ type, object: objectBuffer }))
+    } else if (format === 'wrapped') {
+      wrapped = objectBuffer
+    } else {
+      // deflated format - need to inflate to get wrapped, then recompress
+      const { inflate } = await import('../core-utils/Zlib.ts')
+      const decompressed = await inflate(objectBuffer)
+      wrapped = UniversalBuffer.from(decompressed)
+    }
+    
+    // Compute OID if not provided
+    const computedOid = oid || hashObject(wrapped, objectFormat)
+    
+    // Deflate the wrapped object
+    const deflated = await deflate(wrapped)
+    
+    if (!dryRun) {
+      const db = await this._getDB()
+      // Store in loose objects
+      db.prepare('INSERT OR REPLACE INTO loose_objects (oid, data) VALUES (?, ?)').run(computedOid, deflated)
+    }
+    
+    return computedOid
   }
 
   // ============================================================================
