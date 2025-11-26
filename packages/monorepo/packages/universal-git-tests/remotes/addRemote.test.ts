@@ -6,12 +6,12 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('addRemote', async (t) => {
   await t.test('ok:basic', async () => {
     // Setup
-    const { fs, dir, gitdir } = await makeFixture('test-addRemote')
+    const { repo } = await makeFixture('test-addRemote')
     const remote = 'baz'
     const url = 'git@github.com:baz/baz.git'
     // Test
-    await addRemote({ fs, dir, gitdir, remote, url })
-    const a = await listRemotes({ fs, dir, gitdir })
+    await addRemote({ repo, remote, url })
+    const a = await listRemotes({ repo })
     assert.deepStrictEqual(a, [
       { remote: 'foo', url: 'git@github.com:foo/foo.git' },
       { remote: 'bar', url: 'git@github.com:bar/bar.git' },
@@ -21,15 +21,13 @@ test('addRemote', async (t) => {
 
   await t.test('param:url-missing', async () => {
     // Setup
-    const { fs, dir, gitdir } = await makeFixture('test-addRemote')
+    const { repo } = await makeFixture('test-addRemote')
     const remote = 'baz'
     // Test
     let error: unknown = null
     try {
       await addRemote({
-        fs,
-        dir,
-        gitdir,
+        repo,
         remote,
         url: undefined as any,
       })
@@ -42,13 +40,13 @@ test('addRemote', async (t) => {
 
   await t.test('error:InvalidRefNameError', async () => {
     // Setup
-    const { fs, dir, gitdir } = await makeFixture('test-addRemote')
+    const { repo } = await makeFixture('test-addRemote')
     const remote = '@{HEAD~1}'
     const url = 'git@github.com:baz/baz.git'
     // Test
     let error: unknown = null
     try {
-      await addRemote({ fs, dir, gitdir, remote, url })
+      await addRemote({ repo, remote, url })
     } catch (err) {
       error = err
     }

@@ -6,11 +6,10 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('annotatedTag', async (t) => {
   await t.test('ok:creates-annotated-tag', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-annotatedTag')
+    const { repo } = await makeFixture('test-annotatedTag')
     // Test
     await annotatedTag({
-      fs,
-      gitdir,
+      repo,
       ref: 'latest',
       message: 'some tag message',
       tagger: {
@@ -18,18 +17,17 @@ test('annotatedTag', async (t) => {
         email: 'mail@yuhr.org',
       },
     })
-    const tagRef = await resolveRef({ fs, gitdir, ref: 'refs/tags/latest' })
-    const { tag } = await readTag({ fs, gitdir, oid: tagRef })
+    const tagRef = await resolveRef({ repo, ref: 'refs/tags/latest' })
+    const { tag } = await readTag({ repo, oid: tagRef })
     assert.strictEqual(tag.object, 'cfc039a0acb68bee8bb4f3b13b6b211dbb8c1a69')
   })
 
   await t.test('ok:creates-annotated-tag-to-blob', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-annotatedTag')
+    const { repo } = await makeFixture('test-annotatedTag')
     // Test
     await annotatedTag({
-      fs,
-      gitdir,
+      repo,
       ref: 'latest-blob',
       message: 'some tag message',
       tagger: {
@@ -39,25 +37,23 @@ test('annotatedTag', async (t) => {
       object: 'd670460b4b4aece5915caf5c68d12f560a9fe3e4',
     })
     const tagRef = await resolveRef({
-      fs,
-      gitdir,
+      repo,
       ref: 'refs/tags/latest-blob',
     })
-    const { tag } = await readTag({ fs, gitdir, oid: tagRef })
+    const { tag } = await readTag({ repo, oid: tagRef })
     assert.strictEqual(tag.object, 'd670460b4b4aece5915caf5c68d12f560a9fe3e4')
   })
 
   await t.test('ok:creates-signed-tag', async () => {
     // Setup
     const { pgp } = await import('@isomorphic-git/pgp-plugin')
-    const { fs, gitdir } = await makeFixture('test-annotatedTag')
+    const { repo } = await makeFixture('test-annotatedTag')
     // Test
     // Import pgp-keys from fixtures directory
     const pgpKeysUrl = new URL('../__fixtures__/pgp-keys.mjs', import.meta.url).href
     const { privateKey, publicKey } = await import(pgpKeysUrl)
     await annotatedTag({
-      fs,
-      gitdir,
+      repo,
       ref: 'latest',
       message: 'some tag message',
       tagger: {
@@ -67,8 +63,8 @@ test('annotatedTag', async (t) => {
       signingKey: privateKey,
       onSign: pgp.sign,
     })
-    const oid = await resolveRef({ fs, gitdir, ref: 'latest' })
-    const { tag, payload } = await readTag({ fs, gitdir, oid })
+    const oid = await resolveRef({ repo, ref: 'latest' })
+    const { tag, payload } = await readTag({ repo, oid })
     const { valid, invalid } = await pgp.verify({
       payload,
       publicKey,

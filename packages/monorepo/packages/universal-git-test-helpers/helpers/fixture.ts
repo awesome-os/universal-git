@@ -8,26 +8,17 @@ import type { Repository } from '@awesome-os/universal-git-src/core-utils/Reposi
 import type * as fs from 'fs'
 
 export interface TestFixture {
-  _fs: typeof fs
-  fs: FileSystemProvider
-  dir: string
-  gitdir: string
   repo: Repository
 }
 
 /**
  * Creates a test fixture for Node.js test runner
  * @param fixtureName - Name of the fixture directory
- * @param options - Optional configuration (init: true to initialize repository)
- * @returns Promise resolving to fixture with fs, dir, and gitdir
+ * @param options - Optional configuration (init: true to initialize repository, defaultBranch, bare, objectFormat)
+ * @returns Promise resolving to fixture with repo (and convenience accessors for fs, dir, gitdir)
  */
-export async function makeFixture(fixtureName: string, options?: { init?: boolean }): Promise<TestFixture> {
+export async function makeFixture(fixtureName: string, options?: { init?: boolean; defaultBranch?: string; bare?: boolean; objectFormat?: 'sha1' | 'sha256' }): Promise<TestFixture> {
   const fixture = await makeNodeFixture(fixtureName, options)
-  // FileSystem implements FileSystemProvider interface, but TypeScript needs explicit cast
-  const result = {
-    ...fixture,
-    fs: fixture.fs as FileSystemProvider,
-  }
   
   // For test-empty fixture, ensure the index is clean (empty)
   // This matches native git behavior where a fresh repo has an empty index
@@ -40,10 +31,10 @@ export async function makeFixture(fixtureName: string, options?: { init?: boolea
       const indexPath = `${fixture.gitdir}/index`
       try {
         // Check if index file exists before trying to delete it
-        const stats = await result.fs.lstat(indexPath)
+        const stats = await fixture.fs.lstat(indexPath)
         if (stats) {
           // File exists, delete it
-          await result.fs.rm(indexPath)
+          await fixture.fs.rm(indexPath)
         }
       } catch {
         // Index file doesn't exist, which is fine - it will be empty when first accessed
@@ -54,7 +45,10 @@ export async function makeFixture(fixtureName: string, options?: { init?: boolea
     }
   }
   
-  return result
+  // Return only repo - all operations should go through backend methods
+  return {
+    repo: fixture.repo,
+  }
 }
 
 /**

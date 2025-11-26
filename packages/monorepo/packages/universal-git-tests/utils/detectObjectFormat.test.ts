@@ -2,68 +2,68 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { detectObjectFormat, getOidLength, validateOid } from '@awesome-os/universal-git-src/utils/detectObjectFormat.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { init, setConfig } from '@awesome-os/universal-git-src/index.ts'
+import { setConfig } from '@awesome-os/universal-git-src/index.ts'
 
 test('detectObjectFormat', async (t) => {
   await t.test('ok:detects-SHA1-default', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
+    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const gitdir = await repo.getGitdir()
     
-    const format = await detectObjectFormat(fs, gitdir)
+    const format = await detectObjectFormat(repo.fs, gitdir)
     assert.strictEqual(format, 'sha1')
   })
 
   await t.test('ok:detects-SHA256-configured', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
+    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const gitdir = await repo.getGitdir()
     
     // Set objectformat to sha256
-    await setConfig({ fs, dir, gitdir, path: 'extensions.objectformat', value: 'sha256' })
+    await setConfig({ repo, path: 'extensions.objectformat', value: 'sha256' })
     
-    const format = await detectObjectFormat(fs, gitdir)
+    const format = await detectObjectFormat(repo.fs, gitdir)
     assert.strictEqual(format, 'sha256')
   })
 
   await t.test('edge:missing-config-file', async () => {
-    const { fs } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
     // Use a non-existent gitdir
-    const format = await detectObjectFormat(fs, '/nonexistent/gitdir')
+    const format = await detectObjectFormat(repo.fs, '/nonexistent/gitdir')
     // Should default to SHA-1
     assert.strictEqual(format, 'sha1')
   })
 
   await t.test('edge:config-no-extensions', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
+    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const gitdir = await repo.getGitdir()
     
     // Config exists but no extensions section
-    const format = await detectObjectFormat(fs, gitdir)
+    const format = await detectObjectFormat(repo.fs, gitdir)
     assert.strictEqual(format, 'sha1')
   })
 
   await t.test('edge:config-extensions-no-objectformat', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
+    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const gitdir = await repo.getGitdir()
     
     // Add extensions section without objectformat
-    await setConfig({ fs, dir, gitdir, path: 'extensions.worktreeconfig', value: 'true' })
+    await setConfig({ repo, path: 'extensions.worktreeconfig', value: 'true' })
     
-    const format = await detectObjectFormat(fs, gitdir)
+    const format = await detectObjectFormat(repo.fs, gitdir)
     assert.strictEqual(format, 'sha1')
   })
 
   await t.test('ok:handles-case-insensitive', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
+    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const gitdir = await repo.getGitdir()
     
     // Write config directly with different case
     const configPath = `${gitdir}/config`
     const configContent = `[extensions]
 objectformat = SHA256
 `
-    await fs.write(configPath, configContent, 'utf8')
+    await repo.fs.write(configPath, configContent, 'utf8')
     
-    const format = await detectObjectFormat(fs, gitdir)
+    const format = await detectObjectFormat(repo.fs, gitdir)
     assert.strictEqual(format, 'sha256')
   })
 })

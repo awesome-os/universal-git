@@ -27,6 +27,7 @@
     "nps:build": "nps build",
     "perf:heatmap": "node performance/profile-heatmap.mjs",
     "perf:analyze": "node performance/analyze-hot-path.mjs",
+    "test": "npm run -w @awesome-os/universal-git-tests test",
     "tests": "npm run -w @awesome-os/universal-git-tests tests",
     "test:mock-server": "npm test -- packages/mock-server-tests/tests/**/*.test.ts",
     "tests:coverage": "c8 npm run -w @awesome-os/universal-git-tests tests:coverage",

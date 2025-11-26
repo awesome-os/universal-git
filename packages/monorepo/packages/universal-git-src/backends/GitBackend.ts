@@ -10,6 +10,19 @@
  */
 
 import type { UniversalBuffer } from '../utils/UniversalBuffer.ts'
+
+/**
+ * Worktree gitdir interface - opaque handle to worktree gitdir structure
+ * The actual gitdir path/structure is hidden from consumers
+ */
+export interface WorktreeGitdir {
+  /**
+   * Gets the worktree gitdir path (for internal use only)
+   * This should only be used by GitBackend implementations
+   */
+  getPath(): string
+}
+
 export type GitBackend = {
   // ============================================================================
   // Core Metadata & Current State
@@ -415,6 +428,22 @@ export type GitBackend = {
    * Lists all worktrees
    */
   listWorktrees(): Promise<string[]>
+
+  /**
+   * Creates a worktree gitdir structure
+   * Creates the directory .git/worktrees/<name> and writes the gitdir file
+   * @param name - Worktree name
+   * @param worktreeDir - Absolute path to the worktree directory (for gitdir file)
+   * @returns Opaque WorktreeGitdir interface
+   */
+  createWorktreeGitdir(name: string, worktreeDir: string): Promise<WorktreeGitdir>
+
+  /**
+   * Writes HEAD in a worktree gitdir
+   * @param worktreeGitdir - Worktree gitdir interface
+   * @param value - Commit OID or ref to write
+   */
+  writeWorktreeHEAD(worktreeGitdir: WorktreeGitdir, value: string): Promise<void>
 
   /**
    * Reads the shallow file

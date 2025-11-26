@@ -4,41 +4,42 @@ import { isIgnored } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 
 // NOTE: we cannot actually commit a real .gitignore file in fixtures or fixtures won't be included in this repo
-const writeGitIgnore = async (fs, dir, patterns) =>
-  fs.write(dir + '/.gitignore', patterns.join('\n'))
+const writeGitIgnore = async (repo, patterns) => {
+  const dir = (await repo.getDir())!
+  await repo.fs.write(dir + '/.gitignore', patterns.join('\n'))
+}
 
 describe('isIgnored', () => {
   it('ok:check-gitignore', async () => {
     // Setup
-    const { fs, gitdir, dir } = await makeFixture('test-isIgnored')
-    await writeGitIgnore(fs, dir, ['a.txt', 'c/*', '!c/d.txt', 'd/'])
+    const { repo } = await makeFixture('test-isIgnored', { init: true })
+    await writeGitIgnore(repo, ['a.txt', 'c/*', '!c/d.txt', 'd/'])
     // Test
-    assert.strictEqual(await isIgnored({ fs, gitdir, dir, filepath: 'a.txt' }), true)
-    assert.strictEqual(await isIgnored({ fs, gitdir, dir, filepath: 'b.txt' }), false)
-    assert.strictEqual(await isIgnored({ fs, gitdir, dir, filepath: 'c/d.txt' }), false)
-    assert.strictEqual(await isIgnored({ fs, gitdir, dir, filepath: 'c/e.txt' }), true)
-    assert.strictEqual(await isIgnored({ fs, gitdir, dir, filepath: 'd/' }), true)
+    assert.strictEqual(await isIgnored({ repo, filepath: 'a.txt' }), true)
+    assert.strictEqual(await isIgnored({ repo, filepath: 'b.txt' }), false)
+    assert.strictEqual(await isIgnored({ repo, filepath: 'c/d.txt' }), false)
+    assert.strictEqual(await isIgnored({ repo, filepath: 'c/e.txt' }), true)
+    assert.strictEqual(await isIgnored({ repo, filepath: 'd/' }), true)
   })
   
   it('ok:check-gitignore-subdirectory', async () => {
     // Setup
-    const { fs, gitdir, dir } = await makeFixture('test-isIgnored')
-    await writeGitIgnore(fs, dir, ['a.txt'])
-    await writeGitIgnore(fs, dir + '/c', ['d.txt'])
+    const { repo } = await makeFixture('test-isIgnored', { init: true })
+    const dir = (await repo.getDir())!
+    await writeGitIgnore(repo, ['a.txt'])
+    await repo.fs.write(dir + '/c/.gitignore', 'd.txt\n')
     // Test
-    assert.strictEqual(await isIgnored({ fs, gitdir, dir, filepath: 'a.txt' }), true)
-    assert.strictEqual(await isIgnored({ fs, gitdir, dir, filepath: 'b.txt' }), false)
-    assert.strictEqual(await isIgnored({ fs, gitdir, dir, filepath: 'c/d.txt' }), true)
-    assert.strictEqual(await isIgnored({ fs, gitdir, dir, filepath: 'c/e.txt' }), false)
+    assert.strictEqual(await isIgnored({ repo, filepath: 'a.txt' }), true)
+    assert.strictEqual(await isIgnored({ repo, filepath: 'b.txt' }), false)
+    assert.strictEqual(await isIgnored({ repo, filepath: 'c/d.txt' }), true)
+    assert.strictEqual(await isIgnored({ repo, filepath: 'c/e.txt' }), false)
   })
 
   it('ok:returns-false-non-ignored', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-isIgnored')
+    const { repo } = await makeFixture('test-isIgnored', { init: true })
     
     const ignored = await isIgnored({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: 'test.txt',
     })
     
@@ -46,15 +47,14 @@ describe('isIgnored', () => {
   })
 
   it('ok:returns-true-ignored', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-isIgnored')
+    const { repo } = await makeFixture('test-isIgnored', { init: true })
+    const dir = (await repo.getDir())!
     
     // Create a .gitignore file
-    await fs.write(`${dir}/.gitignore`, '*.log\nnode_modules/\n', 'utf8')
+    await repo.fs.write(`${dir}/.gitignore`, '*.log\nnode_modules/\n', 'utf8')
     
     const ignored = await isIgnored({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: 'test.log',
     })
     
@@ -62,12 +62,10 @@ describe('isIgnored', () => {
   })
 
   it('behavior:always-ignores-git-folders', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-isIgnored')
+    const { repo } = await makeFixture('test-isIgnored', { init: true })
     
     const ignored = await isIgnored({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: '.git',
     })
     
@@ -75,12 +73,10 @@ describe('isIgnored', () => {
   })
 
   it('behavior:never-ignores-root', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-isIgnored')
+    const { repo } = await makeFixture('test-isIgnored', { init: true })
     
     const ignored = await isIgnored({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: '.',
     })
     
@@ -88,19 +84,18 @@ describe('isIgnored', () => {
   })
 
   it('behavior:respects-parent-exclusion', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-isIgnored')
+    const { repo } = await makeFixture('test-isIgnored', { init: true })
+    const dir = (await repo.getDir())!
     
     // Create .gitignore that excludes a directory
-    await fs.write(`${dir}/.gitignore`, 'excluded/\n', 'utf8')
+    await repo.fs.write(`${dir}/.gitignore`, 'excluded/\n', 'utf8')
     
     // Even if we try to un-ignore a file in excluded directory, it should still be ignored
-    await fs.mkdir(`${dir}/excluded`, { recursive: true })
-    await fs.write(`${dir}/excluded/.gitignore`, '!file.txt\n', 'utf8')
+    await repo.fs.mkdir(`${dir}/excluded`, { recursive: true })
+    await repo.fs.write(`${dir}/excluded/.gitignore`, '!file.txt\n', 'utf8')
     
     const ignored = await isIgnored({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: 'excluded/file.txt',
     })
     

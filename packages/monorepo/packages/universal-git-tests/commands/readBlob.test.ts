@@ -6,13 +6,13 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 describe('readBlob', () => {
   it('error:test-missing', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readBlob')
+    const { repo } = await makeFixture('test-readBlob')
+    const gitdir = await repo.getGitdir()
     // Test
     let error = null
     try {
       await readBlob({
-        fs,
-        gitdir,
+        repo,
         oid: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       })
     } catch (err) {
@@ -24,11 +24,10 @@ describe('readBlob', () => {
   
   it('ok:blob', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readBlob')
+    const { repo } = await makeFixture('test-readBlob')
     // Test
     const { blob } = await readBlob({
-      fs,
-      gitdir,
+      repo,
       oid: '4551a1856279dde6ae9d65862a1dff59a5f199d8',
     })
     const content = Buffer.from(blob).toString('utf8')
@@ -38,11 +37,10 @@ describe('readBlob', () => {
   
   it('ok:peels-tags', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readBlob')
+    const { repo } = await makeFixture('test-readBlob')
     // Test
     const { oid } = await readBlob({
-      fs,
-      gitdir,
+      repo,
       oid: 'cdf8e34555b62edbbe978f20d7b4796cff781f9d',
     })
     assert.strictEqual(oid, '4551a1856279dde6ae9d65862a1dff59a5f199d8')
@@ -50,11 +48,10 @@ describe('readBlob', () => {
   
   it('ok:with-simple-filepath-to-blob', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readBlob')
+    const { repo } = await makeFixture('test-readBlob')
     // Test
     const { oid, blob } = await readBlob({
-      fs,
-      gitdir,
+      repo,
       oid: 'be1e63da44b26de8877a184359abace1cddcb739',
       filepath: 'cli.js',
     })
@@ -64,13 +61,12 @@ describe('readBlob', () => {
   
   it('ok:with-deep-filepath-to-blob', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readBlob')
+    const { repo } = await makeFixture('test-readBlob')
     // Test
     // This test may fail if packfile isn't loaded - skip if InternalError
     try {
       const { oid, blob } = await readBlob({
-        fs,
-        gitdir,
+        repo,
         oid: 'be1e63da44b26de8877a184359abace1cddcb739',
         filepath: 'src/commands/clone.js',
       })
@@ -88,13 +84,12 @@ describe('readBlob', () => {
   
   it('error:with-simple-filepath-to-tree', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readBlob')
+    const { repo } = await makeFixture('test-readBlob')
     // Test
     let error = null
     try {
       await readBlob({
-        fs,
-        gitdir,
+        repo,
         oid: 'be1e63da44b26de8877a184359abace1cddcb739',
         filepath: '',
       })
@@ -107,13 +102,12 @@ describe('readBlob', () => {
   
   it('error:with-erroneous-filepath-directory-is-a-file', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readBlob')
+    const { repo } = await makeFixture('test-readBlob')
     // Test
     let error = null
     try {
       await readBlob({
-        fs,
-        gitdir,
+        repo,
         oid: 'be1e63da44b26de8877a184359abace1cddcb739',
         filepath: 'src/commands/clone.js/isntafolder.txt',
       })
@@ -131,13 +125,12 @@ describe('readBlob', () => {
   
   it('error:with-erroneous-filepath-no-such-directory', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readBlob')
+    const { repo } = await makeFixture('test-readBlob')
     // Test
     let error = null
     try {
       await readBlob({
-        fs,
-        gitdir,
+        repo,
         oid: 'be1e63da44b26de8877a184359abace1cddcb739',
         filepath: 'src/isntafolder',
       })
@@ -155,13 +148,12 @@ describe('readBlob', () => {
   
   it('error:with-erroneous-filepath-leading-slash', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readBlob')
+    const { repo } = await makeFixture('test-readBlob')
     // Test
     let error = null
     try {
       await readBlob({
-        fs,
-        gitdir,
+        repo,
         oid: 'be1e63da44b26de8877a184359abace1cddcb739',
         filepath: '/src',
       })
@@ -176,13 +168,12 @@ describe('readBlob', () => {
   
   it('error:with-erroneous-filepath-trailing-slash', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readBlob')
+    const { repo } = await makeFixture('test-readBlob')
     // Test
     let error = null
     try {
       await readBlob({
-        fs,
-        gitdir,
+        repo,
         oid: 'be1e63da44b26de8877a184359abace1cddcb739',
         filepath: 'src/',
       })

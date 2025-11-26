@@ -6,11 +6,10 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 describe('listTags', () => {
   it('ok:basic', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-listTags')
+    const { repo } = await makeFixture('test-listTags')
     // Test
     const refs = await listTags({
-      fs,
-      gitdir,
+      repo,
     })
     assert.ok(Array.isArray(refs))
     assert.ok(refs.length > 0)
@@ -32,27 +31,25 @@ describe('listTags', () => {
   })
 
   it('param:repo-provided', async () => {
-    const { fs, gitdir } = await makeFixture('test-listTags')
-    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const repo = await Repository.open({ fs, gitdir })
+    const { repo } = await makeFixture('test-listTags')
     const tags = await listTags({ repo })
     assert.ok(Array.isArray(tags))
     assert.ok(tags.length >= 0)
   })
 
   it('param:dir-derives-gitdir', async () => {
-    const { fs, dir } = await makeFixture('test-listTags')
-    const tags = await listTags({ fs, dir })
+    const { repo } = await makeFixture('test-listTags')
+    const tags = await listTags({ repo })
     assert.ok(Array.isArray(tags))
     assert.ok(tags.length >= 0)
   })
 
   it('error:caller-property', async () => {
-    const { fs, gitdir } = await makeFixture('test-listTags')
+    const { repo } = await makeFixture('test-listTags')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await listTags({
-        gitdir,
+        repo: undefined as any,
       } as any)
       assert.fail('Should have thrown MissingParameterError')
     } catch (error: any) {
@@ -62,10 +59,8 @@ describe('listTags', () => {
   })
 
   it('edge:empty-repository', async () => {
-    const { fs, dir } = await makeFixture('test-empty')
-    const { init } = await import('@awesome-os/universal-git-src/index.ts')
-    await init({ fs, dir })
-    const tags = await listTags({ fs, dir })
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const tags = await listTags({ repo })
     assert.ok(Array.isArray(tags))
     assert.strictEqual(tags.length, 0)
   })

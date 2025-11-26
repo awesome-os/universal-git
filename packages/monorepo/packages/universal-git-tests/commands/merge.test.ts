@@ -115,7 +115,10 @@ describe('merge', () => {
 
   it('error:UnmergedPathsError', async () => {
     // Setup
-    const { gitdir, dir, fs } = await makeFixture('test-GitIndex-unmerged')
+    const repo = await makeFixture('test-GitIndex-unmerged')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
 
     // Verify the fixture has unmerged paths first
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
@@ -195,7 +198,9 @@ describe('merge', () => {
 
   it('ok:merge-same-branch', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-merge')
+    const repo = await makeFixture('test-merge')
+    const fs = repo.fs
+    const gitdir = await repo.getGitdir()
     // Test
     const desiredOid = await resolveRef({
       cache,
@@ -225,7 +230,9 @@ describe('merge', () => {
 
   it('ok:merge-medium-into-main', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-merge')
+    const repo = await makeFixture('test-merge')
+    const fs = repo.fs
+    const gitdir = await repo.getGitdir()
     // Test
     const desiredOid = await resolveRef({
       cache,
@@ -255,7 +262,9 @@ describe('merge', () => {
 
   it('ok:merge-oldest-into-main', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-merge')
+    const repo = await makeFixture('test-merge')
+    const fs = repo.fs
+    const gitdir = await repo.getGitdir()
     // Test
     const desiredOid = await resolveRef({
       cache,
@@ -285,7 +294,9 @@ describe('merge', () => {
 
   it('ok:merge-newest-into-main', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-merge')
+    const repo = await makeFixture('test-merge')
+    const fs = repo.fs
+    const gitdir = await repo.getGitdir()
     // Test
     const desiredOid = await resolveRef({
       cache,
@@ -315,7 +326,9 @@ describe('merge', () => {
 
   it('ok:merge-no-fast-forward', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-merge-no-ff')
+    const repo = await makeFixture('test-merge-no-ff')
+    const fs = repo.fs
+    const gitdir = await repo.getGitdir()
     const originalOid = await resolveRef({
       cache,
       fs,
@@ -354,7 +367,9 @@ describe('merge', () => {
 
   it('behavior:dryRun-fastForward', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-merge')
+    const repo = await makeFixture('test-merge')
+    const fs = repo.fs
+    const gitdir = await repo.getGitdir()
     // Test
     const originalOid = await resolveRef({
       cache,
@@ -391,7 +406,9 @@ describe('merge', () => {
 
   it('behavior:noUpdateBranch', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-merge')
+    const repo = await makeFixture('test-merge')
+    const fs = repo.fs
+    const gitdir = await repo.getGitdir()
     // Test
     const originalOid = await resolveRef({
       cache,
@@ -433,7 +450,9 @@ describe('merge', () => {
     
     if (!isGitAvailable()) {
       // Fallback to fixture-based test if git is not available
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       const objectFormat = await getFixtureObjectFormat(fs, gitdir)
       const commit = (
         await log({
@@ -560,7 +579,9 @@ describe('merge', () => {
     
     if (!isGitAvailable()) {
       // Fallback to fixture-based test if git is not available
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       const commit = (
         await log({
           cache,
@@ -666,7 +687,9 @@ describe('merge', () => {
 
   it('param:dryRun-missing-author', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-merge')
+    const repo = await makeFixture('test-merge')
+    const fs = repo.fs
+    const gitdir = await repo.getGitdir()
     // Test
     let error: unknown = null
     try {
@@ -693,7 +716,9 @@ describe('merge', () => {
     
     if (!isGitAvailable()) {
       // Fallback to fixture-based test if git is not available
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       const commit = (
         await log({
           cache,
@@ -873,7 +898,9 @@ describe('merge', () => {
     
     if (!isGitAvailable()) {
       // Fallback to fixture-based test if git is not available
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       const commit = (
         await log({
           cache,
@@ -1018,7 +1045,9 @@ describe('merge', () => {
     
     if (!isGitAvailable()) {
       // Fallback to fixture-based test if git is not available
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       const commit = (
         await log({
           cache,
@@ -1156,7 +1185,9 @@ describe('merge', () => {
     
     if (!isGitAvailable()) {
       // Fallback to fixture-based test if git is not available
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       let error: unknown = null
       try {
         await merge({
@@ -1279,7 +1310,9 @@ describe('merge', () => {
     
     if (!isGitAvailable()) {
       // Fallback to fixture-based test if git is not available
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       let error: unknown = null
       try {
         await merge({
@@ -1387,7 +1420,9 @@ describe('merge', () => {
     
     if (!isGitAvailable()) {
       // Fallback to fixture-based test if git is not available
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       let error: unknown = null
       try {
         await merge({
@@ -1491,7 +1526,10 @@ describe('merge', () => {
     
     if (!isGitAvailable()) {
       // Fallback to fixture-based test if git is not available
-      const { fs, gitdir, dir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const dir = await repo.getDir()!
+      const gitdir = await repo.getGitdir()
       const deletedFile = `${dir}/o.txt`
       let error: unknown = null
       try {
@@ -1591,7 +1629,9 @@ describe('merge', () => {
     
     if (!isGitAvailable()) {
       // Fallback to fixture-based test if git is not available
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       const commit = (
         await log({
           cache,
@@ -1707,7 +1747,9 @@ describe('merge', () => {
     
     if (!isGitAvailable()) {
       // Fallback to fixture-based test if git is not available
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       const commit = (
         await log({
           cache,
@@ -1828,7 +1870,10 @@ describe('merge', () => {
     
     if (!isGitAvailable()) {
       // Fallback to fixture-based test if git is not available
-      const { fs, gitdir, dir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const dir = await repo.getDir()!
+      const gitdir = await repo.getGitdir()
       const testFile = `${gitdir}/o.conflict.example`
       const outFile = `${dir}/o.txt`
       const cache = {}
@@ -1965,7 +2010,10 @@ describe('merge', () => {
 
   it('behavior:merge-conflict-no-worktree-update', async () => {
     // Setup
-    const { fs, gitdir, dir } = await makeFixture('test-merge')
+    const repo = await makeFixture('test-merge')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     // Test
     const outFile = `${dir}/o.txt`
 
@@ -2012,7 +2060,9 @@ describe('merge', () => {
 
   it('behavior:merge-custom-resolver', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-merge')
+    const repo = await makeFixture('test-merge')
+    const fs = repo.fs
+    const gitdir = await repo.getGitdir()
 
     const commit = (
       await log({
@@ -2081,7 +2131,10 @@ describe('merge', () => {
   })
 
   it('error:FastForwardError', async () => {
-    const { fs, gitdir, dir } = await makeFixture('test-merge')
+    const repo = await makeFixture('test-merge')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     
     let error: unknown = null
     try {
@@ -2117,7 +2170,10 @@ describe('merge', () => {
   })
 
   it('param:allowUnrelatedHistories', async () => {
-    const { fs, gitdir, dir } = await makeFixture('test-merge')
+    const repo = await makeFixture('test-merge')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     
     // Test that allowUnrelatedHistories parameter is accepted
     // This will likely throw MergeNotSupportedError if branches are unrelated,
@@ -2147,7 +2203,10 @@ describe('merge', () => {
   })
 
   it('behavior:merge-ff-config-false', async () => {
-    const { fs, gitdir, dir } = await makeFixture('test-merge')
+    const repo = await makeFixture('test-merge')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     
     // Set merge.ff to false
     const { setConfig } = await import('@awesome-os/universal-git-src/index.ts')
@@ -2177,7 +2236,10 @@ describe('merge', () => {
   })
 
   it('behavior:merge-ff-config-only', async () => {
-    const { fs, gitdir, dir } = await makeFixture('test-merge')
+    const repo = await makeFixture('test-merge')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     
     // Set merge.ff to "only"
     const { setConfig } = await import('@awesome-os/universal-git-src/index.ts')
@@ -2449,7 +2511,9 @@ describe('merge', () => {
 
   describe('merge:edge-cases-and-branch-coverage', () => {
     it('param:missing-author-fastForward', async () => {
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       
       const originalOid = await resolveRef({ fs, gitdir, ref: 'main' })
       const desiredOid = await resolveRef({ fs, gitdir, ref: 'newest' })
@@ -2477,7 +2541,9 @@ describe('merge', () => {
     })
 
     it('error:missing-author-not-fastForward', async () => {
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       
       let error: unknown = null
       try {
@@ -2503,7 +2569,9 @@ describe('merge', () => {
     })
 
     it('param:missing-committer-fastForward', async () => {
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       
       // Fast-forward merge should not require committer
       const result = await merge({
@@ -2522,7 +2590,9 @@ describe('merge', () => {
     })
 
     it('param:missing-committer-not-fastForward', async () => {
-      const { fs, gitdir } = await makeFixture('test-merge-no-ff')
+      const repo = await makeFixture('test-merge-no-ff')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       
       // Committer is derived from author, so if author is provided, committer should be too
       // This test verifies that committer derivation works correctly
@@ -2562,7 +2632,9 @@ describe('merge', () => {
     })
 
     it('error:signingKey-without-onSign', async () => {
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       
       let error: unknown = null
       try {
@@ -2589,7 +2661,10 @@ describe('merge', () => {
     })
 
     it('error:detached-HEAD', async () => {
-      const { fs, gitdir, dir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const dir = await repo.getDir()!
+      const gitdir = await repo.getGitdir()
       
       // Checkout a commit directly (detached HEAD)
       const { resolveRef } = await import('@awesome-os/universal-git-src/index.ts')
@@ -2621,7 +2696,9 @@ describe('merge', () => {
     })
 
     it('ok:bare-repository', async () => {
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       
       // Test with only gitdir (bare repo scenario)
       const result = await merge({
@@ -2637,7 +2714,8 @@ describe('merge', () => {
     })
 
     it('param:fs-missing', async () => {
-      const { gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const gitdir = await repo.getGitdir()
       const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
       
       let error: unknown = null
@@ -2658,7 +2736,8 @@ describe('merge', () => {
     })
 
     it('param:dir-and-gitdir-missing', async () => {
-      const { fs } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
       
       let error: unknown = null
       try {
@@ -2686,7 +2765,9 @@ describe('merge', () => {
     })
 
     it('behavior:fastForward-false', async () => {
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       
       const originalOid = await resolveRef({ fs, gitdir, ref: 'main' })
       
@@ -2715,7 +2796,9 @@ describe('merge', () => {
     })
 
     it('behavior:fastForwardOnly', async () => {
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       
       const originalOid = await resolveRef({ fs, gitdir, ref: 'main' })
       const desiredOid = await resolveRef({ fs, gitdir, ref: 'newest' })
@@ -2740,7 +2823,9 @@ describe('merge', () => {
     })
 
     it('behavior:dryRun-merge-commit', async () => {
-      const { fs, gitdir } = await makeFixture('test-merge-no-ff')
+      const repo = await makeFixture('test-merge-no-ff')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       
       const originalOid = await resolveRef({ fs, gitdir, ref: 'main' })
       
@@ -2767,7 +2852,9 @@ describe('merge', () => {
     })
 
     it('behavior:noUpdateBranch-merge-commit', async () => {
-      const { fs, gitdir } = await makeFixture('test-merge-no-ff')
+      const repo = await makeFixture('test-merge-no-ff')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       
       const originalOid = await resolveRef({ fs, gitdir, ref: 'main' })
       
@@ -2795,7 +2882,10 @@ describe('merge', () => {
     })
 
     it('behavior:abortOnConflict-false', async () => {
-      const { fs, gitdir, dir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const dir = await repo.getDir()!
+      const gitdir = await repo.getGitdir()
       
       let error: unknown = null
       try {
@@ -2825,7 +2915,9 @@ describe('merge', () => {
     })
 
     it('behavior:custom-mergeDriver', async () => {
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       
       let error: unknown = null
       let result: any = null
@@ -2875,7 +2967,9 @@ describe('merge', () => {
     })
 
     it('param:custom-message', async () => {
-      const { fs, gitdir } = await makeFixture('test-merge-no-ff')
+      const repo = await makeFixture('test-merge-no-ff')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       
       const customMessage = 'Custom merge message'
       const result = await merge({
@@ -2901,7 +2995,9 @@ describe('merge', () => {
     })
 
     it('behavior:default-message', async () => {
-      const { fs, gitdir } = await makeFixture('test-merge-no-ff')
+      const repo = await makeFixture('test-merge-no-ff')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       
       const result = await merge({
         fs,
@@ -2927,7 +3023,9 @@ describe('merge', () => {
     it('error:multiple-merge-bases', async () => {
       // This is hard to test without creating a specific fixture
       // But we can test the error path exists
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       
       // Most fixtures won't have multiple merge bases, so this might not throw
       // But if it does, it should be MergeNotSupportedError
@@ -3093,7 +3191,9 @@ describe('merge', () => {
     })
 
     it('error:caller-property', async () => {
-      const { fs, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const gitdir = await repo.getGitdir()
       
       try {
         await merge({
@@ -3115,7 +3215,10 @@ describe('merge', () => {
     })
 
     it('param:repo-provided', async () => {
-      const { fs, dir, gitdir } = await makeFixture('test-merge')
+      const repo = await makeFixture('test-merge')
+      const fs = repo.fs
+      const dir = await repo.getDir()!
+      const gitdir = await repo.getGitdir()
       
       const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
       const repo = await Repository.open({ fs, dir, gitdir, cache })

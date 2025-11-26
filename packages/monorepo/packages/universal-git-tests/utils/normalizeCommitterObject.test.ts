@@ -8,23 +8,19 @@ import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.
 describe('normalizeCommitterObject', () => {
   it('ok:return-committer-all-properties', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-normalizeAuthorObject')
+    const { repo } = await makeFixture('test-normalizeAuthorObject', { init: true })
 
     await setConfig({
-      fs,
-      gitdir,
+      repo,
       path: 'user.name',
       value: `user-config`,
     })
 
     await setConfig({
-      fs,
-      gitdir,
+      repo,
       path: 'user.email',
       value: `user-config@example.com`,
     })
-
-    const repo = await Repository.open({ fs, gitdir, cache: {}, autoDetectConfig: true })
 
     // Test
     const author = {
@@ -49,23 +45,19 @@ describe('normalizeCommitterObject', () => {
 
   it('ok:return-author-values-no-committer', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-normalizeAuthorObject')
+    const { repo } = await makeFixture('test-normalizeAuthorObject', { init: true })
 
     await setConfig({
-      fs,
-      gitdir,
+      repo,
       path: 'user.name',
       value: `user-config`,
     })
 
     await setConfig({
-      fs,
-      gitdir,
+      repo,
       path: 'user.email',
       value: `user-config@example.com`,
     })
-
-    const repo = await Repository.open({ fs, gitdir, cache: {}, autoDetectConfig: true })
 
     // Test
     const author = {
@@ -80,23 +72,19 @@ describe('normalizeCommitterObject', () => {
 
   it('ok:return-commit-committer-no-provided', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-normalizeAuthorObject')
+    const { repo } = await makeFixture('test-normalizeAuthorObject', { init: true })
 
     await setConfig({
-      fs,
-      gitdir,
+      repo,
       path: 'user.name',
       value: `user-config`,
     })
 
     await setConfig({
-      fs,
-      gitdir,
+      repo,
       path: 'user.email',
       value: `user-config@example.com`,
     })
-
-    const repo = await Repository.open({ fs, gitdir, cache: {}, autoDetectConfig: true })
 
     // Test
     const commit = {
@@ -122,23 +110,19 @@ describe('normalizeCommitterObject', () => {
 
   it('ok:return-config-values-no-provided', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-normalizeAuthorObject')
+    const { repo } = await makeFixture('test-normalizeAuthorObject', { init: true })
 
     await setConfig({
-      fs,
-      gitdir,
+      repo,
       path: 'user.name',
       value: `user-config`,
     })
 
     await setConfig({
-      fs,
-      gitdir,
+      repo,
       path: 'user.email',
       value: `user-config@example.com`,
     })
-
-    const repo = await Repository.open({ fs, gitdir, cache: {}, autoDetectConfig: true })
 
     // Test
     const committer = await normalizeCommitterObject({ repo })
@@ -150,7 +134,9 @@ describe('normalizeCommitterObject', () => {
 
   it('edge:return-undefined-no-value', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-normalizeAuthorObject')
+    const { repo: _repo } = await makeFixture('test-normalizeAuthorObject', { init: true })
+    const fs = _repo.fs
+    const gitdir = await _repo.getGitdir()
 
     // Disable auto-detection and ignore system/global config to ensure no config values are found
     const repo = await Repository.open({ fs, gitdir, cache: {}, autoDetectConfig: false, ignoreSystemConfig: true })

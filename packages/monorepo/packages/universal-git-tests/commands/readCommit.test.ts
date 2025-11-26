@@ -6,13 +6,12 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 describe('readCommit', () => {
   it('error:NotFoundError', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readCommit')
+    const { repo } = await makeFixture('test-readCommit')
     // Test
     let error = null
     try {
       await readCommit({
-        fs,
-        gitdir,
+        repo,
         oid: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       })
     } catch (err) {
@@ -24,11 +23,10 @@ describe('readCommit', () => {
   
   it('ok:basic', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readCommit')
+    const { repo } = await makeFixture('test-readCommit')
     // Test
     const result = await readCommit({
-      fs,
-      gitdir,
+      repo,
       oid: 'e10ebb90d03eaacca84de1af0a59b444232da99e',
     })
     assert.strictEqual(result.oid, 'e10ebb90d03eaacca84de1af0a59b444232da99e')
@@ -42,11 +40,10 @@ describe('readCommit', () => {
   
   it('ok:from-packfile', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readCommit')
+    const { repo } = await makeFixture('test-readCommit')
     // Test
     const result = await readCommit({
-      fs,
-      gitdir,
+      repo,
       oid: '0b8faa11b353db846b40eb064dfb299816542a46',
     })
     assert.strictEqual(result.oid, '0b8faa11b353db846b40eb064dfb299816542a46')
@@ -57,11 +54,10 @@ describe('readCommit', () => {
   
   it('behavior:peels-tags', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readCommit')
+    const { repo } = await makeFixture('test-readCommit')
     // Test
     const result = await readCommit({
-      fs,
-      gitdir,
+      repo,
       oid: '587d3f8290b513e2ee85ecd317e6efecd545aee6',
     })
     assert.strictEqual(result.oid, '033417ae18b174f078f2f44232cb7a374f4c60ce')
@@ -82,12 +78,11 @@ describe('readCommit', () => {
   })
 
   it('param:oid-missing', async () => {
-    const { fs, gitdir } = await makeFixture('test-readCommit')
+    const { repo } = await makeFixture('test-readCommit')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await readCommit({
-        fs,
-        gitdir,
+        repo,
       } as any)
       assert.fail('Should have thrown MissingParameterError')
     } catch (error) {
@@ -97,13 +92,10 @@ describe('readCommit', () => {
   })
 
   it('param:repo-provided', async () => {
-    const { fs, gitdir, dir } = await makeFixture('test-readCommit')
-    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const repo = await Repository.open({ fs, dir, gitdir })
+    const { repo } = await makeFixture('test-readCommit')
     // Provide gitdir explicitly to avoid default parameter evaluation issue
     const result = await readCommit({
       repo,
-      gitdir, // Explicitly provide to avoid default parameter evaluation
       oid: 'e10ebb90d03eaacca84de1af0a59b444232da99e',
     })
     assert.strictEqual(result.oid, 'e10ebb90d03eaacca84de1af0a59b444232da99e')
@@ -111,11 +103,9 @@ describe('readCommit', () => {
   })
 
   it('param:dir-derives-gitdir', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-readCommit')
+    const { repo } = await makeFixture('test-readCommit')
     const result = await readCommit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       oid: 'e10ebb90d03eaacca84de1af0a59b444232da99e',
     })
     assert.strictEqual(result.oid, 'e10ebb90d03eaacca84de1af0a59b444232da99e')
@@ -123,12 +113,11 @@ describe('readCommit', () => {
   })
 
   it('error:caller-property', async () => {
-    const { fs, gitdir } = await makeFixture('test-readCommit')
+    const { repo } = await makeFixture('test-readCommit')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await readCommit({
-        fs,
-        gitdir,
+        repo,
       } as any)
       assert.fail('Should have thrown MissingParameterError')
     } catch (error: any) {
@@ -138,11 +127,10 @@ describe('readCommit', () => {
   })
 
   it('edge:no-parent', async () => {
-    const { fs, gitdir } = await makeFixture('test-readCommit')
+    const { repo } = await makeFixture('test-readCommit')
     // Find a commit without parent (initial commit)
     const result = await readCommit({
-      fs,
-      gitdir,
+      repo,
       oid: 'e10ebb90d03eaacca84de1af0a59b444232da99e',
     })
     // This commit has a parent, but we can test the structure
@@ -150,10 +138,9 @@ describe('readCommit', () => {
   })
 
   it('edge:multiple-parents', async () => {
-    const { fs, gitdir } = await makeFixture('test-readCommit')
+    const { repo } = await makeFixture('test-readCommit')
     const result = await readCommit({
-      fs,
-      gitdir,
+      repo,
       oid: 'e10ebb90d03eaacca84de1af0a59b444232da99e',
     })
     // Verify parent array structure

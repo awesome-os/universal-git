@@ -64,7 +64,13 @@ await worktree({
 })
 ```
 
-## Opening a Repository with a Worktree
+## Repository and Multiple Worktrees
+
+`Repository` is a thin wrapper that manages:
+- **1 `GitBackend`** (always present) - handles all Git repository data
+- **Multiple linked worktree checkouts** (optional) - each with its own `WorktreeBackend` instance
+
+### Opening a Repository with a Worktree
 
 When working with linked worktrees, you can use `Repository.open()` with both `dir` and `gitdir` parameters:
 
@@ -87,6 +93,57 @@ const repo = await Repository.open({
 - **`dir`** === linked worktree checkout - the working directory
 
 The worktree's `.git` is typically a **file** (not a directory) pointing to the gitdir. The implementation treats the gitdir as a bare repository and uses the dir as the working directory. No inference is performed - the provided paths are used as-is.
+
+### Creating Worktrees with Custom Backends
+
+You can create worktrees with specific `WorktreeBackend` types:
+
+```typescript
+import { Repository } from 'universal-git'
+import { GitWorktreeS3 } from 'universal-git/git/worktree/s3'
+
+const repo = await Repository.open({ fs, dir: '/path/to/repo' })
+
+// Create a worktree with a custom backend (e.g., S3 storage)
+const worktree = await repo.createWorktree(
+  '/path/to/s3-worktree',
+  'feature-branch',
+  's3-worktree',
+  {
+    worktreeBackendFactory: (dir) => {
+      // Create a custom backend for this worktree
+      return new GitWorktreeS3(s3Client, bucket, `${prefix}/${dir}`)
+    }
+  }
+)
+
+// Or pass a pre-created backend instance
+const s3Backend = new GitWorktreeS3(s3Client, bucket, prefix)
+const worktree2 = await repo.createWorktree(
+  '/path/to/another-s3-worktree',
+  'other-branch',
+  's3-worktree-2',
+  {
+    worktreeBackend: s3Backend
+  }
+)
+```
+
+### Managing Multiple Worktrees
+
+```typescript
+// Get worktree by name
+const worktree = repo.getWorktreeByName('feature-worktree')
+
+// List all worktrees
+const allWorktrees = repo.listWorktrees()
+// Returns: Map<string, Worktree> - keyed by worktree name
+
+// Access worktree properties
+for (const [name, worktree] of allWorktrees) {
+  console.log(`Worktree: ${name}, Dir: ${worktree.dir}`)
+}
+```
 
 For more details, see [Repository.open() Behavior](./repository.md#linked-worktree-pattern) and [dir vs gitdir](./dir-vs-gitdir.md#linked-worktree-pattern).
 

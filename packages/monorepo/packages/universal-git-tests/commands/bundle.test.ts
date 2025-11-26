@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { bundle, verifyBundle, unbundle, init, add, commit, branch, tag, readObject, resolveRef } from '@awesome-os/universal-git-src/index.ts'
+import { bundle, verifyBundle, unbundle, add, commit, branch, tag, readObject, resolveRef } from '@awesome-os/universal-git-src/index.ts'
 import { readRef } from '@awesome-os/universal-git-src/git/refs/readRef.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { join } from '@awesome-os/universal-git-src/utils/join.ts'
@@ -13,35 +13,31 @@ import { createGitWorktreeBackend } from '@awesome-os/universal-git-src/git/work
 
 test('bundle', async (t) => {
   await t.test('creates bundle with specific refs', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-bundle')
+    const { repo } = await makeFixture('test-bundle', { init: true })
+    const dir = (await repo.getDir())!
+    const gitdir = await repo.getGitdir()
     
     // Create some commits and branches
     await nodeFs.writeFile(join(dir, 'file1.txt'), 'content1')
-    await add({ fs, dir, gitdir, filepath: 'file1.txt' })
+    await add({ repo, filepath: 'file1.txt' })
     const commit1 = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'First commit',
       author: { name: 'Test', email: 'test@example.com' },
     })
     
-    await branch({ fs, dir, gitdir, ref: 'feature', checkout: true })
+    await branch({ repo, ref: 'feature', checkout: true })
     await nodeFs.writeFile(join(dir, 'file2.txt'), 'content2')
-    await add({ fs, dir, gitdir, filepath: 'file2.txt' })
+    await add({ repo, filepath: 'file2.txt' })
     const commit2 = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'Second commit',
       author: { name: 'Test', email: 'test@example.com' },
     })
     
     // Create a tag (lightweight tag)
     await tag({
-      fs,
-      dir,
-      gitdir,
+      repo,
       ref: 'v1.0.0',
       object: commit1,
       force: true,
@@ -51,8 +47,7 @@ test('bundle', async (t) => {
     const bundlePath = join(os.tmpdir(), `bundle-test-${Date.now()}.bundle`)
     try {
       const result = await bundle({
-        fs,
-        gitdir,
+        repo,
         filepath: bundlePath,
         refs: ['refs/heads/master', 'refs/tags/v1.0.0'],
       })
@@ -65,11 +60,11 @@ test('bundle', async (t) => {
       assert.ok(result.objectCount > 0, 'Should have objects')
       
       // Verify bundle file exists
-      const exists = await fs.exists(bundlePath)
+      const exists = await repo.fs.exists(bundlePath)
       assert.strictEqual(exists, true, 'Bundle file should exist')
       
       // Verify bundle file is not empty
-      const bundleData = await fs.read(bundlePath)
+      const bundleData = await repo.fs.read(bundlePath)
       assert.ok(bundleData, 'Bundle file should have content')
       assert.ok(UniversalBuffer.isBuffer(bundleData) ? bundleData.length > 0 : (bundleData as string).length > 0, 'Bundle file should not be empty')
     } finally {
@@ -83,24 +78,22 @@ test('bundle', async (t) => {
   })
   
   await t.test('creates bundle with all refs', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-bundle')
+    const { repo } = await makeFixture('test-bundle', { init: true })
+    const dir = (await repo.getDir())!
+    const gitdir = await repo.getGitdir()
     
     // Create commits and branches
     await nodeFs.writeFile(join(dir, 'file1.txt'), 'content1')
-    await add({ fs, dir, gitdir, filepath: 'file1.txt' })
+    await add({ repo, filepath: 'file1.txt' })
     await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'First commit',
       author: { name: 'Test', email: 'test@example.com' },
     })
     
-    await branch({ fs, dir, gitdir, ref: 'feature', checkout: false })
+    await branch({ repo, ref: 'feature', checkout: false })
     await tag({
-      fs,
-      dir,
-      gitdir,
+      repo,
       ref: 'v1.0.0',
       object: 'refs/heads/master',
     })
@@ -109,8 +102,7 @@ test('bundle', async (t) => {
     const bundlePath = join(os.tmpdir(), `bundle-all-${Date.now()}.bundle`)
     try {
       const result = await bundle({
-        fs,
-        gitdir,
+        repo,
         filepath: bundlePath,
         all: true,
       })
@@ -128,15 +120,15 @@ test('bundle', async (t) => {
   })
   
   await t.test('creates bundle with default HEAD', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-bundle')
+    const { repo } = await makeFixture('test-bundle', { init: true })
+    const dir = (await repo.getDir())!
+    const gitdir = await repo.getGitdir()
     
     // Create a commit
     await nodeFs.writeFile(join(dir, 'file1.txt'), 'content1')
-    await add({ fs, dir, gitdir, filepath: 'file1.txt' })
+    await add({ repo, filepath: 'file1.txt' })
     const commitOid = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'First commit',
       author: { name: 'Test', email: 'test@example.com' },
     })
@@ -145,8 +137,7 @@ test('bundle', async (t) => {
     const bundlePath = join(os.tmpdir(), `bundle-head-${Date.now()}.bundle`)
     try {
       const result = await bundle({
-        fs,
-        gitdir,
+        repo,
         filepath: bundlePath,
       })
       
@@ -155,7 +146,7 @@ test('bundle', async (t) => {
       assert.ok(result.objectCount > 0, 'Should have objects')
       
       // Verify the HEAD ref is included
-      const headRef = await readRef({ fs, gitdir, ref: 'HEAD' })
+      const headRef = await repo.gitBackend!.readRef('HEAD')
       if (headRef && !headRef.startsWith('ref: ')) {
         // Detached HEAD
         assert.ok(result.refs.has('HEAD') || result.refs.has(headRef), 'Should include HEAD')
@@ -174,15 +165,15 @@ test('bundle', async (t) => {
   })
   
   await t.test('throws error when no refs found', async () => {
-    const { fs, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const gitdir = await repo.getGitdir()
     
     const bundlePath = join(os.tmpdir(), `bundle-empty-${Date.now()}.bundle`)
     try {
       await assert.rejects(
         async () => {
           await bundle({
-            fs,
-            gitdir,
+            repo,
             filepath: bundlePath,
             refs: ['refs/heads/nonexistent'],
           })
@@ -203,15 +194,15 @@ test('bundle', async (t) => {
 
 test('verifyBundle', async (t) => {
   await t.test('verifies valid bundle', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-bundle')
+    const { repo } = await makeFixture('test-bundle', { init: true })
+    const dir = (await repo.getDir())!
+    const gitdir = await repo.getGitdir()
     
     // Create a commit
     await nodeFs.writeFile(join(dir, 'file1.txt'), 'content1')
-    await add({ fs, dir, gitdir, filepath: 'file1.txt' })
+    await add({ repo, filepath: 'file1.txt' })
     await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'First commit',
       author: { name: 'Test', email: 'test@example.com' },
     })
@@ -220,14 +211,13 @@ test('verifyBundle', async (t) => {
     const bundlePath = join(os.tmpdir(), `bundle-verify-${Date.now()}.bundle`)
     try {
       await bundle({
-        fs,
-        gitdir,
+        repo,
         filepath: bundlePath,
       })
       
       // Verify bundle
       const result = await verifyBundle({
-        fs,
+        fs: repo.fs,
         filepath: bundlePath,
       })
       
@@ -244,7 +234,7 @@ test('verifyBundle', async (t) => {
   })
   
   await t.test('rejects invalid bundle format', async () => {
-    const { fs } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
     
     // Create invalid bundle file
     const bundlePath = join(os.tmpdir(), `bundle-invalid-${Date.now()}.bundle`)
@@ -252,7 +242,7 @@ test('verifyBundle', async (t) => {
       await nodeFs.writeFile(bundlePath, 'invalid bundle content')
       
       const result = await verifyBundle({
-        fs,
+        fs: repo.fs,
         filepath: bundlePath,
       })
       
@@ -268,12 +258,12 @@ test('verifyBundle', async (t) => {
   })
   
   await t.test('rejects non-existent bundle file', async () => {
-    const { fs } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
     
     const bundlePath = join(os.tmpdir(), `bundle-nonexistent-${Date.now()}.bundle`)
     
     const result = await verifyBundle({
-      fs,
+      fs: repo.fs,
       filepath: bundlePath,
     })
     
@@ -284,35 +274,31 @@ test('verifyBundle', async (t) => {
 
 test('unbundle', async (t) => {
   await t.test('unbundles bundle into repository', async () => {
-    const { fs: sourceFs, dir: sourceDir, gitdir: sourceGitdir } = await makeFixture('test-bundle')
+    const { repo: sourceRepo } = await makeFixture('test-bundle', { init: true })
+    const sourceDir = (await sourceRepo.getDir())!
+    const sourceGitdir = await sourceRepo.getGitdir()
     
     // Create commits and branches in source repo
     await nodeFs.writeFile(join(sourceDir, 'file1.txt'), 'content1')
-    await add({ fs: sourceFs, dir: sourceDir, gitdir: sourceGitdir, filepath: 'file1.txt' })
+    await add({ repo: sourceRepo, filepath: 'file1.txt' })
     const commit1 = await commit({
-      fs: sourceFs,
-      dir: sourceDir,
-      gitdir: sourceGitdir,
+      repo: sourceRepo,
       message: 'First commit',
       author: { name: 'Test', email: 'test@example.com' },
     })
     
-    await branch({ fs: sourceFs, dir: sourceDir, gitdir: sourceGitdir, ref: 'feature', checkout: true })
+    await branch({ repo: sourceRepo, ref: 'feature', checkout: true })
     await nodeFs.writeFile(join(sourceDir, 'file2.txt'), 'content2')
-    await add({ fs: sourceFs, dir: sourceDir, gitdir: sourceGitdir, filepath: 'file2.txt' })
+    await add({ repo: sourceRepo, filepath: 'file2.txt' })
     const commit2 = await commit({
-      fs: sourceFs,
-      dir: sourceDir,
-      gitdir: sourceGitdir,
+      repo: sourceRepo,
       message: 'Second commit',
       author: { name: 'Test', email: 'test@example.com' },
     })
     
     // Create a tag (lightweight tag)
     await tag({
-      fs: sourceFs,
-      dir: sourceDir,
-      gitdir: sourceGitdir,
+      repo: sourceRepo,
       ref: 'v1.0.0',
       object: commit1,
       force: true,
@@ -322,26 +308,33 @@ test('unbundle', async (t) => {
     const bundlePath = join(os.tmpdir(), `bundle-unbundle-${Date.now()}.bundle`)
     try {
       await bundle({
-        fs: sourceFs,
-        gitdir: sourceGitdir,
+        repo: sourceRepo,
         filepath: bundlePath,
         refs: ['refs/heads/master', 'refs/heads/feature', 'refs/tags/v1.0.0'],
       })
       
       // Create destination repository
       const destDir = join(os.tmpdir(), `unbundle-dest-${Date.now()}`)
-      const destGitdir = join(destDir, '.git')
+      await nodeFs.mkdir(destDir, { recursive: true })
       try {
-        await init({ fs: sourceFs, dir: destDir })
+        const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
+        const destRepo = await Repository.open({
+          fs: sourceRepo.fs,
+          dir: destDir,
+          init: true,
+          cache: {},
+          autoDetectConfig: true,
+        })
+        const destGitdir = await destRepo.getGitdir()
         
         // Create backends for destination repo
         const destGitBackend = createBackend({
           type: 'filesystem',
-          fs: sourceFs,
+          fs: sourceRepo.fs,
           gitdir: destGitdir,
         })
         const destWorktree = createGitWorktreeBackend({
-          fs: sourceFs,
+          fs: sourceRepo.fs,
           dir: destDir,
         })
         
@@ -360,19 +353,19 @@ test('unbundle', async (t) => {
         assert.ok(result.imported.has('refs/tags/v1.0.0'), 'Should have imported tag')
         
         // Verify refs were imported correctly
-        const masterOid = await readRef({ fs: sourceFs, gitdir: destGitdir, ref: 'refs/heads/master' })
-        const featureOid = await readRef({ fs: sourceFs, gitdir: destGitdir, ref: 'refs/heads/feature' })
-        const tagOid = await readRef({ fs: sourceFs, gitdir: destGitdir, ref: 'refs/tags/v1.0.0' })
+        const masterOid = await destRepo.gitBackend!.readRef('refs/heads/master')
+        const featureOid = await destRepo.gitBackend!.readRef('refs/heads/feature')
+        const tagOid = await destRepo.gitBackend!.readRef('refs/tags/v1.0.0')
         
         assert.ok(masterOid, 'Master ref should exist')
         assert.ok(featureOid, 'Feature ref should exist')
         assert.ok(tagOid, 'Tag ref should exist')
         
         // Verify objects are accessible
-        const masterCommit = await readObject({ fs: sourceFs, gitdir: destGitdir, oid: masterOid! })
+        const masterCommit = await destRepo.gitBackend!.readObject(masterOid!)
         assert.ok(masterCommit, 'Master commit should be readable')
         
-        const featureCommit = await readObject({ fs: sourceFs, gitdir: destGitdir, oid: featureOid! })
+        const featureCommit = await destRepo.gitBackend!.readObject(featureOid!)
         assert.ok(featureCommit, 'Feature commit should be readable')
       } finally {
         // Cleanup destination
@@ -393,45 +386,52 @@ test('unbundle', async (t) => {
   })
   
   await t.test('unbundles specific refs only', async () => {
-    const { fs: sourceFs, dir: sourceDir, gitdir: sourceGitdir } = await makeFixture('test-bundle')
+    const { repo: sourceRepo } = await makeFixture('test-bundle', { init: true })
+    const sourceDir = (await sourceRepo.getDir())!
+    const sourceGitdir = await sourceRepo.getGitdir()
     
     // Create commits
     await nodeFs.writeFile(join(sourceDir, 'file1.txt'), 'content1')
-    await add({ fs: sourceFs, dir: sourceDir, gitdir: sourceGitdir, filepath: 'file1.txt' })
+    await add({ repo: sourceRepo, filepath: 'file1.txt' })
     await commit({
-      fs: sourceFs,
-      dir: sourceDir,
-      gitdir: sourceGitdir,
+      repo: sourceRepo,
       message: 'First commit',
       author: { name: 'Test', email: 'test@example.com' },
     })
     
-    await branch({ fs: sourceFs, dir: sourceDir, gitdir: sourceGitdir, ref: 'feature', checkout: false })
+    await branch({ repo: sourceRepo, ref: 'feature', checkout: false })
     
     // Create bundle with multiple refs
     const bundlePath = join(os.tmpdir(), `bundle-specific-${Date.now()}.bundle`)
     try {
       await bundle({
-        fs: sourceFs,
-        gitdir: sourceGitdir,
+        repo: sourceRepo,
         filepath: bundlePath,
         refs: ['refs/heads/master', 'refs/heads/feature'],
       })
       
       // Create destination repository
       const destDir = join(os.tmpdir(), `unbundle-specific-${Date.now()}`)
-      const destGitdir = join(destDir, '.git')
+      await nodeFs.mkdir(destDir, { recursive: true })
       try {
-        await init({ fs: sourceFs, dir: destDir })
+        const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
+        const destRepo = await Repository.open({
+          fs: sourceRepo.fs,
+          dir: destDir,
+          init: true,
+          cache: {},
+          autoDetectConfig: true,
+        })
+        const destGitdir = await destRepo.getGitdir()
         
         // Create backends for destination repo
         const destGitBackend = createBackend({
           type: 'filesystem',
-          fs: sourceFs,
+          fs: sourceRepo.fs,
           gitdir: destGitdir,
         })
         const destWorktree = createGitWorktreeBackend({
-          fs: sourceFs,
+          fs: sourceRepo.fs,
           dir: destDir,
         })
         
@@ -464,15 +464,15 @@ test('unbundle', async (t) => {
   })
   
   await t.test('rejects refs that already exist with different OID', async () => {
-    const { fs: sourceFs, dir: sourceDir, gitdir: sourceGitdir } = await makeFixture('test-bundle')
+    const { repo: sourceRepo } = await makeFixture('test-bundle', { init: true })
+    const sourceDir = (await sourceRepo.getDir())!
+    const sourceGitdir = await sourceRepo.getGitdir()
     
     // Create commit in source
     await nodeFs.writeFile(join(sourceDir, 'file1.txt'), 'content1')
-    await add({ fs: sourceFs, dir: sourceDir, gitdir: sourceGitdir, filepath: 'file1.txt' })
+    await add({ repo: sourceRepo, filepath: 'file1.txt' })
     const commit1 = await commit({
-      fs: sourceFs,
-      dir: sourceDir,
-      gitdir: sourceGitdir,
+      repo: sourceRepo,
       message: 'First commit',
       author: { name: 'Test', email: 'test@example.com' },
     })
@@ -481,25 +481,29 @@ test('unbundle', async (t) => {
     const bundlePath = join(os.tmpdir(), `bundle-conflict-${Date.now()}.bundle`)
     try {
       await bundle({
-        fs: sourceFs,
-        gitdir: sourceGitdir,
+        repo: sourceRepo,
         filepath: bundlePath,
         refs: ['refs/heads/master'],
       })
       
       // Create destination repository with different commit
       const destDir = join(os.tmpdir(), `unbundle-conflict-${Date.now()}`)
-      const destGitdir = join(destDir, '.git')
+      await nodeFs.mkdir(destDir, { recursive: true })
       try {
-        await init({ fs: sourceFs, dir: destDir })
-        
-        // Create a different commit in destination
-        await nodeFs.writeFile(join(destDir, 'file2.txt'), 'different content')
-        await add({ fs: sourceFs, dir: destDir, gitdir: destGitdir, filepath: 'file2.txt' })
-        await commit({
-          fs: sourceFs,
+        const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
+        const destRepo = await Repository.open({
+          fs: sourceRepo.fs,
           dir: destDir,
-          gitdir: destGitdir,
+          init: true,
+          cache: {},
+          autoDetectConfig: true,
+        })
+        const destGitdir = await destRepo.getGitdir()
+        
+        await nodeFs.writeFile(join(destDir, 'file2.txt'), 'different content')
+        await add({ repo: destRepo, filepath: 'file2.txt' })
+        await commit({
+          repo: destRepo,
           message: 'Different commit',
           author: { name: 'Test', email: 'test@example.com' },
         })
@@ -507,11 +511,11 @@ test('unbundle', async (t) => {
         // Create backends for destination repo
         const destGitBackend = createBackend({
           type: 'filesystem',
-          fs: sourceFs,
+          fs: sourceRepo.fs,
           gitdir: destGitdir,
         })
         const destWorktree = createGitWorktreeBackend({
-          fs: sourceFs,
+          fs: sourceRepo.fs,
           dir: destDir,
         })
         
@@ -541,15 +545,15 @@ test('unbundle', async (t) => {
   })
   
   await t.test('throws error when bundle file does not exist', async () => {
-    const { fs, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const gitdir = await repo.getGitdir()
     
     const bundlePath = join(os.tmpdir(), `bundle-nonexistent-${Date.now()}.bundle`)
     
     await assert.rejects(
       async () => {
         await unbundle({
-          fs,
-          gitdir,
+          repo,
           filepath: bundlePath,
         })
       },
@@ -562,15 +566,15 @@ test('unbundle', async (t) => {
 
 test('bundle format parsing', async (t) => {
   await t.test('parses bundle header correctly', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-bundle')
+    const { repo } = await makeFixture('test-bundle', { init: true })
+    const dir = (await repo.getDir())!
+    const gitdir = await repo.getGitdir()
     
     // Create a commit
     await nodeFs.writeFile(join(dir, 'file1.txt'), 'content1')
-    await add({ fs, dir, gitdir, filepath: 'file1.txt' })
+    await add({ repo, filepath: 'file1.txt' })
     await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'First commit',
       author: { name: 'Test', email: 'test@example.com' },
     })
@@ -579,13 +583,12 @@ test('bundle format parsing', async (t) => {
     const bundlePath = join(os.tmpdir(), `bundle-parse-${Date.now()}.bundle`)
     try {
       await bundle({
-        fs,
-        gitdir,
+        repo,
         filepath: bundlePath,
       })
       
       // Read and parse bundle
-      const bundleData = await fs.read(bundlePath)
+      const bundleData = await repo.fs.read(bundlePath)
       const buffer = UniversalBuffer.isBuffer(bundleData) ? bundleData : UniversalBuffer.from(bundleData)
       
       const { parseBundleHeader, extractPackfileFromBundle } = await import('@awesome-os/universal-git-src/git/bundle/parseBundle.ts')

@@ -158,6 +158,27 @@ export interface GitWorktreeBackend {
   getDirectory?(): string | null
 
   // ============================================================================
+  // Worktree Config Operations
+  // ============================================================================
+
+  /**
+   * Read worktree config (worktree-specific config that overrides repository config)
+   * @param gitdir - Git directory path (can be worktree gitdir or main gitdir)
+   * @returns ConfigObject if worktree config exists, null otherwise
+   */
+  readWorktreeConfig(gitdir: string): Promise<import('../../core-utils/ConfigParser.ts').ConfigObject | null>
+
+  /**
+   * Write worktree config (worktree-specific config that overrides repository config)
+   * @param gitdir - Git directory path (can be worktree gitdir or main gitdir)
+   * @param config - Config object to write
+   */
+  writeWorktreeConfig(
+    gitdir: string,
+    config: import('../../core-utils/ConfigParser.ts').ConfigObject
+  ): Promise<void>
+
+  // ============================================================================
   // Sparse Checkout Operations
   // ============================================================================
 

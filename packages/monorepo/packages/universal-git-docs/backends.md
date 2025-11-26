@@ -250,11 +250,18 @@ All backends provide universal interface methods that work regardless of impleme
 - `readMultiPackIndex()` / `writeMultiPackIndex()` - Multi-pack index
 
 ### References
-- `readRef()` / `writeRef()` - Individual refs
-- `readPackedRefs()` / `writePackedRefs()` - Packed refs
-- `listRefs()` - List all refs
+- `readRef(ref: string, depth?: number, cache?: Record<string, unknown>): Promise<string | null>` - Read a ref (handles worktree context automatically)
+- `writeRef(ref: string, value: string, skipReflog?: boolean, cache?: Record<string, unknown>): Promise<void>` - Write a ref (handles worktree context automatically)
+- `writeSymbolicRef(ref: string, value: string, oldOid?: string, cache?: Record<string, unknown>): Promise<void>` - Write a symbolic ref (handles worktree context automatically)
+- `readSymbolicRef(ref: string): Promise<string | null>` - Read a symbolic ref (handles worktree context automatically)
+- `deleteRef(ref: string, cache?: Record<string, unknown>): Promise<void>` - Delete a ref (handles worktree context automatically)
+- `listRefs(filepath: string): Promise<string[]>` - List refs in a directory
 
-**Note**: While backends provide ref methods, ref operations should go through centralized functions in `src/git/refs/` to ensure reflog tracking and locking. See [Ref Writing Architecture](./ARCHITECTURE_REF_WRITING.md).
+**Worktree Context Handling**: All ref operations automatically handle worktree context:
+- **HEAD** and worktree-specific refs go to the worktree gitdir (`.git/worktrees/<name>/HEAD`)
+- **Other refs** (branches, tags, etc.) go to the main gitdir (`.git/refs/heads/`, `.git/refs/tags/`, etc.)
+
+**Note**: Backend ref methods internally use centralized functions in `src/git/refs/` to ensure reflog tracking and locking. The backend handles all details (fs, gitdir, objectFormat, worktree context) - you don't need to pass these parameters. See [Ref Writing Architecture](./ARCHITECTURE_REF_WRITING.md).
 
 ### Reflogs
 - `readReflog()` / `writeReflog()` - Reflog entries

@@ -19,8 +19,10 @@ test('checkout', async (t) => {
   await t.test('ok:checkout-branch', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, gitdir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
     const onPostCheckout: any[] = []
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     
     await checkout({
       repo,
@@ -30,7 +32,7 @@ test('checkout', async (t) => {
       },
     })
     
-    const files = await fs.readdir(dir)
+    const files = await repo.fs.readdir(dir)
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('.babelrc'), 'Should have .babelrc')
     assert.ok(files.includes('src'), 'Should have src directory')
@@ -40,8 +42,8 @@ test('checkout', async (t) => {
     assert.ok(index.length > 0, 'Should have files in index')
     assert.ok(index.includes('src/commands/checkout.js'), 'Should have checkout.js')
     
-    const sha = await fs.read(`${gitdir}/HEAD`, 'utf8')
-    assert.strictEqual(sha, 'ref: refs/heads/test-branch\n', 'HEAD should point to test-branch')
+    const headRef = await repo.gitBackend!.readSymbolicRef('HEAD')
+    assert.strictEqual(headRef, 'refs/heads/test-branch', 'HEAD should point to test-branch')
     
     assert.strictEqual(onPostCheckout.length, 1, 'onPostCheckout should be called once')
     assert.strictEqual(onPostCheckout[0].newHead, 'e10ebb90d03eaacca84de1af0a59b444232da99e', 'newHead should match')
@@ -50,7 +52,7 @@ test('checkout', async (t) => {
     
     // Verify HEAD reflog entry was created
     await verifyReflogEntry({
-      fs,
+      fs: repo.fs,
       gitdir,
       ref: 'HEAD',
       expectedOldOid: '0f55956cbd50de80c2f86e6e565f00c92ce86631',
@@ -63,37 +65,39 @@ test('checkout', async (t) => {
   await t.test('ok:checkout-tag', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, gitdir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
     
     await checkout({
       repo,
       ref: 'v1.0.0',
     })
     
-    const files = await fs.readdir(dir)
+    const files = await repo.fs.readdir(dir)
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('src'), 'Should have src directory')
     
-    const sha = await fs.read(`${gitdir}/HEAD`, 'utf8')
-    assert.strictEqual(sha, 'e10ebb90d03eaacca84de1af0a59b444232da99e\n', 'HEAD should point to tag commit')
+    const headOid = await repo.gitBackend!.readRef('HEAD')
+    assert.strictEqual(headOid, 'e10ebb90d03eaacca84de1af0a59b444232da99e', 'HEAD should point to tag commit')
   })
 
   await t.test('ok:checkout-sha', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, gitdir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
     
     await checkout({
       repo,
       ref: 'v1.0.0',
     })
     
-    const files = await fs.readdir(dir)
+    const files = await repo.fs.readdir(dir)
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('src'), 'Should have src directory')
     
-    const sha = await fs.read(`${gitdir}/HEAD`, 'utf8')
-    assert.strictEqual(sha, 'e10ebb90d03eaacca84de1af0a59b444232da99e\n', 'HEAD should point to SHA')
+    const headOid = await repo.gitBackend!.readRef('HEAD')
+    assert.strictEqual(headOid, 'e10ebb90d03eaacca84de1af0a59b444232da99e', 'HEAD should point to SHA')
   })
 
   await t.test('error:unfetched-branch', async () => {
@@ -124,13 +128,15 @@ test('checkout', async (t) => {
   await t.test('behavior:file-permissions', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, gitdir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     // Create branch without checking it out (we'll use worktree instead)
     await branch({ repo, ref: 'other', checkout: false })
     
     // Verify branch creation reflog
     await verifyReflogEntry({
-      fs,
+      fs: repo.fs,
       gitdir,
       ref: 'refs/heads/other',
       expectedMessage: 'branch',
@@ -145,12 +151,12 @@ test('checkout', async (t) => {
       await worktree({ repo, add: true, path: testBranchWorktreePath, ref: 'test-branch' })
       
       // Create files in the worktree
-      await fs.write(`${testBranchWorktreePath}/regular-file.txt`, 'regular file', { mode: 0o666 })
-      await fs.write(`${testBranchWorktreePath}/executable-file.sh`, 'executable file', { mode: 0o777 })
+      await repo.fs.write(`${testBranchWorktreePath}/regular-file.txt`, 'regular file', { mode: 0o666 })
+      await repo.fs.write(`${testBranchWorktreePath}/executable-file.sh`, 'executable file', { mode: 0o777 })
       
       // Capture expected file modes from worktree
-      const regularFileStat = await fs.lstat(`${testBranchWorktreePath}/regular-file.txt`)
-      const executableFileStat = await fs.lstat(`${testBranchWorktreePath}/executable-file.sh`)
+      const regularFileStat = await repo.fs.lstat(`${testBranchWorktreePath}/regular-file.txt`)
+      const executableFileStat = await repo.fs.lstat(`${testBranchWorktreePath}/executable-file.sh`)
       assert.ok(regularFileStat, 'regular-file.txt stat should not be null')
       assert.ok(executableFileStat, 'executable-file.sh stat should not be null')
       const expectedRegularFileMode = regularFileStat.mode
@@ -159,9 +165,9 @@ test('checkout', async (t) => {
       // Stage files in worktree
       // Create worktree backend for the worktree path
       const { createGitWorktreeBackend } = await import('@awesome-os/universal-git-src/git/worktree/index.ts')
-      const worktreeBackend = createGitWorktreeBackend({ fs, dir: testBranchWorktreePath })
+      const worktreeBackend = createGitWorktreeBackend({ fs: repo.fs, dir: testBranchWorktreePath })
       const { createBackend } = await import('@awesome-os/universal-git-src/backends/index.ts')
-      const gitBackend = createBackend({ type: 'filesystem', fs, gitdir })
+      const gitBackend = createBackend({ type: 'filesystem', fs: repo.fs, gitdir })
       
       await add({ gitBackend, worktree: worktreeBackend, filepath: 'regular-file.txt' })
       await add({ gitBackend, worktree: worktreeBackend, filepath: 'executable-file.sh' })
@@ -177,7 +183,7 @@ test('checkout', async (t) => {
       
       // Verify the branch ref exists and points to the commit
       // Note: The branch might have existed in the fixture, so we check it was updated
-      const branchOid = await resolveRef({ fs, gitdir, ref: 'refs/heads/test-branch' })
+      const branchOid = await resolveRef({ repo, ref: 'refs/heads/test-branch' })
       // The branch should point to our new commit
       assert.strictEqual(branchOid, commitOid, `Branch should point to the commit. Branch OID: ${branchOid}, Commit OID: ${commitOid}`)
       
@@ -189,8 +195,8 @@ test('checkout', async (t) => {
       })
       
       // Verify files exist and have correct permissions in main worktree
-      const actualRegularFileStat = await fs.lstat(`${dir}/regular-file.txt`)
-      const actualExecutableFileStat = await fs.lstat(`${dir}/executable-file.sh`)
+      const actualRegularFileStat = await repo.fs.lstat(`${dir}/regular-file.txt`)
+      const actualExecutableFileStat = await repo.fs.lstat(`${dir}/executable-file.sh`)
       
       assert.ok(actualRegularFileStat, 'regular-file.txt should exist')
       assert.ok(actualExecutableFileStat, 'executable-file.sh should exist')
@@ -201,20 +207,21 @@ test('checkout', async (t) => {
       assert.strictEqual(actualRegularFileMode, expectedRegularFileMode, 'Regular file mode should be preserved')
       assert.strictEqual(actualExecutableFileMode, expectedExecutableFileMode, 'Executable file mode should be preserved')
     } finally {
-      await cleanupWorktrees(fs, dir, gitdir)
+      await cleanupWorktrees(repo.fs, dir, gitdir)
     }
   })
 
   await t.test('behavior:changing-file-permissions', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
 
-    await fs.write(`${dir}/regular-file.txt`, 'regular file', { mode: 0o666 })
-    await fs.write(`${dir}/executable-file.sh`, 'executable file', { mode: 0o777 })
+    await repo.fs.write(`${dir}/regular-file.txt`, 'regular file', { mode: 0o666 })
+    await repo.fs.write(`${dir}/executable-file.sh`, 'executable file', { mode: 0o777 })
     
-    const regularFileStat = await fs.lstat(`${dir}/regular-file.txt`)
-    const executableFileStat = await fs.lstat(`${dir}/executable-file.sh`)
+    const regularFileStat = await repo.fs.lstat(`${dir}/regular-file.txt`)
+    const executableFileStat = await repo.fs.lstat(`${dir}/executable-file.sh`)
     assert.ok(regularFileStat, 'regular-file.txt stat should not be null')
     assert.ok(executableFileStat, 'executable-file.sh stat should not be null')
     const { mode: expectedRegularFileMode } = regularFileStat
@@ -224,7 +231,7 @@ test('checkout', async (t) => {
       repo,
       ref: 'regular-file',
     })
-    const helloStat1 = await fs.lstat(`${dir}/hello.sh`)
+    const helloStat1 = await repo.fs.lstat(`${dir}/hello.sh`)
     assert.ok(helloStat1, 'hello.sh stat should not be null')
     const { mode: actualRegularFileMode } = helloStat1
     assert.strictEqual(actualRegularFileMode, expectedRegularFileMode, 'File mode should match')
@@ -233,7 +240,7 @@ test('checkout', async (t) => {
       repo,
       ref: 'executable-file',
     })
-    const helloStat2 = await fs.lstat(`${dir}/hello.sh`)
+    const helloStat2 = await repo.fs.lstat(`${dir}/hello.sh`)
     assert.ok(helloStat2, 'hello.sh stat should not be null')
     const { mode: actualExecutableFileMode } = helloStat2
     assert.strictEqual(actualExecutableFileMode, expectedExecutableFileMode, 'Executable mode should match')
@@ -242,7 +249,8 @@ test('checkout', async (t) => {
   await t.test('ok:directories-filepaths', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
 
     await checkout({
       repo,
@@ -250,7 +258,7 @@ test('checkout', async (t) => {
       filepaths: ['src/models', 'test'],
     })
     
-    const files = await fs.readdir(dir)
+    const files = await repo.fs.readdir(dir)
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('src'), 'Should have src directory')
     assert.ok(files.includes('test'), 'Should have test directory')
@@ -264,7 +272,8 @@ test('checkout', async (t) => {
   await t.test('ok:files-filepaths', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
 
     await checkout({
       repo,
@@ -272,7 +281,7 @@ test('checkout', async (t) => {
       filepaths: ['src/models/GitBlob.js', 'src/utils/write.js'],
     })
     
-    const files = await fs.readdir(dir)
+    const files = await repo.fs.readdir(dir)
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('src'), 'Should have src directory')
     assert.strictEqual(files.length, 1, 'Should only have src')
@@ -285,9 +294,10 @@ test('checkout', async (t) => {
   await t.test('error:detects-conflicts', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
 
-    await fs.write(`${dir}/README.md`, 'Hello world', 'utf8')
+    await repo.fs.write(`${dir}/README.md`, 'Hello world', 'utf8')
     
     let error: unknown = null
     try {
@@ -309,9 +319,10 @@ test('checkout', async (t) => {
   await t.test('behavior:ignore-conflicts-dryRun', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
 
-    await fs.write(`${dir}/README.md`, 'Hello world', 'utf8')
+    await repo.fs.write(`${dir}/README.md`, 'Hello world', 'utf8')
     
     let error: unknown = null
     try {
@@ -326,16 +337,17 @@ test('checkout', async (t) => {
     }
     
     assert.strictEqual(error, null, 'Should not throw error with force and dryRun')
-    const content = await fs.read(`${dir}/README.md`, 'utf8')
+    const content = await repo.fs.read(`${dir}/README.md`, 'utf8')
     assert.strictEqual(content, 'Hello world', 'File should not be changed in dry run')
   })
 
   await t.test('param:force-ignore-conflicts', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
 
-    await fs.write(`${dir}/README.md`, 'Hello world', 'utf8')
+    await repo.fs.write(`${dir}/README.md`, 'Hello world', 'utf8')
     
     let error: unknown = null
     try {
@@ -349,21 +361,22 @@ test('checkout', async (t) => {
     }
     
     assert.strictEqual(error, null, 'Should not throw error with force')
-    const content = await fs.read(`${dir}/README.md`, 'utf8')
+    const content = await repo.fs.read(`${dir}/README.md`, 'utf8')
     assert.notStrictEqual(content, 'Hello world', 'File should be changed when force is true')
   })
 
   await t.test('behavior:restore-to-HEAD', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
 
     await checkout({
       repo,
       ref: 'test-branch',
     })
 
-    await fs.write(`${dir}/README.md`, 'Hello world', 'utf8')
+    await repo.fs.write(`${dir}/README.md`, 'Hello world', 'utf8')
     
     let error: unknown = null
     try {
@@ -376,14 +389,15 @@ test('checkout', async (t) => {
     }
     
     assert.strictEqual(error, null, 'Should not throw error')
-    const content = await fs.read(`${dir}/README.md`, 'utf8')
+    const content = await repo.fs.read(`${dir}/README.md`, 'utf8')
     assert.notStrictEqual(content, 'Hello world', 'File should be restored to HEAD')
   })
 
   await t.test('behavior:no-delete-other-files', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
 
     await checkout({
       repo,
@@ -395,7 +409,7 @@ test('checkout', async (t) => {
       ref: 'v1.0.0',
     })
     
-    const files = await fs.readdir(dir)
+    const files = await repo.fs.readdir(dir)
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('README.md'), 'README.md should still exist')
   })
@@ -450,7 +464,8 @@ test('checkout', async (t) => {
   await t.test('behavior:no-delete-ignored-files', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
     // Checkout the test-branch
     await checkout({
       repo,
@@ -465,12 +480,12 @@ test('checkout', async (t) => {
     })
     
     // Add a regular file to the ignored dir
-    await fs.write(`${dir}/ignored/regular-file.txt`, 'regular file', { mode: 0o666 })
+    await repo.fs.write(`${dir}/ignored/regular-file.txt`, 'regular file', { mode: 0o666 })
 
     // Add and commit a gitignore, ignoring everything but itself
     const gitignoreContent = `*
 !.gitignore`
-    await fs.write(`${dir}/ignored/.gitignore`, gitignoreContent, { mode: 0o666 })
+    await repo.fs.write(`${dir}/ignored/.gitignore`, gitignoreContent, { mode: 0o666 })
     await add({ repo, filepath: 'ignored/.gitignore' })
 
     await commit({
@@ -486,7 +501,7 @@ test('checkout', async (t) => {
       ref: 'v1.0.0',
     })
     
-    const files = await fs.readdir(`${dir}/ignored`)
+    const files = await repo.fs.readdir(`${dir}/ignored`)
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('regular-file.txt'), 'regular-file.txt should still exist')
     assert.strictEqual(files.includes('.gitignore'), false, '.gitignore should be removed (was tracked)')
@@ -495,23 +510,26 @@ test('checkout', async (t) => {
   await t.test('param:repo-provided', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, gitdir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
     
     await repo.checkout('test-branch', {})
     
-    const files = await fs.readdir(dir)
+    const files = await repo.fs.readdir(dir)
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('.babelrc'), 'Should have .babelrc')
     assert.ok(files.includes('src'), 'Should have src directory')
     
-    const sha = await fs.read(`${gitdir}/HEAD`, 'utf8')
-    assert.strictEqual(sha, 'ref: refs/heads/test-branch\n', 'HEAD should point to test-branch')
+    const headRef = await repo.gitBackend!.readSymbolicRef('HEAD')
+    assert.strictEqual(headRef, 'refs/heads/test-branch', 'HEAD should point to test-branch')
   })
 
   await t.test('param:repo-or-fs-missing', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { dir, gitdir } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     
     await assert.rejects(
@@ -532,7 +550,8 @@ test('checkout', async (t) => {
   await t.test('param:dir-missing', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, gitdir } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const gitdir = await repo.getGitdir()
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     
     await assert.rejects(
@@ -540,7 +559,7 @@ test('checkout', async (t) => {
         // @ts-ignore - testing error case (dir is intentionally missing)
         // When dir is missing and repo is not provided, checkout requires dir parameter
         await checkout({
-          fs,
+          fs: repo.fs,
           gitdir,
           ref: 'test-branch',
         } as any)
@@ -554,7 +573,8 @@ test('checkout', async (t) => {
   await t.test('param:noUpdateHead-default', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, gitdir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
     
     // First checkout a branch to set up state
     await checkout({
@@ -563,7 +583,7 @@ test('checkout', async (t) => {
     })
     
     // Modify a file
-    await fs.write(`${dir}/README.md`, 'modified', 'utf8')
+    await repo.fs.write(`${dir}/README.md`, 'modified', 'utf8')
     
     // Checkout with no ref (should default noUpdateHead to true)
     await checkout({
@@ -573,17 +593,18 @@ test('checkout', async (t) => {
     })
     
     // File should be restored but HEAD should not change
-    const content = await fs.read(`${dir}/README.md`, 'utf8')
+    const content = await repo.fs.read(`${dir}/README.md`, 'utf8')
     assert.notStrictEqual(content, 'modified', 'File should be restored')
     
-    const sha = await fs.read(`${gitdir}/HEAD`, 'utf8')
-    assert.strictEqual(sha, 'ref: refs/heads/test-branch\n', 'HEAD should still point to test-branch')
+    const headRef = await repo.gitBackend!.readSymbolicRef('HEAD')
+    assert.strictEqual(headRef, 'refs/heads/test-branch', 'HEAD should still point to test-branch')
   })
 
   await t.test('param:noUpdateHead-false', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
     // First checkout a branch to set up state
     await checkout({
       repo,
@@ -591,7 +612,7 @@ test('checkout', async (t) => {
     })
     
     // Modify a file
-    await fs.write(`${dir}/README.md`, 'modified', 'utf8')
+    await repo.fs.write(`${dir}/README.md`, 'modified', 'utf8')
     
     // Checkout with no ref but noUpdateHead explicitly false
     await checkout({
@@ -602,14 +623,15 @@ test('checkout', async (t) => {
     })
     
     // File should be restored
-    const content = await fs.read(`${dir}/README.md`, 'utf8')
+    const content = await repo.fs.read(`${dir}/README.md`, 'utf8')
     assert.notStrictEqual(content, 'modified', 'File should be restored')
   })
 
   await t.test('param:ref-defaults-HEAD', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
     // First checkout a branch to set up state
     await checkout({
       repo,
@@ -617,7 +639,7 @@ test('checkout', async (t) => {
     })
     
     // Modify a file
-    await fs.write(`${dir}/README.md`, 'modified', 'utf8')
+    await repo.fs.write(`${dir}/README.md`, 'modified', 'utf8')
     
     // Checkout with no ref parameter (should default to HEAD)
     await checkout({
@@ -627,7 +649,7 @@ test('checkout', async (t) => {
     })
     
     // File should be restored to HEAD state
-    const content = await fs.read(`${dir}/README.md`, 'utf8')
+    const content = await repo.fs.read(`${dir}/README.md`, 'utf8')
     assert.notStrictEqual(content, 'modified', 'File should be restored to HEAD')
   })
 
@@ -653,14 +675,15 @@ test('checkout', async (t) => {
   await t.test('param:repo-and-filepaths', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
     
     await checkout({
       repo,
       ref: 'v1.0.0',
     })
     
-    const files = await fs.readdir(dir)
+    const files = await repo.fs.readdir(dir)
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('src'), 'Should have src directory')
     assert.ok(files.includes('test'), 'Should have test directory')
@@ -669,7 +692,8 @@ test('checkout', async (t) => {
   await t.test('param:repo-uses-dir', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
     
     // Checkout without providing dir (should use repo.dir)
     await checkout({
@@ -677,7 +701,7 @@ test('checkout', async (t) => {
       ref: 'v1.0.0',
     })
     
-    const files = await fs.readdir(dir)
+    const files = await repo.fs.readdir(dir)
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('.babelrc'), 'Should have .babelrc')
     assert.ok(files.includes('src'), 'Should have src directory')
@@ -686,14 +710,15 @@ test('checkout', async (t) => {
   await t.test('param:nonBlocking-batchSize', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
 
     await checkout({
       repo,
       ref: 'v1.0.0',
     })
     
-    const files = await fs.readdir(dir)
+    const files = await repo.fs.readdir(dir)
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('.babelrc'), 'Should have .babelrc')
     assert.ok(files.includes('src'), 'Should have src directory')
@@ -702,14 +727,15 @@ test('checkout', async (t) => {
   await t.test('param:track-false', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
 
     await checkout({
       repo,
       ref: 'test-branch',
     })
     
-    const files = await fs.readdir(dir)
+    const files = await repo.fs.readdir(dir)
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('.babelrc'), 'Should have .babelrc')
     assert.ok(files.includes('src'), 'Should have src directory')
@@ -718,9 +744,10 @@ test('checkout', async (t) => {
   await t.test('param:noCheckout-true', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { fs, dir, gitdir, repo } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
+    const dir = await repo.getDir()!
     // Get initial state
-    const initialFiles = await fs.readdir(dir)
+    const initialFiles = await repo.fs.readdir(dir)
     
     await checkout({
       repo,
@@ -729,11 +756,11 @@ test('checkout', async (t) => {
     })
     
     // HEAD should be updated but working directory should not change
-    const sha = await fs.read(`${gitdir}/HEAD`, 'utf8')
-    assert.strictEqual(sha, 'ref: refs/heads/test-branch\n', 'HEAD should point to test-branch')
+    const headRef = await repo.gitBackend!.readSymbolicRef('HEAD')
+    assert.strictEqual(headRef, 'refs/heads/test-branch', 'HEAD should point to test-branch')
     
     // Working directory should remain unchanged
-    const files = await fs.readdir(dir)
+    const files = await repo.fs.readdir(dir)
     assert.ok(files, 'Files should not be null')
     assert.ok(initialFiles, 'Initial files should not be null')
     assert.deepStrictEqual(files.sort(), initialFiles.sort(), 'Working directory should not change')

@@ -491,10 +491,24 @@ export class FilesystemBackend implements GitBackend {
   async readRef(ref: string, depth: number = 5, cache: Record<string, unknown> = {}): Promise<string | null> {
     const { readRef } = await import('../git/refs/readRef.ts')
     const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
-    const objectFormat = await detectObjectFormat(this.fs, this.gitdir, cache)
+    const { isWorktreeGitdir, getMainGitdir, isWorktreeSpecificRef } = await import('../git/refs/worktreeRefs.ts')
+    
+    // Handle worktree context: HEAD goes to worktree gitdir, other refs go to main gitdir
+    let effectiveGitdir = this.gitdir
+    if (isWorktreeGitdir(this.gitdir)) {
+      if (isWorktreeSpecificRef(ref)) {
+        // HEAD and worktree-specific refs go to worktree gitdir
+        effectiveGitdir = this.gitdir
+      } else {
+        // Other refs go to main gitdir
+        effectiveGitdir = await getMainGitdir({ fs: this.fs, worktreeGitdir: this.gitdir })
+      }
+    }
+    
+    const objectFormat = await detectObjectFormat(this.fs, effectiveGitdir, cache)
     return readRef({
       fs: this.fs,
-      gitdir: this.gitdir,
+      gitdir: effectiveGitdir,
       ref,
       depth,
       objectFormat,
@@ -505,10 +519,24 @@ export class FilesystemBackend implements GitBackend {
   async writeRef(ref: string, value: string, skipReflog: boolean = false, cache: Record<string, unknown> = {}): Promise<void> {
     const { writeRef } = await import('../git/refs/writeRef.ts')
     const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
-    const objectFormat = await detectObjectFormat(this.fs, this.gitdir, cache)
+    const { isWorktreeGitdir, getMainGitdir, isWorktreeSpecificRef } = await import('../git/refs/worktreeRefs.ts')
+    
+    // Handle worktree context: HEAD goes to worktree gitdir, other refs go to main gitdir
+    let effectiveGitdir = this.gitdir
+    if (isWorktreeGitdir(this.gitdir)) {
+      if (isWorktreeSpecificRef(ref)) {
+        // HEAD and worktree-specific refs go to worktree gitdir
+        effectiveGitdir = this.gitdir
+      } else {
+        // Other refs go to main gitdir
+        effectiveGitdir = await getMainGitdir({ fs: this.fs, worktreeGitdir: this.gitdir })
+      }
+    }
+    
+    const objectFormat = await detectObjectFormat(this.fs, effectiveGitdir, cache)
     return writeRef({
       fs: this.fs,
-      gitdir: this.gitdir,
+      gitdir: effectiveGitdir,
       ref,
       value,
       objectFormat,
@@ -519,10 +547,24 @@ export class FilesystemBackend implements GitBackend {
   async writeSymbolicRef(ref: string, value: string, oldOid?: string, cache: Record<string, unknown> = {}): Promise<void> {
     const { writeSymbolicRef } = await import('../git/refs/writeRef.ts')
     const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
-    const objectFormat = await detectObjectFormat(this.fs, this.gitdir, cache)
+    const { isWorktreeGitdir, getMainGitdir, isWorktreeSpecificRef } = await import('../git/refs/worktreeRefs.ts')
+    
+    // Handle worktree context: HEAD goes to worktree gitdir, other refs go to main gitdir
+    let effectiveGitdir = this.gitdir
+    if (isWorktreeGitdir(this.gitdir)) {
+      if (isWorktreeSpecificRef(ref)) {
+        // HEAD and worktree-specific refs go to worktree gitdir
+        effectiveGitdir = this.gitdir
+      } else {
+        // Other refs go to main gitdir
+        effectiveGitdir = await getMainGitdir({ fs: this.fs, worktreeGitdir: this.gitdir })
+      }
+    }
+    
+    const objectFormat = await detectObjectFormat(this.fs, effectiveGitdir, cache)
     return writeSymbolicRef({
       fs: this.fs,
-      gitdir: this.gitdir,
+      gitdir: effectiveGitdir,
       ref,
       value,
       oldOid,
@@ -532,18 +574,46 @@ export class FilesystemBackend implements GitBackend {
 
   async readSymbolicRef(ref: string): Promise<string | null> {
     const { readSymbolicRef } = await import('../git/refs/readRef.ts')
+    const { isWorktreeGitdir, getMainGitdir, isWorktreeSpecificRef } = await import('../git/refs/worktreeRefs.ts')
+    
+    // Handle worktree context: HEAD goes to worktree gitdir, other refs go to main gitdir
+    let effectiveGitdir = this.gitdir
+    if (isWorktreeGitdir(this.gitdir)) {
+      if (isWorktreeSpecificRef(ref)) {
+        // HEAD and worktree-specific refs go to worktree gitdir
+        effectiveGitdir = this.gitdir
+      } else {
+        // Other refs go to main gitdir
+        effectiveGitdir = await getMainGitdir({ fs: this.fs, worktreeGitdir: this.gitdir })
+      }
+    }
+    
     return readSymbolicRef({
       fs: this.fs,
-      gitdir: this.gitdir,
+      gitdir: effectiveGitdir,
       ref,
     })
   }
 
   async deleteRef(ref: string, cache: Record<string, unknown> = {}): Promise<void> {
     const { deleteRef } = await import('../git/refs/deleteRef.ts')
+    const { isWorktreeGitdir, getMainGitdir, isWorktreeSpecificRef } = await import('../git/refs/worktreeRefs.ts')
+    
+    // Handle worktree context: HEAD goes to worktree gitdir, other refs go to main gitdir
+    let effectiveGitdir = this.gitdir
+    if (isWorktreeGitdir(this.gitdir)) {
+      if (isWorktreeSpecificRef(ref)) {
+        // HEAD and worktree-specific refs go to worktree gitdir
+        effectiveGitdir = this.gitdir
+      } else {
+        // Other refs go to main gitdir
+        effectiveGitdir = await getMainGitdir({ fs: this.fs, worktreeGitdir: this.gitdir })
+      }
+    }
+    
     return deleteRef({
       fs: this.fs,
-      gitdir: this.gitdir,
+      gitdir: effectiveGitdir,
       ref,
     })
   }
@@ -754,6 +824,38 @@ export class FilesystemBackend implements GitBackend {
     } catch {
       return []
     }
+  }
+
+  async createWorktreeGitdir(name: string, worktreeDir: string): Promise<import('./GitBackend.ts').WorktreeGitdir> {
+    // Create worktree gitdir: <repo>/.git/worktrees/<name>
+    const worktreeGitdir = join(this.gitdir, 'worktrees', name)
+    await this.fs.mkdir(worktreeGitdir, { recursive: true })
+    
+    // Write .git/worktrees/<name>/gitdir file containing absolute path to worktree directory
+    // This is the reverse mapping that Git uses to find worktrees
+    // This is part of the gitdir structure, so it's handled by GitBackend
+    const worktreeGitdirFile = join(worktreeGitdir, 'gitdir')
+    await this.fs.write(worktreeGitdirFile, UniversalBuffer.from(worktreeDir, 'utf8'))
+    
+    // Return opaque interface - the actual path is hidden
+    return {
+      getPath: () => worktreeGitdir,
+    }
+  }
+
+  async writeWorktreeHEAD(worktreeGitdir: import('./GitBackend.ts').WorktreeGitdir, value: string): Promise<void> {
+    // Write HEAD in worktree gitdir
+    const worktreeGitdirPath = worktreeGitdir.getPath()
+    const { writeRef } = await import('../git/refs/writeRef.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const objectFormat = await detectObjectFormat(this.fs, worktreeGitdirPath, {})
+    await writeRef({
+      fs: this.fs,
+      gitdir: worktreeGitdirPath,
+      ref: 'HEAD',
+      value: value.trim(),
+      objectFormat,
+    })
   }
 
   async readShallow(): Promise<string | null> {

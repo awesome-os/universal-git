@@ -438,6 +438,23 @@ export class GitWorktreeFs implements GitWorktreeBackend {
       mergeDriver: options?.mergeDriver,
     })
   }
+
+  // ============================================================================
+  // Worktree Config Operations
+  // ============================================================================
+
+  async readWorktreeConfig(gitdir: string): Promise<import('../../../core-utils/ConfigParser.ts').ConfigObject | null> {
+    const { readWorktreeConfig } = await import('../../config/worktreeConfig.ts')
+    return readWorktreeConfig({ fs: this.fs, gitdir })
+  }
+
+  async writeWorktreeConfig(
+    gitdir: string,
+    config: import('../../../core-utils/ConfigParser.ts').ConfigObject
+  ): Promise<void> {
+    const { writeWorktreeConfig } = await import('../../config/worktreeConfig.ts')
+    return writeWorktreeConfig({ fs: this.fs, gitdir, config })
+  }
 }
 
 

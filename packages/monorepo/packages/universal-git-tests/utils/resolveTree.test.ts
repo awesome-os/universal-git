@@ -8,21 +8,19 @@ import { NotFoundError } from '@awesome-os/universal-git-src/errors/NotFoundErro
 
 test('resolveTree', async (t) => {
   await t.test('ok:resolves-tree', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = (await repo.getDir())!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const blobOid = await writeBlob({
-      fs,
-      dir,
-      gitdir,
+      repo,
       blob: Buffer.from('content'),
       cache,
     })
     
     const treeOid = await writeTree({
-      fs,
-      dir,
-      gitdir,
+      repo,
       tree: [
         { path: 'file.txt', mode: '100644', oid: blobOid, type: 'blob' },
       ],
@@ -30,7 +28,7 @@ test('resolveTree', async (t) => {
     })
     
     const result = await resolveTree({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: treeOid,
@@ -43,13 +41,14 @@ test('resolveTree', async (t) => {
   })
 
   await t.test('edge:empty-tree', async () => {
-    const { fs, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const emptyTreeOid = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
     
     const result = await resolveTree({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: emptyTreeOid,
@@ -61,13 +60,14 @@ test('resolveTree', async (t) => {
   })
 
   await t.test('edge:SHA256-empty-tree', async () => {
-    const { fs, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const emptyTreeOid = '0'.repeat(64)
     
     const result = await resolveTree({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: emptyTreeOid,
@@ -80,21 +80,19 @@ test('resolveTree', async (t) => {
   })
 
   await t.test('ok:resolves-commit-tree', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = (await repo.getDir())!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const blobOid = await writeBlob({
-      fs,
-      dir,
-      gitdir,
+      repo,
       blob: Buffer.from('content'),
       cache,
     })
     
     const treeOid = await writeTree({
-      fs,
-      dir,
-      gitdir,
+      repo,
       tree: [
         { path: 'file.txt', mode: '100644', oid: blobOid, type: 'blob' },
       ],
@@ -102,9 +100,7 @@ test('resolveTree', async (t) => {
     })
     
     const commitOid = await writeCommit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       commit: {
         tree: treeOid,
         parent: [],
@@ -116,7 +112,7 @@ test('resolveTree', async (t) => {
     })
     
     const result = await resolveTree({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: commitOid,
@@ -128,21 +124,19 @@ test('resolveTree', async (t) => {
   })
 
   await t.test('ok:peels-tag-to-tree', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = (await repo.getDir())!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const blobOid = await writeBlob({
-      fs,
-      dir,
-      gitdir,
+      repo,
       blob: Buffer.from('content'),
       cache,
     })
     
     const treeOid = await writeTree({
-      fs,
-      dir,
-      gitdir,
+      repo,
       tree: [
         { path: 'file.txt', mode: '100644', oid: blobOid, type: 'blob' },
       ],
@@ -150,9 +144,7 @@ test('resolveTree', async (t) => {
     })
     
     const tagOid = await writeTag({
-      fs,
-      dir,
-      gitdir,
+      repo,
       tag: {
         object: treeOid,
         type: 'tree',
@@ -164,7 +156,7 @@ test('resolveTree', async (t) => {
     })
     
     const result = await resolveTree({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: tagOid,
@@ -176,13 +168,13 @@ test('resolveTree', async (t) => {
   })
 
   await t.test('error:ObjectTypeError-non-tree', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = (await repo.getDir())!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const blobOid = await writeBlob({
-      fs,
-      dir,
-      gitdir,
+      repo,
       blob: Buffer.from('content'),
       cache,
     })
@@ -190,7 +182,7 @@ test('resolveTree', async (t) => {
     await assert.rejects(
       async () => {
         await resolveTree({
-          fs,
+          fs: repo.fs,
           cache,
           gitdir,
           oid: blobOid,
@@ -203,7 +195,8 @@ test('resolveTree', async (t) => {
   })
 
   await t.test('error:NotFoundError-non-existent', async () => {
-    const { fs, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const nonExistentOid = 'a'.repeat(40)
@@ -211,7 +204,7 @@ test('resolveTree', async (t) => {
     await assert.rejects(
       async () => {
         await resolveTree({
-          fs,
+          fs: repo.fs,
           cache,
           gitdir,
           oid: nonExistentOid,
@@ -224,19 +217,19 @@ test('resolveTree', async (t) => {
   })
 
   await t.test('param:objectFormat', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = (await repo.getDir())!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const treeOid = await writeTree({
-      fs,
-      dir,
-      gitdir,
+      repo,
       tree: [],
       cache,
     })
     
     const result = await resolveTree({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: treeOid,
@@ -248,19 +241,19 @@ test('resolveTree', async (t) => {
   })
 
   await t.test('ok:detects-objectFormat', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = (await repo.getDir())!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const treeOid = await writeTree({
-      fs,
-      dir,
-      gitdir,
+      repo,
       tree: [],
       cache,
     })
     
     const result = await resolveTree({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: treeOid,
@@ -271,29 +264,25 @@ test('resolveTree', async (t) => {
   })
 
   await t.test('ok:tree-multiple-entries', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = (await repo.getDir())!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const blob1Oid = await writeBlob({
-      fs,
-      dir,
-      gitdir,
+      repo,
       blob: Buffer.from('content1'),
       cache,
     })
     
     const blob2Oid = await writeBlob({
-      fs,
-      dir,
-      gitdir,
+      repo,
       blob: Buffer.from('content2'),
       cache,
     })
     
     const nestedTreeOid = await writeTree({
-      fs,
-      dir,
-      gitdir,
+      repo,
       tree: [
         { path: 'nested.txt', mode: '100644', oid: blob2Oid, type: 'blob' },
       ],
@@ -301,9 +290,7 @@ test('resolveTree', async (t) => {
     })
     
     const treeOid = await writeTree({
-      fs,
-      dir,
-      gitdir,
+      repo,
       tree: [
         { path: 'file1.txt', mode: '100644', oid: blob1Oid, type: 'blob' },
         { path: 'file2.txt', mode: '100644', oid: blob2Oid, type: 'blob' },
@@ -313,7 +300,7 @@ test('resolveTree', async (t) => {
     })
     
     const result = await resolveTree({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: treeOid,
@@ -325,21 +312,19 @@ test('resolveTree', async (t) => {
   })
 
   await t.test('ok:tree-different-modes', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = (await repo.getDir())!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const blobOid = await writeBlob({
-      fs,
-      dir,
-      gitdir,
+      repo,
       blob: Buffer.from('content'),
       cache,
     })
     
     const treeOid = await writeTree({
-      fs,
-      dir,
-      gitdir,
+      repo,
       tree: [
         { path: 'regular.txt', mode: '100644', oid: blobOid, type: 'blob' },
         { path: 'executable.sh', mode: '100755', oid: blobOid, type: 'blob' },
@@ -349,7 +334,7 @@ test('resolveTree', async (t) => {
     })
     
     const result = await resolveTree({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: treeOid,

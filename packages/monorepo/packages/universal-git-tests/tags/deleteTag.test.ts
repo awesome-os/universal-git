@@ -6,28 +6,26 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('deleteTag', async (t) => {
   await t.test('ok:basic', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-deleteTag')
+    const { repo } = await makeFixture('test-deleteTag')
     // Test
     await deleteTag({
-      fs,
-      gitdir,
+      repo,
       ref: 'latest',
     })
     const refs = await listTags({
-      fs,
-      gitdir,
+      repo,
     })
     assert.deepStrictEqual(refs, ['prev'])
   })
 
   await t.test('param:ref-missing', async () => {
     // Setup
-    const { fs, dir, gitdir } = await makeFixture('test-deleteTag')
+    const { repo } = await makeFixture('test-deleteTag')
     const { Errors } = await import('@awesome-os/universal-git-src/index.ts')
     let error = null
     // Test
     try {
-      await deleteTag({ fs, dir, gitdir })
+      await deleteTag({ repo })
     } catch (err) {
       error = err
     }
@@ -51,27 +49,25 @@ test('deleteTag', async (t) => {
   })
 
   await t.test('param:repo-provided', async () => {
-    const { fs, gitdir } = await makeFixture('test-deleteTag')
-    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const repo = await Repository.open({ fs, gitdir })
+    const { repo } = await makeFixture('test-deleteTag')
     await deleteTag({ repo, ref: 'latest' })
-    const tags = await listTags({ fs, gitdir })
+    const tags = await listTags({ repo })
     assert.deepStrictEqual(tags, ['prev'])
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-deleteTag')
-    await deleteTag({ fs, dir, gitdir, ref: 'latest' })
-    const tags = await listTags({ fs, gitdir })
+    const { repo } = await makeFixture('test-deleteTag')
+    await deleteTag({ repo, ref: 'latest' })
+    const tags = await listTags({ repo })
     assert.deepStrictEqual(tags, ['prev'])
   })
 
   await t.test('error:caller-property', async () => {
-    const { fs, gitdir } = await makeFixture('test-deleteTag')
+    const { repo } = await makeFixture('test-deleteTag')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await deleteTag({
-        gitdir,
+        repo: undefined as any,
         ref: 'latest',
       } as any)
       assert.fail('Should have thrown MissingParameterError')
@@ -82,10 +78,10 @@ test('deleteTag', async (t) => {
   })
 
   await t.test('edge:non-existent-tag', async () => {
-    const { fs, gitdir } = await makeFixture('test-deleteTag')
+    const { repo } = await makeFixture('test-deleteTag')
     const { Errors } = await import('@awesome-os/universal-git-src/index.ts')
     try {
-      await deleteTag({ fs, gitdir, ref: 'nonexistent-tag' })
+      await deleteTag({ repo, ref: 'nonexistent-tag' })
       // Should throw NotFoundError or may be idempotent
       // If it doesn't throw, that's also acceptable behavior
     } catch (error) {

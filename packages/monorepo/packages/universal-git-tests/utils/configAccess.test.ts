@@ -4,7 +4,9 @@ import { ConfigAccess, getConfigValue, setConfigValue } from '@awesome-os/univer
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 
 test('configAccess', async (t) => {
-  const { fs, dir, gitdir } = await makeFixture('test-config-access')
+  const { repo } = await makeFixture('test-config-access', { init: true })
+  const fs = repo.fs
+  const gitdir = await repo.getGitdir()
 
   await t.test('ok:constructor-initializes', () => {
     const access = new ConfigAccess(fs, gitdir)
@@ -95,14 +97,14 @@ test('configAccess', async (t) => {
   })
 
   await t.test('ok:getConfigValue-convenience', async () => {
-    await setConfigValue(fs, gitdir, 'user.name', 'Convenience User', 'local')
-    const value = await getConfigValue(fs, gitdir, 'user.name')
+    await setConfigValue(repo.fs, gitdir, 'user.name', 'Convenience User', 'local')
+    const value = await getConfigValue(repo.fs, gitdir, 'user.name')
     assert.strictEqual(value, 'Convenience User')
   })
 
   await t.test('ok:setConfigValue-convenience', async () => {
-    await setConfigValue(fs, gitdir, 'user.email', 'convenience@example.com', 'local')
-    const value = await getConfigValue(fs, gitdir, 'user.email')
+    await setConfigValue(repo.fs, gitdir, 'user.email', 'convenience@example.com', 'local')
+    const value = await getConfigValue(repo.fs, gitdir, 'user.email')
     assert.strictEqual(value, 'convenience@example.com')
   })
 

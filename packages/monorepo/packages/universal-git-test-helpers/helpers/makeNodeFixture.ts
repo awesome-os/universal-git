@@ -58,7 +58,7 @@ export async function useTempDir(fixture: string): Promise<string> {
   return tempDir
 }
 
-export async function makeNodeFixture(fixture: string, options?: { init?: boolean }) {
+export async function makeNodeFixture(fixture: string, options?: { init?: boolean; defaultBranch?: string; bare?: boolean; objectFormat?: 'sha1' | 'sha256' }) {
   onExit(cleanupTempDirs)
 
   const fs = new FileSystem(_fs)
@@ -66,18 +66,31 @@ export async function makeNodeFixture(fixture: string, options?: { init?: boolea
   const dir = await useTempDir(fixture)
   const gitdir = await useTempDir(`${fixture}.git`)
 
-  // Create Repository instance for convenience
+  // Create backends explicitly
+  const { FilesystemBackend } = await import('@awesome-os/universal-git-src/backends/FilesystemBackend.ts')
+  const { createGitWorktreeBackend } = await import('@awesome-os/universal-git-src/git/worktree/index.ts')
+  
+  // Create GitBackend (FilesystemBackend)
+  const gitBackend = new FilesystemBackend(fs, gitdir)
+  
+  // Create WorktreeBackend (GitWorktreeFs)
+  const worktreeBackend = createGitWorktreeBackend({ fs, dir })
+
+  // Create Repository instance with explicit backends
   // Repository is not exported as subpath, use relative path
   const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
   const repo = await Repository.open({
     fs,
-    dir,
-    gitdir,
+    gitBackend,
+    worktree: worktreeBackend,
     cache: {},
     autoDetectConfig: true,
     init: options?.init || false,
+    defaultBranch: options?.defaultBranch,
+    bare: options?.bare,
+    objectFormat: options?.objectFormat,
   })
 
-  return { _fs, fs, dir, gitdir, repo }
+  return { _fs, fs, dir, gitdir, worktree: worktreeBackend, gitBackend, repo }
 }
 

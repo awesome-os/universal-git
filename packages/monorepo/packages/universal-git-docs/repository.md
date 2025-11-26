@@ -5,16 +5,23 @@ sidebar_label: Repository
 
 # Repository Class
 
-The `Repository` class is the central abstraction for Git repository operations in universal-git. It provides caching, state management, and a unified interface for all Git operations.
+The `Repository` class is a **thin wrapper** around `GitBackend` and multiple `WorktreeBackend` instances. It provides caching, state management, and a unified interface for all Git operations.
 
 ## What is Repository?
 
-`Repository` is a context object that:
-- Manages Git repository state (index, config, refs, etc.)
-- Provides caching for performance
-- Handles instance management (singleton pattern)
-- Integrates with backends for storage
-- Provides lazy-loaded access to Git operations
+`Repository` is a thin wrapper that delegates to:
+- **1 `GitBackend`** (always present) - handles all Git repository data (objects, refs, config, index, etc.)
+  - For bare repositories: only `GitBackend` is present
+  - For remote repositories: `GitBackend` handles remote operations
+- **Multiple linked worktree checkouts** (optional) - each with its own `WorktreeBackend` instance
+  - Main worktree: optional, has its own `WorktreeBackend`
+  - Linked worktrees: each has its own `WorktreeBackend` instance
+  - `WorktreeBackend` type can be specified on checkout (filesystem, memory, S3, etc.)
+
+**Key Principle**: `Repository` is a thin wrapper - it doesn't implement Git operations itself, but delegates to backends. This enables:
+- Backend-agnostic operations (work with any storage backend)
+- Multiple worktrees with different backend types
+- Consistent API regardless of backend implementation
 
 ## When to Use Repository
 
@@ -355,7 +362,9 @@ await repo.writeSymbolicRefDirect('HEAD', 'refs/heads/main')
 const refs = await repo.listRefs()
 ```
 
-**Note**: Ref operations go through centralized functions in `src/git/refs/` to ensure reflog tracking and locking. See [Ref Writing Architecture](./ARCHITECTURE_REF_WRITING.md).
+**Note**: Ref operations are handled by `GitBackend` methods, which internally use centralized functions in `src/git/refs/` to ensure reflog tracking and locking. The backend automatically handles worktree context (HEAD goes to worktree gitdir, other refs go to main gitdir). See [Ref Writing Architecture](./ARCHITECTURE_REF_WRITING.md).
+
+**Backend Integration**: `Repository.writeRefDirect()` and other ref methods simply call `gitBackend.writeRef()` - the backend handles all details internally (fs, gitdir, objectFormat, worktree context, etc.). You don't need to pass these parameters.
 
 ### Object Operations
 
@@ -373,11 +382,32 @@ const oid = await repo.writeObject({
 ### Worktree Operations
 
 ```typescript
-// Get worktree
+// Get main worktree
 const worktree = await repo.worktree()
+
+// Create a new linked worktree with a specific backend type
+const newWorktree = await repo.createWorktree(
+  '/path/to/new/worktree',
+  'feature-branch',
+  'feature-worktree',
+  {
+    worktreeBackendFactory: (dir) => {
+      // Create a custom backend for this worktree
+      return new GitWorktreeS3(s3Client, bucket, `${prefix}/${dir}`)
+    }
+  }
+)
+
+// Get worktree by name
+const worktreeByName = repo.getWorktreeByName('feature-worktree')
+
+// List all worktrees
+const allWorktrees = repo.listWorktrees()
 
 // Worktree provides access to working directory operations
 ```
+
+**Multiple Worktrees**: `Repository` can manage multiple worktrees simultaneously. Each worktree has its own `WorktreeBackend` instance, allowing different storage backends for different worktrees.
 
 ## Backend Integration
 

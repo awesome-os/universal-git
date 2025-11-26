@@ -6,11 +6,10 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 describe('readTag', () => {
   it('ok:annotated-tag', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readTag')
+    const { repo } = await makeFixture('test-readTag')
     // Test
     const tag = await readTag({
-      fs,
-      gitdir,
+      repo,
       oid: '587d3f8290b513e2ee85ecd317e6efecd545aee6',
     })
     assert.strictEqual(tag.oid, '587d3f8290b513e2ee85ecd317e6efecd545aee6')
@@ -38,12 +37,11 @@ describe('readTag', () => {
   })
 
   it('param:oid-missing', async () => {
-    const { fs, gitdir } = await makeFixture('test-readTag')
+    const { repo } = await makeFixture('test-readTag')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await readTag({
-        fs,
-        gitdir,
+        repo,
       } as any)
       assert.fail('Should have thrown MissingParameterError')
     } catch (error) {
@@ -53,13 +51,10 @@ describe('readTag', () => {
   })
 
   it('param:repo-provided', async () => {
-    const { fs, gitdir, dir } = await makeFixture('test-readTag')
-    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const repo = await Repository.open({ fs, dir, gitdir })
+    const { repo } = await makeFixture('test-readTag')
     // Provide gitdir explicitly to avoid default parameter evaluation issue
     const tag = await readTag({
       repo,
-      gitdir, // Explicitly provide to avoid default parameter evaluation
       oid: '587d3f8290b513e2ee85ecd317e6efecd545aee6',
     })
     assert.strictEqual(tag.oid, '587d3f8290b513e2ee85ecd317e6efecd545aee6')
@@ -67,11 +62,9 @@ describe('readTag', () => {
   })
 
   it('param:dir-derives-gitdir', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-readTag')
+    const { repo } = await makeFixture('test-readTag')
     const tag = await readTag({
-      fs,
-      dir,
-      gitdir,
+      repo,
       oid: '587d3f8290b513e2ee85ecd317e6efecd545aee6',
     })
     assert.strictEqual(tag.oid, '587d3f8290b513e2ee85ecd317e6efecd545aee6')
@@ -79,12 +72,11 @@ describe('readTag', () => {
   })
 
   it('error:caller-property', async () => {
-    const { fs, gitdir } = await makeFixture('test-readTag')
+    const { repo } = await makeFixture('test-readTag')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await readTag({
-        fs,
-        gitdir,
+        repo,
       } as any)
       assert.fail('Should have thrown MissingParameterError')
     } catch (error: any) {
@@ -94,12 +86,11 @@ describe('readTag', () => {
   })
 
   it('edge:tag-points-to-tree', async () => {
-    const { fs, gitdir } = await makeFixture('test-readTag')
+    const { repo } = await makeFixture('test-readTag')
     // Try to read a tag - if it points to a tree, it should still work
     try {
       const tag = await readTag({
-        fs,
-        gitdir,
+        repo,
         oid: '587d3f8290b513e2ee85ecd317e6efecd545aee6',
       })
       assert.ok(tag.tag)
@@ -111,10 +102,9 @@ describe('readTag', () => {
   })
 
   it('edge:tag-no-message', async () => {
-    const { fs, gitdir } = await makeFixture('test-readTag')
+    const { repo } = await makeFixture('test-readTag')
     const tag = await readTag({
-      fs,
-      gitdir,
+      repo,
       oid: '587d3f8290b513e2ee85ecd317e6efecd545aee6',
     })
     // Tag may or may not have message

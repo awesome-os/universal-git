@@ -9,21 +9,19 @@ import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBu
 
 test('resolveCommit', async (t) => {
   await t.test('ok:resolves-commit', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const treeOid = await writeTree({
-      fs,
-      dir,
-      gitdir,
+      repo,
       tree: [],
       cache,
     })
     
     const commitOid = await writeCommit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       commit: {
         tree: treeOid,
         parent: [],
@@ -35,7 +33,7 @@ test('resolveCommit', async (t) => {
     })
     
     const result = await resolveCommit({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: commitOid,
@@ -51,21 +49,19 @@ test('resolveCommit', async (t) => {
   })
 
   await t.test('ok:peels-tag-to-commit', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const treeOid = await writeTree({
-      fs,
-      dir,
-      gitdir,
+      repo,
       tree: [],
       cache,
     })
     
     const commitOid = await writeCommit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       commit: {
         tree: treeOid,
         parent: [],
@@ -77,9 +73,7 @@ test('resolveCommit', async (t) => {
     })
     
     const tagOid = await writeTag({
-      fs,
-      dir,
-      gitdir,
+      repo,
       tag: {
         object: commitOid,
         type: 'commit',
@@ -91,7 +85,7 @@ test('resolveCommit', async (t) => {
     })
     
     const result = await resolveCommit({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: tagOid,
@@ -103,13 +97,13 @@ test('resolveCommit', async (t) => {
   })
 
   await t.test('error:ObjectTypeError-non-commit', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const blobOid = await writeBlob({
-      fs,
-      dir,
-      gitdir,
+      repo,
       blob: UniversalBuffer.from('content'),
       cache,
     })
@@ -117,7 +111,7 @@ test('resolveCommit', async (t) => {
     await assert.rejects(
       async () => {
         await resolveCommit({
-          fs,
+          fs: repo.fs,
           cache,
           gitdir,
           oid: blobOid,
@@ -130,7 +124,8 @@ test('resolveCommit', async (t) => {
   })
 
   await t.test('error:NotFoundError-non-existent', async () => {
-    const { fs, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const nonExistentOid = 'a'.repeat(40)
@@ -138,7 +133,7 @@ test('resolveCommit', async (t) => {
     await assert.rejects(
       async () => {
         await resolveCommit({
-          fs,
+          fs: repo.fs,
           cache,
           gitdir,
           oid: nonExistentOid,
@@ -151,21 +146,19 @@ test('resolveCommit', async (t) => {
   })
 
   await t.test('ok:commit-with-parent', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const treeOid = await writeTree({
-      fs,
-      dir,
-      gitdir,
+      repo,
       tree: [],
       cache,
     })
     
     const parentOid = await writeCommit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       commit: {
         tree: treeOid,
         parent: [],
@@ -177,9 +170,7 @@ test('resolveCommit', async (t) => {
     })
     
     const commitOid = await writeCommit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       commit: {
         tree: treeOid,
         parent: [parentOid],
@@ -191,7 +182,7 @@ test('resolveCommit', async (t) => {
     })
     
     const result = await resolveCommit({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: commitOid,
@@ -204,21 +195,19 @@ test('resolveCommit', async (t) => {
   })
 
   await t.test('ok:commit-multiple-parents', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const treeOid = await writeTree({
-      fs,
-      dir,
-      gitdir,
+      repo,
       tree: [],
       cache,
     })
     
     const parent1Oid = await writeCommit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       commit: {
         tree: treeOid,
         parent: [],
@@ -230,9 +219,7 @@ test('resolveCommit', async (t) => {
     })
     
     const parent2Oid = await writeCommit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       commit: {
         tree: treeOid,
         parent: [],
@@ -244,9 +231,7 @@ test('resolveCommit', async (t) => {
     })
     
     const commitOid = await writeCommit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       commit: {
         tree: treeOid,
         parent: [parent1Oid, parent2Oid],
@@ -258,7 +243,7 @@ test('resolveCommit', async (t) => {
     })
     
     const result = await resolveCommit({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: commitOid,
@@ -273,21 +258,19 @@ test('resolveCommit', async (t) => {
   })
 
   await t.test('ok:commit-different-committer', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const treeOid = await writeTree({
-      fs,
-      dir,
-      gitdir,
+      repo,
       tree: [],
       cache,
     })
     
     const commitOid = await writeCommit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       commit: {
         tree: treeOid,
         parent: [],
@@ -299,7 +282,7 @@ test('resolveCommit', async (t) => {
     })
     
     const result = await resolveCommit({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: commitOid,

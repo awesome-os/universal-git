@@ -6,9 +6,9 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 describe('listFiles', () => {
   it('ok:index', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-listFiles')
+    const { repo } = await makeFixture('test-listFiles')
     // Test
-    const files = await listFiles({ fs, gitdir })
+    const files = await listFiles({ repo })
     // Verify it returns an array with files
     assert.ok(Array.isArray(files))
     assert.ok(files.length > 0)
@@ -18,9 +18,9 @@ describe('listFiles', () => {
   
   it('ok:ref', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-checkout')
+    const { repo } = await makeFixture('test-checkout')
     // Test
-    const files = await listFiles({ fs, gitdir, ref: 'test-branch' })
+    const files = await listFiles({ repo, ref: 'test-branch' })
     // Verify it returns an array with files
     assert.ok(Array.isArray(files))
     assert.ok(files.length > 0)
@@ -40,27 +40,25 @@ describe('listFiles', () => {
   })
 
   it('param:repo-provided', async () => {
-    const { fs, gitdir } = await makeFixture('test-listFiles')
-    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const repo = await Repository.open({ fs, gitdir })
+    const { repo } = await makeFixture('test-listFiles')
     const files = await listFiles({ repo })
     assert.ok(Array.isArray(files))
     assert.ok(files.length >= 0)
   })
 
   it('param:dir-derives-gitdir', async () => {
-    const { fs, dir } = await makeFixture('test-listFiles')
-    const files = await listFiles({ fs, dir })
+    const { repo } = await makeFixture('test-listFiles')
+    const files = await listFiles({ repo })
     assert.ok(Array.isArray(files))
     assert.ok(files.length >= 0)
   })
 
   it('error:caller-property', async () => {
-    const { fs, gitdir } = await makeFixture('test-listFiles')
+    const { repo } = await makeFixture('test-listFiles')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await listFiles({
-        gitdir,
+        repo: undefined as any,
       } as any)
       assert.fail('Should have thrown MissingParameterError')
     } catch (error: any) {
@@ -70,18 +68,16 @@ describe('listFiles', () => {
   })
 
   it('edge:empty-repository', async () => {
-    const { fs, dir } = await makeFixture('test-empty')
-    const { init } = await import('@awesome-os/universal-git-src/index.ts')
-    await init({ fs, dir })
-    const files = await listFiles({ fs, dir })
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const files = await listFiles({ repo })
     assert.ok(Array.isArray(files))
     assert.strictEqual(files.length, 0)
   })
 
   it('error:non-existent-ref', async () => {
-    const { fs, gitdir } = await makeFixture('test-listFiles')
+    const { repo } = await makeFixture('test-listFiles')
     try {
-      await listFiles({ fs, gitdir, ref: 'nonexistent-ref' })
+      await listFiles({ repo, ref: 'nonexistent-ref' })
       // Should throw NotFoundError
       assert.fail('Should have thrown NotFoundError')
     } catch (error) {

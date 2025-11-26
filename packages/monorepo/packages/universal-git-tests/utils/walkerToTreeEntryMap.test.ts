@@ -7,7 +7,10 @@ import { init, add, commit, readCommit, listFiles } from '@awesome-os/universal-
 
 test('walkerToTreeEntryMap', async (t) => {
   await t.test('behavior:acquireLock-serializes-concurrent', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-lock')
+    const { repo } = await makeFixture('test-lock')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     let executionOrder: number[] = []
@@ -36,7 +39,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('behavior:acquireLock-different-keys-parallel', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-lock-parallel')
+    const { repo } = await makeFixture('test-lock-parallel')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     let executionOrder: number[] = []
@@ -69,7 +75,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('param:acquireLock-filepath-object', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-lock-filepath')
+    const { repo } = await makeFixture('test-lock-filepath')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     const result = await acquireLock({ filepath: 'test.txt' }, async () => {
@@ -80,7 +89,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:writeTreeChanges-returns-null-no-changes', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-write-tree-no-changes')
+    const { repo } = await makeFixture('test-write-tree-no-changes')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.write(`${dir}/test.txt`, 'initial')
@@ -99,7 +111,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:writeTreeChanges-creates-tree-staged', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-write-tree-staged')
+    const { repo } = await makeFixture('test-write-tree-staged')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.write(`${dir}/test.txt`, 'initial')
@@ -124,7 +139,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:writeTreeChanges-creates-tree-workdir', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-write-tree-workdir')
+    const { repo } = await makeFixture('test-write-tree-workdir')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.write(`${dir}/test.txt`, 'initial')
@@ -148,7 +166,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:writeTreeChanges-handles-deletions', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-write-tree-delete')
+    const { repo } = await makeFixture('test-write-tree-delete')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.write(`${dir}/test.txt`, 'initial')
@@ -171,7 +192,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:writeTreeChanges-handles-new-files', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-write-tree-new')
+    const { repo } = await makeFixture('test-write-tree-new')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.write(`${dir}/test.txt`, 'initial')
@@ -195,7 +219,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:writeTreeChanges-handles-nested-dirs', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-write-tree-nested')
+    const { repo } = await makeFixture('test-write-tree-nested')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.mkdir(`${dir}/nested`, { recursive: true })
@@ -218,7 +245,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:applyTreeChanges-applies-to-workdir', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-apply-tree')
+    const { repo } = await makeFixture('test-apply-tree')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.write(`${dir}/test.txt`, 'initial')
@@ -249,7 +279,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('param:applyTreeChanges-wasStaged', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-apply-tree-staged')
+    const { repo } = await makeFixture('test-apply-tree-staged')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.write(`${dir}/test.txt`, 'initial')
@@ -285,7 +318,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:applyTreeChanges-handles-deletions', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-apply-tree-delete')
+    const { repo } = await makeFixture('test-apply-tree-delete')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.write(`${dir}/test.txt`, 'initial')
@@ -330,7 +366,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:applyTreeChanges-handles-new-files', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-apply-tree-new')
+    const { repo } = await makeFixture('test-apply-tree-new')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.write(`${dir}/test.txt`, 'initial')
@@ -361,7 +400,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('edge:writeTreeChanges-empty-repo', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-write-tree-empty')
+    const { repo } = await makeFixture('test-write-tree-empty')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     // Empty repo - HEAD doesn't exist
@@ -377,7 +419,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:applyTreeChanges-handles-rmdir', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-apply-tree-rmdir')
+    const { repo } = await makeFixture('test-apply-tree-rmdir')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     // Create a directory with a file
@@ -417,7 +462,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:applyTreeChanges-handles-mkdir', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-apply-tree-mkdir')
+    const { repo } = await makeFixture('test-apply-tree-mkdir')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.write(`${dir}/test.txt`, 'initial')
@@ -451,7 +499,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('behavior:applyTreeChanges-skips-removed-dirs', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-apply-tree-skip-removed-dir')
+    const { repo } = await makeFixture('test-apply-tree-skip-removed-dir')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     // Create a directory structure
@@ -494,7 +545,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('edge:applyTreeChanges-missing-OID', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-apply-tree-missing-oid')
+    const { repo } = await makeFixture('test-apply-tree-missing-oid')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.write(`${dir}/test.txt`, 'initial')
@@ -528,7 +582,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('error:applyTreeChanges-NotFoundError', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-apply-tree-missing-object')
+    const { repo } = await makeFixture('test-apply-tree-missing-object')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.write(`${dir}/test.txt`, 'initial')
@@ -585,7 +642,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('applyTreeChanges handles index deletion when wasStaged is true', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-apply-tree-index-delete')
+    const { repo } = await makeFixture('test-apply-tree-index-delete')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.write(`${dir}/test.txt`, 'initial')
@@ -632,7 +692,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('applyTreeChanges uses fallback stats when file missing after write', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-apply-tree-fallback-stats')
+    const { repo } = await makeFixture('test-apply-tree-fallback-stats')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.write(`${dir}/test.txt`, 'initial')
@@ -689,7 +752,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('applyTreeChanges handles special file types (not tree or blob)', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-apply-tree-special-types')
+    const { repo } = await makeFixture('test-apply-tree-special-types')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     // This test covers line 668 - when type is not 'tree' or 'blob'
@@ -722,7 +788,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('applyTreeChanges gets stats from stash entry when file not in workdir', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-apply-tree-stash-stats')
+    const { repo } = await makeFixture('test-apply-tree-stash-stats')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.write(`${dir}/test.txt`, 'initial')
@@ -757,7 +826,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('applyTreeChanges creates minimal stats when stash entry has no stats', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-apply-tree-minimal-stats')
+    const { repo } = await makeFixture('test-apply-tree-minimal-stats')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.write(`${dir}/test.txt`, 'initial')
@@ -789,7 +861,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('applyTreeChanges handles non-NotFoundError during object read', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-apply-tree-other-error')
+    const { repo } = await makeFixture('test-apply-tree-other-error')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.write(`${dir}/test.txt`, 'initial')
@@ -835,7 +910,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('applyTreeChanges handles file in removed directory (startsWith check)', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-apply-tree-removed-dir-file')
+    const { repo } = await makeFixture('test-apply-tree-removed-dir-file')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     // Create a directory with multiple files
@@ -888,7 +966,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('applyTreeChanges handles missing OID in write operation', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-apply-tree-missing-oid-write')
+    const { repo } = await makeFixture('test-apply-tree-missing-oid-write')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     // This test is designed to trigger the missing OID check in the write case
@@ -920,7 +1001,10 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('applyTreeChanges uses fallback stats when finalStats is null', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-apply-tree-null-final-stats')
+    const { repo } = await makeFixture('test-apply-tree-null-final-stats')
+    const fs = repo.fs
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     await init({ fs, dir, gitdir })
     
     await fs.write(`${dir}/test.txt`, 'initial')

@@ -6,21 +6,21 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('deleteRemote', async (t) => {
   await t.test('ok:basic', async () => {
     // Setup
-    const { fs, dir, gitdir } = await makeFixture('test-deleteRemote')
+    const { repo } = await makeFixture('test-deleteRemote')
     const remote = 'foo'
     // Test
-    await deleteRemote({ fs, dir, gitdir, remote })
-    const a = await listRemotes({ fs, dir, gitdir })
+    await deleteRemote({ repo, remote })
+    const a = await listRemotes({ repo })
     assert.deepStrictEqual(a, [{ remote: 'bar', url: 'git@github.com:bar/bar.git' }])
   })
 
   await t.test('param:remote-missing', async () => {
     // Setup
-    const { fs, dir, gitdir } = await makeFixture('test-addRemote')
+    const { repo } = await makeFixture('test-addRemote')
     // Test
     let error = null
     try {
-      await deleteRemote({ fs, dir, gitdir })
+      await deleteRemote({ repo })
     } catch (err) {
       error = err
     }

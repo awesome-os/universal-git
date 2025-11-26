@@ -6,11 +6,10 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('resolveRef', async (t) => {
   await t.test('ok:resolve-full-oid', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-resolveRef')
+    const { repo } = await makeFixture('test-resolveRef')
     // Test
     const ref = await resolveRef({
-      fs,
-      gitdir,
+      repo,
       ref: '1e40fdfba1cf17f3c9f9f3d6b392b1865e5147b9',
     })
     assert.strictEqual(ref, '1e40fdfba1cf17f3c9f9f3d6b392b1865e5147b9')
@@ -18,11 +17,10 @@ test('resolveRef', async (t) => {
 
   await t.test('ok:resolve-remote-branch', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-resolveRef')
+    const { repo } = await makeFixture('test-resolveRef')
     // Test
     const ref = await resolveRef({
-      fs,
-      gitdir,
+      repo,
       ref: 'origin/test-branch',
     })
     assert.strictEqual(ref, 'e10ebb90d03eaacca84de1af0a59b444232da99e')
@@ -30,11 +28,10 @@ test('resolveRef', async (t) => {
 
   await t.test('ok:resolve-config-ref', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-resolveRef')
+    const { repo } = await makeFixture('test-resolveRef')
     // Test
     const ref = await resolveRef({
-      fs,
-      gitdir,
+      repo,
       ref: 'config',
     })
     assert.strictEqual(ref, 'e10ebb90d03eaacca84de1af0a59b444232da99e')
@@ -42,11 +39,10 @@ test('resolveRef', async (t) => {
 
   await t.test('ok:resolve-tag', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-resolveRef')
+    const { repo } = await makeFixture('test-resolveRef')
     // Test
     const ref = await resolveRef({
-      fs,
-      gitdir,
+      repo,
       ref: 'test-tag',
     })
     assert.strictEqual(ref, '1e40fdfba1cf17f3c9f9f3d6b392b1865e5147b9')
@@ -54,11 +50,10 @@ test('resolveRef', async (t) => {
 
   await t.test('ok:resolve-HEAD', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-resolveRef')
+    const { repo } = await makeFixture('test-resolveRef')
     // Test
     const ref = await resolveRef({
-      fs,
-      gitdir,
+      repo,
       ref: 'HEAD',
     })
     assert.strictEqual(ref, '033417ae18b174f078f2f44232cb7a374f4c60ce')
@@ -66,11 +61,10 @@ test('resolveRef', async (t) => {
 
   await t.test('param:depth', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-resolveRef')
+    const { repo } = await makeFixture('test-resolveRef')
     // Test
     const ref = await resolveRef({
-      fs,
-      gitdir,
+      repo,
       ref: 'HEAD',
       depth: 2,
     })
@@ -79,15 +73,14 @@ test('resolveRef', async (t) => {
 
   await t.test('ok:resolve-packed-refs', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-resolveRef')
+    const { repo } = await makeFixture('test-resolveRef')
     // Test
     // Note: This test may fail if the fixture doesn't have v0.0.1 in packed-refs
     // Skipping for now as it may be a fixture issue
     let ref: string | null = null
     try {
       ref = await resolveRef({
-        fs,
-        gitdir,
+        repo,
         ref: 'v0.0.1',
       })
       assert.strictEqual(ref, '1a2149e96a9767b281a8f10fd014835322da2d14')
@@ -103,13 +96,12 @@ test('resolveRef', async (t) => {
 
   await t.test('error:ref-not-exist', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-resolveRef')
+    const { repo } = await makeFixture('test-resolveRef')
     // Test
     let error: Error | {} = {}
     try {
       await resolveRef({
-        fs,
-        gitdir,
+        repo,
         ref: 'this-is-not-a-ref',
       })
     } catch (err) {

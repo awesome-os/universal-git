@@ -21,31 +21,29 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 describe('abortMerge', () => {
   it('ok:conflicted-files-different-stages', async () => {
     // Setup
-    const { gitdir, dir, fs } = await makeFixture('test-abortMerge')
+    const { repo } = await makeFixture('test-abortMerge')
 
-    const branchA = await resolveRef({ fs, gitdir, ref: 'a' })
-    const branchB = await resolveRef({ fs, gitdir, ref: 'b' })
+    const branchA = await resolveRef({ repo, ref: 'a' })
+    const branchB = await resolveRef({ repo, ref: 'b' })
     const ancestor = '2d7b1a9b82e52bd8648cf156aa559eff3a27a678' // common ancestor, hard coded, not ideal
 
     const fileAVersions = [
-      await readBlob({ fs, gitdir, oid: ancestor, filepath: 'a' }),
-      await readBlob({ fs, gitdir, oid: branchA, filepath: 'a' }),
-      await readBlob({ fs, gitdir, oid: branchB, filepath: 'a' }),
+      await readBlob({ repo, oid: ancestor, filepath: 'a' }),
+      await readBlob({ repo, oid: branchA, filepath: 'a' }),
+      await readBlob({ repo, oid: branchB, filepath: 'a' }),
     ]
 
     const fileBVersions = [
-      await readBlob({ fs, gitdir, oid: ancestor, filepath: 'b' }),
-      await readBlob({ fs, gitdir, oid: branchA, filepath: 'b' }),
-      await readBlob({ fs, gitdir, oid: branchB, filepath: 'b' }),
+      await readBlob({ repo, oid: ancestor, filepath: 'b' }),
+      await readBlob({ repo, oid: branchA, filepath: 'b' }),
+      await readBlob({ repo, oid: branchB, filepath: 'b' }),
     ]
 
     // Test
     let error: unknown = null
     try {
       await merge({
-        fs,
-        dir,
-        gitdir,
+        repo,
         ours: 'a',
         theirs: 'b',
         abortOnConflict: false,
@@ -62,7 +60,6 @@ describe('abortMerge', () => {
     assert.notStrictEqual(error, null)
     assert.ok(error instanceof Errors.MergeConflictError || (error as any).code === Errors.MergeConflictError.code)
 
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
     const index = await repo.readIndexDirect()
     assert.strictEqual(index.unmergedPaths.length, 2)
     assert.strictEqual(index.entriesFlat.length, 7)
@@ -83,35 +80,29 @@ describe('abortMerge', () => {
     
     const fileAStages = [
       await readBlob({
-        fs,
-        gitdir,
+        repo,
         oid: entryA.stages[1].oid,
       }),
       await readBlob({
-        fs,
-        gitdir,
+        repo,
         oid: entryA.stages[2].oid,
       }),
       await readBlob({
-        fs,
-        gitdir,
+        repo,
         oid: entryA.stages[3].oid,
       }),
     ]
     const fileBStages = [
       await readBlob({
-        fs,
-        gitdir,
+        repo,
         oid: entryB.stages[1].oid,
       }),
       await readBlob({
-        fs,
-        gitdir,
+        repo,
         oid: entryB.stages[2].oid,
       }),
       await readBlob({
-        fs,
-        gitdir,
+        repo,
         oid: entryB.stages[3].oid,
       }),
     ]
@@ -171,7 +162,8 @@ describe('abortMerge', () => {
 
   it('ok:abort-after-modifying-files', async () => {
     // Setup
-    const { repo, fs, dir } = await makeFixture('test-abortMerge')
+    const { repo } = await makeFixture('test-abortMerge')
+    const dir = await repo.getDir()!
 
     // Test
     let error: unknown = null
@@ -195,9 +187,9 @@ describe('abortMerge', () => {
     assert.notStrictEqual(error, null)
     assert.ok(error instanceof Errors.MergeConflictError || (error as any).code === Errors.MergeConflictError.code)
 
-    await fs.rm(`${dir}/a`)
-    await fs.write(`${dir}/b`, 'new text for file b')
-    await fs.write(`${dir}/c`, 'new text for file c')
+    await repo.fs.rm(`${dir}/a`)
+    await repo.fs.write(`${dir}/b`, 'new text for file b')
+    await repo.fs.write(`${dir}/c`, 'new text for file c')
 
     await abortMerge({ repo })
 
@@ -221,8 +213,8 @@ describe('abortMerge', () => {
         assert.strictEqual(await modified(index, head), false)
       },
     })
-    const fileCData = await fs.read(`${dir}/c`)
-    const fileBData = await fs.read(`${dir}/b`)
+    const fileCData = await repo.fs.read(`${dir}/c`)
+    const fileBData = await repo.fs.read(`${dir}/b`)
     const fileCContent = fileCData ? new TextDecoder().decode(typeof fileCData === 'string' ? new TextEncoder().encode(fileCData) : fileCData) : ''
     const fileBContent = fileBData ? new TextDecoder().decode(typeof fileBData === 'string' ? new TextEncoder().encode(fileBData) : fileBData) : ''
     assert.strictEqual(fileCContent, 'new text for file c')
@@ -231,21 +223,20 @@ describe('abortMerge', () => {
 
   it('behavior:workdir-ne-index-eq-head', async () => {
     // Setup
-    const { fs, gitdir, dir } = await makeFixture('test-abortMerge')
+    const { repo } = await makeFixture('test-abortMerge')
+    const dir = await repo.getDir()!
 
-    const head = await resolveRef({ fs, gitdir, ref: 'HEAD' })
+    const head = await resolveRef({ repo, ref: 'HEAD' })
 
     const fileAHeadVersion = await readBlob({
-      fs,
-      gitdir,
+      repo,
       oid: head,
       filepath: 'a',
     }).then(result => {
       return new TextDecoder().decode(result.blob)
     })
     const fileBHeadVersion = await readBlob({
-      fs,
-      gitdir,
+      repo,
       oid: head,
       filepath: 'b',
     }).then(result => {
@@ -256,9 +247,7 @@ describe('abortMerge', () => {
     let error: unknown = null
     try {
       await merge({
-        fs,
-        dir,
-        gitdir,
+        repo,
         ours: 'a',
         theirs: 'b',
         abortOnConflict: false,
@@ -276,23 +265,23 @@ describe('abortMerge', () => {
     assert.notStrictEqual(error, null)
     assert.ok(error instanceof Errors.MergeConflictError || (error as any).code === Errors.MergeConflictError.code)
 
-    await fs.write(`${dir}/c`, 'new text for file c')
-    await abortMerge({ fs, dir, gitdir })
+    await repo.fs.write(`${dir}/c`, 'new text for file c')
+    await abortMerge({ repo })
 
-    const fileAContent = await fs.read(`${dir}/a`).then(buffer => {
+    const fileAContent = await repo.fs.read(`${dir}/a`).then(buffer => {
       assert.ok(buffer !== null, 'File a content should not be null')
       return buffer.toString()
     })
-    const fileBContent = await fs.read(`${dir}/b`).then(buffer => {
+    const fileBContent = await repo.fs.read(`${dir}/b`).then(buffer => {
       assert.ok(buffer !== null, 'File b content should not be null')
       return buffer.toString()
     })
-    const fileCContent = await fs.read(`${dir}/c`).then(buffer => {
+    const fileCContent = await repo.fs.read(`${dir}/c`).then(buffer => {
       assert.ok(buffer !== null, 'File c content should not be null')
       return buffer.toString()
     })
 
-    const dirContents = await fs.readdir(dir)
+    const dirContents = await repo.fs.readdir(dir)
     assert.ok(dirContents !== null && dirContents !== undefined, 'readdir should return an array')
 
     assert.strictEqual(dirContents.length, 3)

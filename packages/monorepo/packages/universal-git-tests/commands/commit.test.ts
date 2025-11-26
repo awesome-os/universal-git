@@ -7,11 +7,11 @@ import {
   commit,
   log,
   resolveRef,
-  init,
   add,
 } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { verifyReflogEntry } from '@awesome-os/universal-git-test-helpers/helpers/reflogHelpers.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
 
 describe('commit', () => {
   // CRITICAL: Use a shared cache object for ALL git commands in these tests
@@ -24,13 +24,12 @@ describe('commit', () => {
   })
   it('error:UnmergedPathsError', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-GitIndex-unmerged')
+    const { repo } = await makeFixture('test-GitIndex-unmerged')
     // Test
     let error = null
     try {
       await commit({
-        fs,
-        gitdir,
+        repo,
         author: {
           name: 'Mr. Test',
           email: 'mrtest@example.com',
@@ -38,7 +37,6 @@ describe('commit', () => {
           timezoneOffset: -0,
         },
         message: 'Initial commit',
-        cache,
       })
     } catch (e) {
       error = e
@@ -49,8 +47,8 @@ describe('commit', () => {
   
   it('ok:basic', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-commit')
-    const { oid: originalOid } = (await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache }))[0]
+    const { repo } = await makeFixture('test-commit')
+    const { oid: originalOid } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     // Test
     const author = {
       name: 'Mr. Test',
@@ -59,15 +57,14 @@ describe('commit', () => {
       timezoneOffset: -0,
     }
     const sha = await commit({
-      fs,
-      gitdir,
+      repo,
       author,
       message: 'Initial commit',
     })
     assert.strictEqual(sha, '7a51c0b1181d738198ff21c4679d3aa32eb52fe0')
     // updates branch pointer
     const { oid: currentOid, commit: currentCommit } = (
-      await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache })
+      await log({ repo, ref: 'HEAD', depth: 1 })
     )[0]
     assert.deepStrictEqual(currentCommit.parent, [originalOid])
     assert.deepStrictEqual(currentCommit.author, author)
@@ -77,8 +74,9 @@ describe('commit', () => {
     assert.strictEqual(currentOid, sha)
     
     // Verify reflog entry was created
+    const gitdir = await repo.getGitdir()
     await verifyReflogEntry({
-      fs,
+      fs: repo.fs,
       gitdir,
       ref: 'refs/heads/master',
       expectedOldOid: originalOid,
@@ -90,10 +88,11 @@ describe('commit', () => {
 
   it('ok:initial-commit', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-init')
-    await init({ fs, dir })
-    await fs.write(path.join(dir, 'hello.md'), 'Hello, World!')
-    await add({ fs, dir, filepath: 'hello.md', cache })
+    const { repo } = await makeFixture('test-init', { init: true })
+    const dir = repo.getWorktree()?.dir
+    if (!dir) throw new Error('Repository must have a worktree')
+    await repo.fs.write(path.join(dir, 'hello.md'), 'Hello, World!')
+    await add({ repo, filepath: 'hello.md' })
 
     // Test
     const author = {
@@ -104,22 +103,20 @@ describe('commit', () => {
     }
 
     await commit({
-      fs,
-      dir,
+      repo,
       author,
       message: 'Initial commit',
-      cache,
     })
 
-    const commits = await log({ fs, dir, ref: 'HEAD', cache })
+    const commits = await log({ repo, ref: 'HEAD' })
     assert.strictEqual(commits.length, 1)
     assert.deepStrictEqual(commits[0].commit.parent, [])
-    assert.strictEqual(await resolveRef({ fs, dir, ref: 'HEAD', cache }), commits[0].oid)
+    assert.strictEqual(await resolveRef({ repo, ref: 'HEAD' }), commits[0].oid)
   })
 
   it('param:message-missing', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-commit')
+    const { repo } = await makeFixture('test-commit')
     // Test
     const author = {
       name: 'Mr. Test',
@@ -132,8 +129,7 @@ describe('commit', () => {
 
     try {
       await commit({
-        fs,
-        gitdir,
+        repo,
         author,
       })
     } catch (err) {
@@ -146,12 +142,11 @@ describe('commit', () => {
 
   it('behavior:noUpdateBranch', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-commit')
-    const { oid: originalOid } = (await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache }))[0]
+    const { repo } = await makeFixture('test-commit')
+    const { oid: originalOid } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     // Test
     const sha = await commit({
-      fs,
-      gitdir,
+      repo,
       author: {
         name: 'Mr. Test',
         email: 'mrtest@example.com',
@@ -163,12 +158,13 @@ describe('commit', () => {
     })
     assert.strictEqual(sha, '7a51c0b1181d738198ff21c4679d3aa32eb52fe0')
     // does NOT update branch pointer
-    const { oid: currentOid } = (await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache }))[0]
+    const { oid: currentOid } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     assert.strictEqual(currentOid, originalOid)
     assert.notStrictEqual(currentOid, sha)
-    // but DID create commit object
+    // but DID create commit object - use backend to check
+    const gitdir = await repo.getGitdir()
     assert.strictEqual(
-      await fs.exists(
+      await repo.fs.exists(
         `${gitdir}/objects/7a/51c0b1181d738198ff21c4679d3aa32eb52fe0`
       ),
       true
@@ -177,12 +173,11 @@ describe('commit', () => {
 
   it('behavior:dryRun', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-commit')
-    const { oid: originalOid } = (await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache }))[0]
+    const { repo } = await makeFixture('test-commit')
+    const { oid: originalOid } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     // Test
     const sha = await commit({
-      fs,
-      gitdir,
+      repo,
       author: {
         name: 'Mr. Test',
         email: 'mrtest@example.com',
@@ -194,12 +189,13 @@ describe('commit', () => {
     })
     assert.strictEqual(sha, '7a51c0b1181d738198ff21c4679d3aa32eb52fe0')
     // does NOT update branch pointer
-    const { oid: currentOid } = (await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache }))[0]
+    const { oid: currentOid } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     assert.strictEqual(currentOid, originalOid)
     assert.notStrictEqual(currentOid, sha)
-    // and did NOT create commit object
+    // and did NOT create commit object - use backend to check
+    const gitdir = await repo.getGitdir()
     assert.strictEqual(
-      await fs.exists(
+      await repo.fs.exists(
         `${gitdir}/objects/7a/51c0b1181d738198ff21c4679d3aa32eb52fe0`
       ),
       false
@@ -208,12 +204,11 @@ describe('commit', () => {
 
   it('param:custom-ref', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-commit')
-    const { oid: originalOid } = (await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache }))[0]
+    const { repo } = await makeFixture('test-commit')
+    const { oid: originalOid } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     // Test
     const sha = await commit({
-      fs,
-      gitdir,
+      repo,
       author: {
         name: 'Mr. Test',
         email: 'mrtest@example.com',
@@ -225,17 +220,15 @@ describe('commit', () => {
     })
     assert.strictEqual(sha, '7a51c0b1181d738198ff21c4679d3aa32eb52fe0')
     // does NOT update master branch pointer
-    const { oid: currentOid } = (await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache }))[0]
+    const { oid: currentOid } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     assert.strictEqual(currentOid, originalOid)
     assert.notStrictEqual(currentOid, sha)
     // but DOES update master-copy
     const { oid: copyOid } = (
       await log({
-        fs,
-        gitdir,
+        repo,
         depth: 1,
         ref: 'master-copy',
-        cache,
       })
     )[0]
     assert.strictEqual(sha, copyOid)
@@ -243,8 +236,8 @@ describe('commit', () => {
 
   it('param:custom-parents-tree', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-commit')
-    const { oid: originalOid } = (await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache }))[0]
+    const { repo } = await makeFixture('test-commit')
+    const { oid: originalOid } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     // Test
     const parent = [
       '1111111111111111111111111111111111111111',
@@ -253,8 +246,7 @@ describe('commit', () => {
     ]
     const tree = '4444444444444444444444444444444444444444'
     const sha = await commit({
-      fs,
-      gitdir,
+      repo,
       parent,
       tree,
       author: {
@@ -269,11 +261,9 @@ describe('commit', () => {
     // does NOT update master branch pointer
     const { parent: parents, tree: _tree } = (
       await log({
-        fs,
-        gitdir,
+        repo,
         ref: 'HEAD',
         depth: 1,
-        cache,
       })
     )[0].commit
     assert.notDeepStrictEqual(parents, [originalOid])
@@ -283,15 +273,14 @@ describe('commit', () => {
 
   it('param:author-missing', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-commit')
+    const { repo } = await makeFixture('test-commit')
     // Test
     // Use ignoreSystemConfig: true to ensure no global/system config is read
     // This makes the test hermetic and independent of the test environment
     let error = null
     try {
       await commit({
-        fs,
-        gitdir,
+        repo,
         author: {
           email: 'mrtest@example.com',
           timestamp: 1262356920,
@@ -311,12 +300,11 @@ describe('commit', () => {
 
   it('behavior:timezone', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-commit')
+    const { repo } = await makeFixture('test-commit')
     let commits
     // Test
     await commit({
-      fs,
-      gitdir,
+      repo,
       author: {
         name: 'Mr. Test',
         email: 'mrtest@example.com',
@@ -325,12 +313,11 @@ describe('commit', () => {
       },
       message: '-0 offset',
     })
-    commits = await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache })
+    commits = await log({ repo, ref: 'HEAD', depth: 1 })
     assert.strictEqual(Object.is(commits[0].commit.author.timezoneOffset, -0), true)
 
     await commit({
-      fs,
-      gitdir,
+      repo,
       author: {
         name: 'Mr. Test',
         email: 'mrtest@example.com',
@@ -339,12 +326,11 @@ describe('commit', () => {
       },
       message: '+0 offset',
     })
-    commits = await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache })
+    commits = await log({ repo, ref: 'HEAD', depth: 1 })
     assert.strictEqual(Object.is(commits[0].commit.author.timezoneOffset, 0), true)
 
     await commit({
-      fs,
-      gitdir,
+      repo,
       author: {
         name: 'Mr. Test',
         email: 'mrtest@example.com',
@@ -353,12 +339,11 @@ describe('commit', () => {
       },
       message: '+240 offset',
     })
-    commits = await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache })
+    commits = await log({ repo, ref: 'HEAD', depth: 1 })
     assert.strictEqual(Object.is(commits[0].commit.author.timezoneOffset, 240), true)
 
     await commit({
-      fs,
-      gitdir,
+      repo,
       author: {
         name: 'Mr. Test',
         email: 'mrtest@example.com',
@@ -367,7 +352,7 @@ describe('commit', () => {
       },
       message: '-240 offset',
     })
-    commits = await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache })
+    commits = await log({ repo, ref: 'HEAD', depth: 1 })
     assert.strictEqual(
       Object.is(commits[0].commit.author.timezoneOffset, -240),
       true
@@ -376,7 +361,7 @@ describe('commit', () => {
 
   it('behavior:amend-new-message', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-commit')
+    const { repo } = await makeFixture('test-commit')
     const author = {
       name: 'Mr. Test',
       email: 'mrtest@example.com',
@@ -384,24 +369,22 @@ describe('commit', () => {
       timezoneOffset: -0,
     }
     await commit({
-      fs,
-      gitdir,
+      repo,
       author,
       message: 'Initial commit',
     })
 
     // Test
     const { oid: originalOid, commit: originalCommit } = (
-      await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache })
+      await log({ repo, ref: 'HEAD', depth: 1 })
     )[0]
     await commit({
-      fs,
-      gitdir,
+      repo,
       message: 'Amended commit',
       amend: true,
     })
     const { oid: amendedOid, commit: amendedCommit } = (
-      await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache })
+      await log({ repo, ref: 'HEAD', depth: 1 })
     )[0]
 
     assert.notStrictEqual(amendedOid, originalOid)
@@ -411,12 +394,12 @@ describe('commit', () => {
     assert.strictEqual(amendedCommit.committer.email, originalCommit.committer.email)
     assert.strictEqual(amendedCommit.message, 'Amended commit\n')
     assert.deepStrictEqual(amendedCommit.parent, originalCommit.parent)
-    assert.strictEqual(await resolveRef({ fs, gitdir, ref: 'HEAD', cache }), amendedOid)
+    assert.strictEqual(await resolveRef({ repo, ref: 'HEAD' }), amendedOid)
   })
 
   it('behavior:amend-change-author', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-commit')
+    const { repo } = await makeFixture('test-commit')
     const author = {
       name: 'Mr. Test',
       email: 'mrtest@example.com',
@@ -424,15 +407,14 @@ describe('commit', () => {
       timezoneOffset: -0,
     }
     await commit({
-      fs,
-      gitdir,
+      repo,
       author,
       message: 'Initial commit',
     })
 
     // Test
     const { oid: originalOid, commit: originalCommit } = (
-      await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache })
+      await log({ repo, ref: 'HEAD', depth: 1 })
     )[0]
 
     const newAuthor = {
@@ -442,13 +424,12 @@ describe('commit', () => {
       timezoneOffset: -0,
     }
     await commit({
-      fs,
-      gitdir,
+      repo,
       author: newAuthor,
       amend: true,
     })
     const { oid: amendedOid, commit: amendedCommit } = (
-      await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache })
+      await log({ repo, ref: 'HEAD', depth: 1 })
     )[0]
 
     assert.notStrictEqual(amendedOid, originalOid)
@@ -456,15 +437,16 @@ describe('commit', () => {
     assert.deepStrictEqual(amendedCommit.committer, newAuthor)
     assert.strictEqual(amendedCommit.message, originalCommit.message)
     assert.deepStrictEqual(amendedCommit.parent, originalCommit.parent)
-    assert.strictEqual(await resolveRef({ fs, gitdir, ref: 'HEAD', cache }), amendedOid)
+    assert.strictEqual(await resolveRef({ repo, ref: 'HEAD' }), amendedOid)
   })
 
   it('error:amend-no-initial-commit', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-init')
-    await init({ fs, dir })
-    await fs.write(path.join(dir, 'hello.md'), 'Hello, World!')
-    await add({ fs, dir, filepath: 'hello.md', cache })
+    const { repo } = await makeFixture('test-init', { init: true })
+    const dir = repo.getWorktree()?.dir
+    if (!dir) throw new Error('Repository must have a worktree')
+    await repo.fs.write(path.join(dir, 'hello.md'), 'Hello, World!')
+    await add({ repo, filepath: 'hello.md' })
 
     // Test
     const author = {
@@ -477,8 +459,7 @@ describe('commit', () => {
     let error = null
     try {
       await commit({
-        fs,
-        dir,
+        repo,
         author,
         message: 'Initial commit',
         amend: true,
@@ -491,13 +472,19 @@ describe('commit', () => {
   })
 
   it('error:caller-property', async () => {
-    const { fs, gitdir } = await makeFixture('test-commit')
+    // Use a fresh repo without config to ensure no author is found
+    const { repo } = await makeFixture('test-init', { init: true })
+    const dir = repo.getWorktree()?.dir
+    if (!dir) throw new Error('Repository must have a worktree')
+    
+    // Add a file so we have something to commit
+    await repo.fs.write(path.join(dir, 'file.txt'), 'content')
+    await add({ repo, filepath: 'file.txt' })
     
     let error: any = null
     try {
       await commit({
-        fs,
-        gitdir,
+        repo,
         message: 'Test commit',
         // Missing author - use ignoreSystemConfig: true to ensure no author from config
         autoDetectConfig: false,
@@ -512,13 +499,12 @@ describe('commit', () => {
   })
 
   it('param:signingKey-without-onSign', async () => {
-    const { fs, gitdir } = await makeFixture('test-commit')
+    const { repo } = await makeFixture('test-commit')
     
     let error: any = null
     try {
       await commit({
-        fs,
-        gitdir,
+        repo,
         author: {
           name: 'Mr. Test',
           email: 'mrtest@example.com',
@@ -539,11 +525,12 @@ describe('commit', () => {
   })
 
   it('behavior:default-branch-from-config', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-init')
-    await init({ fs, dir, gitdir, defaultBranch: 'develop' })
+    const { repo } = await makeFixture('test-init', { init: true, defaultBranch: 'develop' })
+    const dir = repo.getWorktree()?.dir
+    if (!dir) throw new Error('Repository must have a worktree')
     
-    await fs.write(path.join(dir, 'file.txt'), 'content')
-    await add({ fs, dir, gitdir, filepath: 'file.txt', cache })
+    await repo.fs.write(path.join(dir, 'file.txt'), 'content')
+    await add({ repo, filepath: 'file.txt' })
     
     const author = {
       name: 'Mr. Test',
@@ -553,31 +540,29 @@ describe('commit', () => {
     }
     
     const sha = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       author,
       message: 'Initial commit',
-      cache,
     })
     
     // Verify commit was created and branch was set
-    const commits = await log({ fs, dir, gitdir, ref: 'HEAD', cache })
+    const commits = await log({ repo, ref: 'HEAD' })
     assert.strictEqual(commits.length, 1)
     assert.strictEqual(commits[0].oid, sha)
     
     // Verify HEAD points to develop branch
-    const headRef = await resolveRef({ fs, dir, gitdir, ref: 'HEAD', cache })
-    const developRef = await resolveRef({ fs, dir, gitdir, ref: 'refs/heads/develop', cache })
+    const headRef = await resolveRef({ repo, ref: 'HEAD' })
+    const developRef = await resolveRef({ repo, ref: 'refs/heads/develop' })
     assert.strictEqual(headRef, developRef)
   })
 
   it('behavior:default-branch-master', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-init')
-    await init({ fs, dir, gitdir })
+    const { repo } = await makeFixture('test-init', { init: true })
+    const dir = repo.getWorktree()?.dir
+    if (!dir) throw new Error('Repository must have a worktree')
     
-    await fs.write(path.join(dir, 'file.txt'), 'content')
-    await add({ fs, dir, gitdir, filepath: 'file.txt', cache })
+    await repo.fs.write(path.join(dir, 'file.txt'), 'content')
+    await add({ repo, filepath: 'file.txt' })
     
     const author = {
       name: 'Mr. Test',
@@ -587,27 +572,23 @@ describe('commit', () => {
     }
     
     const sha = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       author,
       message: 'Initial commit',
-      cache,
     })
     
     // Verify commit was created
-    const commits = await log({ fs, dir, gitdir, ref: 'HEAD', cache })
+    const commits = await log({ repo, ref: 'HEAD' })
     assert.strictEqual(commits.length, 1)
     assert.strictEqual(commits[0].oid, sha)
   })
 
   it('param:custom-ref-creates-commit', async () => {
-    const { fs, gitdir } = await makeFixture('test-commit')
-    const { oid: originalOid } = (await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache }))[0]
+    const { repo } = await makeFixture('test-commit')
+    const { oid: originalOid } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     
     const sha = await commit({
-      fs,
-      gitdir,
+      repo,
       author: {
         name: 'Mr. Test',
         email: 'mrtest@example.com',
@@ -616,11 +597,10 @@ describe('commit', () => {
       },
       message: 'Test commit',
       ref: 'refs/heads/custom-branch',
-      cache,
     })
     
     // Verify custom branch was created and updated
-    const customLog = await log({ fs, gitdir, depth: 1, ref: 'custom-branch', cache })
+    const customLog = await log({ repo, depth: 1, ref: 'custom-branch' })
     assert.ok(customLog.length > 0, 'Custom branch should have commits')
     const { oid: customOid } = customLog[0]
     assert.strictEqual(customOid, sha, 'Custom branch should point to new commit')
@@ -630,7 +610,7 @@ describe('commit', () => {
   })
 
   it('behavior:amend-uses-previous-parents', async () => {
-    const { fs, gitdir } = await makeFixture('test-commit')
+    const { repo } = await makeFixture('test-commit')
     const author = {
       name: 'Mr. Test',
       email: 'mrtest@example.com',
@@ -640,45 +620,38 @@ describe('commit', () => {
     
     // Make first commit
     const firstSha = await commit({
-      fs,
-      gitdir,
+      repo,
       author,
       message: 'First commit',
-      cache,
     })
     
     // Make second commit
     await commit({
-      fs,
-      gitdir,
+      repo,
       author,
       message: 'Second commit',
-      cache,
     })
     
     // Amend the second commit
     const amendedSha = await commit({
-      fs,
-      gitdir,
+      repo,
       author,
       message: 'Amended second commit',
       amend: true,
-      cache,
     })
     
     // Verify amended commit has the same parent as the original second commit
-    const { commit: amendedCommit } = (await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache }))[0]
+    const { commit: amendedCommit } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     assert.deepStrictEqual(amendedCommit.parent, [firstSha], 'Amended commit should have same parent')
     assert.notStrictEqual(amendedSha, firstSha, 'Amended commit should be different OID')
   })
 
   it('param:parent-resolves-refs', async () => {
-    const { fs, gitdir } = await makeFixture('test-commit')
-    const { oid: originalOid } = (await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache }))[0]
+    const { repo } = await makeFixture('test-commit')
+    const { oid: originalOid } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     
     const sha = await commit({
-      fs,
-      gitdir,
+      repo,
       author: {
         name: 'Mr. Test',
         email: 'mrtest@example.com',
@@ -687,21 +660,19 @@ describe('commit', () => {
       },
       message: 'Test commit',
       parent: ['HEAD'], // Use ref instead of OID
-      cache,
     })
     
     // Verify commit has correct parent
-    const { commit: newCommit } = (await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache }))[0]
+    const { commit: newCommit } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     assert.deepStrictEqual(newCommit.parent, [originalOid], 'Parent should be resolved from ref')
   })
 
   it('param:tree-uses-provided', async () => {
-    const { fs, gitdir } = await makeFixture('test-commit')
-    const { commit: originalCommit } = (await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache }))[0]
+    const { repo } = await makeFixture('test-commit')
+    const { commit: originalCommit } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     
     const sha = await commit({
-      fs,
-      gitdir,
+      repo,
       author: {
         name: 'Mr. Test',
         email: 'mrtest@example.com',
@@ -710,24 +681,29 @@ describe('commit', () => {
       },
       message: 'Test commit',
       tree: originalCommit.tree, // Use existing tree
-      cache,
     })
     
     // Verify commit uses provided tree
-    const { commit: newCommit } = (await log({ fs, gitdir, ref: 'HEAD', depth: 1, cache }))[0]
+    const { commit: newCommit } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     assert.strictEqual(newCommit.tree, originalCommit.tree, 'Commit should use provided tree')
   })
 
   it('error:index-read-error', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-init')
-    await init({ fs, dir, gitdir })
+    const { repo } = await makeFixture('test-init', { init: true })
+    const dir = repo.getWorktree()?.dir
+    if (!dir) throw new Error('Repository must have a worktree')
+    const gitdir = await repo.getGitdir()
     
-    await fs.write(path.join(dir, 'file.txt'), 'content')
-    await add({ fs, dir, gitdir, filepath: 'file.txt', cache })
+    await repo.fs.write(path.join(dir, 'file.txt'), 'content')
+    await add({ repo, filepath: 'file.txt' })
     
-    // Delete index to simulate read error
+    // Delete index to simulate read error - use backend method
     try {
-      await fs.rm(path.join(gitdir, 'index'))
+      const indexBuffer = await repo.gitBackend!.readIndex()
+      if (indexBuffer.length > 0) {
+        // Write empty index to simulate deletion
+        await repo.gitBackend!.writeIndex(UniversalBuffer.alloc(0))
+      }
     } catch {
       // Index might not exist
     }
@@ -741,26 +717,24 @@ describe('commit', () => {
     
     // Commit should still work with empty index
     const sha = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       author,
       message: 'Initial commit',
-      cache,
     })
     
     // Verify commit was created
-    const commits = await log({ fs, dir, gitdir, ref: 'HEAD', cache })
+    const commits = await log({ repo, ref: 'HEAD' })
     assert.strictEqual(commits.length, 1)
     assert.strictEqual(commits[0].oid, sha)
   })
 
   it('param:autoDetectConfig-false', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-init')
-    await init({ fs, dir, gitdir })
+    const { repo } = await makeFixture('test-init', { init: true })
+    const dir = repo.getWorktree()?.dir
+    if (!dir) throw new Error('Repository must have a worktree')
     
-    await fs.write(path.join(dir, 'file.txt'), 'content')
-    await add({ fs, dir, gitdir, filepath: 'file.txt', cache })
+    await repo.fs.write(path.join(dir, 'file.txt'), 'content')
+    await add({ repo, filepath: 'file.txt' })
     
     const author = {
       name: 'Mr. Test',
@@ -770,17 +744,14 @@ describe('commit', () => {
     }
     
     const sha = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       author,
       message: 'Initial commit',
       autoDetectConfig: false,
-      cache,
     })
     
     // Verify commit was created
-    const commits = await log({ fs, dir, gitdir, ref: 'HEAD', cache })
+    const commits = await log({ repo, ref: 'HEAD' })
     assert.strictEqual(commits.length, 1)
     assert.strictEqual(commits[0].oid, sha)
   })

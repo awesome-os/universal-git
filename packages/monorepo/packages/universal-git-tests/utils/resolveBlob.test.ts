@@ -8,19 +8,19 @@ import { NotFoundError } from '@awesome-os/universal-git-src/errors/NotFoundErro
 
 test('resolveBlob', async (t) => {
   await t.test('ok:resolves-blob', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const blobOid = await writeBlob({
-      fs,
-      dir,
-      gitdir,
+      repo,
       blob: Buffer.from('test content'),
       cache,
     })
     
     const result = await resolveBlob({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: blobOid,
@@ -32,21 +32,19 @@ test('resolveBlob', async (t) => {
   })
 
   await t.test('ok:peels-tag-to-blob', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const blobOid = await writeBlob({
-      fs,
-      dir,
-      gitdir,
+      repo,
       blob: Buffer.from('tagged blob content'),
       cache,
     })
     
     const tagOid = await writeTag({
-      fs,
-      dir,
-      gitdir,
+      repo,
       tag: {
         object: blobOid,
         type: 'blob',
@@ -58,7 +56,7 @@ test('resolveBlob', async (t) => {
     })
     
     const result = await resolveBlob({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: tagOid,
@@ -70,21 +68,21 @@ test('resolveBlob', async (t) => {
   })
 
   await t.test('error:ObjectTypeError-non-blob', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     // Write an empty tree object
     const { writeTree } = await import('@awesome-os/universal-git-src/commands/writeTree.ts')
     const treeOid = await writeTree({
-      fs,
-      gitdir,
+      repo,
       tree: [],
     })
     
     await assert.rejects(
       async () => {
         await resolveBlob({
-          fs,
+          fs: repo.fs,
           cache,
           gitdir,
           oid: treeOid,
@@ -97,7 +95,8 @@ test('resolveBlob', async (t) => {
   })
 
   await t.test('error:NotFoundError-non-existent', async () => {
-    const { fs, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const nonExistentOid = 'a'.repeat(40)
@@ -105,7 +104,7 @@ test('resolveBlob', async (t) => {
     await assert.rejects(
       async () => {
         await resolveBlob({
-          fs,
+          fs: repo.fs,
           cache,
           gitdir,
           oid: nonExistentOid,
@@ -118,19 +117,19 @@ test('resolveBlob', async (t) => {
   })
 
   await t.test('edge:empty-blob', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const blobOid = await writeBlob({
-      fs,
-      dir,
-      gitdir,
+      repo,
       blob: Buffer.from(''),
       cache,
     })
     
     const result = await resolveBlob({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: blobOid,
@@ -142,20 +141,20 @@ test('resolveBlob', async (t) => {
   })
 
   await t.test('ok:handles-binary-blob', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const binaryContent = Buffer.from([0x00, 0x01, 0x02, 0xFF, 0xFE, 0xFD])
     const blobOid = await writeBlob({
-      fs,
-      dir,
-      gitdir,
+      repo,
       blob: binaryContent,
       cache,
     })
     
     const result = await resolveBlob({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: blobOid,
@@ -167,20 +166,20 @@ test('resolveBlob', async (t) => {
   })
 
   await t.test('ok:handles-large-blob', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     const cache: Record<string, unknown> = {}
     
     const largeContent = Buffer.alloc(10000, 'x')
     const blobOid = await writeBlob({
-      fs,
-      dir,
-      gitdir,
+      repo,
       blob: largeContent,
       cache,
     })
     
     const result = await resolveBlob({
-      fs,
+      fs: repo.fs,
       cache,
       gitdir,
       oid: blobOid,

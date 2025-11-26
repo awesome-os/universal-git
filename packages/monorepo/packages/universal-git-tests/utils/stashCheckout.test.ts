@@ -9,29 +9,29 @@ import {
 } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { analyzeCheckout } from '@awesome-os/universal-git-src/git/worktree/WorkdirManager.ts'
-import { createFileSystem } from '@awesome-os/universal-git-src/utils/createFileSystem.ts'
 
 describe('stash checkout integration', () => {
-  const addUserConfig = async (fs: any, dir: string, gitdir: string) => {
-    await setConfig({ fs, dir, gitdir, path: 'user.name', value: 'stash tester' })
-    await setConfig({ fs, dir, gitdir, path: 'user.email', value: 'test@stash.com' })
+  const addUserConfig = async (repo: any) => {
+    await setConfig({ repo, path: 'user.name', value: 'stash tester' })
+    await setConfig({ repo, path: 'user.email', value: 'test@stash.com' })
   }
 
   it('ok:restore-files-after-stash', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-stash')
-    await addUserConfig(fs, dir, gitdir)
-    const cache = {}
+    const { repo } = await makeFixture('test-stash')
+    await addUserConfig(repo)
+    const dir = repo.getWorktree()?.dir
+    if (!dir) throw new Error('Repository must have a worktree')
     
     // Get original content
-    const originalContent = await fs.read(`${dir}/a.txt`)
+    const originalContent = await repo.fs.read(`${dir}/a.txt`)
     
     // Make changes and stage them
-    await fs.write(`${dir}/a.txt`, 'staged changes - a')
-    await add({ fs, dir, gitdir, filepath: 'a.txt', cache })
+    await repo.fs.write(`${dir}/a.txt`, 'staged changes - a')
+    await add({ repo, filepath: 'a.txt' })
     
-    // Verify file is staged (status might be 'modified' or 'staged' depending on implementation)
-    const statusBefore = await status({ fs, dir, gitdir, filepath: 'a.txt', cache })
-    assert.ok(statusBefore === 'staged' || statusBefore === 'modified', `Status should be 'staged' or 'modified', got '${statusBefore}'`)
+    // Verify file is staged (status should be 'modified' after staging)
+    const statusBefore = await status({ repo, filepath: 'a.txt' })
+    assert.ok(statusBefore === 'modified', `Status should be 'modified', got '${statusBefore}'`)
     
     // After add, index should match the staged content, but workdir still has the staged content
     // So index OID != HEAD OID, but workdir OID == index OID
@@ -40,31 +40,35 @@ describe('stash checkout integration', () => {
     // 1. Create stash commit with the staged changes
     // 2. Checkout HEAD to restore files
     // 3. Reset index to match HEAD
-    await stash({ fs, dir, gitdir, cache })
+    await stash({ repo })
     
     // Verify file is restored to original content
-    const restoredContent = await fs.read(`${dir}/a.txt`)
+    const restoredContent = await repo.fs.read(`${dir}/a.txt`)
+    assert.ok(restoredContent !== null, 'restoredContent should not be null')
+    assert.ok(originalContent !== null, 'originalContent should not be null')
     assert.strictEqual(restoredContent.toString(), originalContent.toString(), 'File should be restored to original content after stash')
     
     // Verify status shows file is unmodified
-    const statusAfter = await status({ fs, dir, gitdir, filepath: 'a.txt', cache })
+    const statusAfter = await status({ repo, filepath: 'a.txt' })
     assert.strictEqual(statusAfter, 'unmodified', 'File should be unmodified after stash')
   })
 
   it('behavior:detect-workdir-changes-analyzeCheckout', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-stash')
-    await addUserConfig(fs, dir, gitdir)
-    const cache = {}
+    const { repo } = await makeFixture('test-stash')
+    await addUserConfig(repo)
+    const dir = repo.getWorktree()?.dir
+    if (!dir) throw new Error('Repository must have a worktree')
+    const gitdir = await repo.getGitdir()
     
     // Get HEAD tree OID
     const { readCommit, resolveRef } = await import('@awesome-os/universal-git-src/index.ts')
-    const headOid = await resolveRef({ fs, gitdir, ref: 'HEAD' })
-    const commitResult = await readCommit({ fs, gitdir, oid: headOid })
+    const headOid = await resolveRef({ repo, ref: 'HEAD' })
+    const commitResult = await readCommit({ repo, oid: headOid })
     const treeOid = commitResult.commit.tree
     
     // Make changes and stage them (so index matches staged content, not HEAD)
-    await fs.write(`${dir}/a.txt`, 'staged changes - a')
-    await add({ fs, dir, gitdir, filepath: 'a.txt', cache })
+    await repo.fs.write(`${dir}/a.txt`, 'staged changes - a')
+    await add({ repo, filepath: 'a.txt' })
     
     // Now the index has the staged content, but HEAD has the original
     // When we analyze checkout to HEAD, it should detect that:
@@ -73,17 +77,15 @@ describe('stash checkout integration', () => {
     // So it should create an update operation
     
     // Read the index first, then pass it to analyzeCheckout
-    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
     const index = await repo.readIndexDirect(false)
     
     const operations = await analyzeCheckout({
-      fs,
+      fs: repo.fs,
       dir,
       gitdir,
       treeOid,
       force: true,
-      cache,
+      cache: repo.cache,
       index, // Pass the index object
     })
     
@@ -93,72 +95,62 @@ describe('stash checkout integration', () => {
   })
 
   it('ok:restore-files-unstaged-changes', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-stash')
-    await addUserConfig(fs, dir, gitdir)
-    const cache = {}
+    const { repo } = await makeFixture('test-stash')
+    await addUserConfig(repo)
+    const dir = repo.getWorktree()?.dir
+    if (!dir) throw new Error('Repository must have a worktree')
     
-    // CRITICAL: Create Repository instance once and use it for everything
-    // This ensures the same fs instance is used throughout the test
-    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
+    // Get original content - use repo.fs
+    const originalContent = await repo.fs.read(`${dir}/a.txt`)
     
-    // CRITICAL: Use createFileSystem to ensure we're using the same fs instance as the Repository
-    // This ensures that writes from checkout are visible to reads in the test
-    const normalizedFs = createFileSystem(fs)
-    
-    // Get original content - use normalized fs to match checkout's fs
-    const originalContent = await normalizedFs.read(`${dir}/a.txt`)
-    
-    // Make changes but don't stage them using normalized fs
-    await normalizedFs.write(`${dir}/a.txt`, 'unstaged changes')
+    // Make changes but don't stage them
+    await repo.fs.write(`${dir}/a.txt`, 'unstaged changes')
     
     // Verify file is modified but not staged (status might have '*' prefix)
-    const statusBefore = await status({ fs, dir, gitdir, filepath: 'a.txt', cache })
+    const statusBefore = await status({ repo, filepath: 'a.txt' })
     assert.ok(statusBefore === 'modified' || statusBefore === '*modified', `Status should be 'modified' or '*modified', got '${statusBefore}'`)
     
-    // Now checkout with force should restore to HEAD - pass repo to ensure fs consistency
+    // Now checkout with force should restore to HEAD
     await checkout({
-      repo, // Pass Repository instance to ensure same fs instance
-      fs,   // Still pass for backward compatibility
-      dir,
-      gitdir,
+      repo,
       ref: 'HEAD',
       force: true,
-      cache,
     })
     
-    // Verify file is restored - use normalized fs to match checkout's fs
-    const restoredContent = await normalizedFs.read(`${dir}/a.txt`)
+    // Verify file is restored
+    const restoredContent = await repo.fs.read(`${dir}/a.txt`)
+    assert.ok(restoredContent !== null, 'restoredContent should not be null')
+    assert.ok(originalContent !== null, 'originalContent should not be null')
     assert.strictEqual(restoredContent.toString(), originalContent.toString())
     
     // Verify status shows file is unmodified
-    // CRITICAL: Use the same repo instance to ensure we see the updated index
-    // The status API creates its own Repository instance, but we can ensure cache consistency
-    // by using the same cache object and ensuring the index is written to disk
-    const statusAfter = await status({ fs, dir, gitdir, filepath: 'a.txt', cache })
+    const statusAfter = await status({ repo, filepath: 'a.txt' })
     assert.strictEqual(statusAfter, 'unmodified', `Expected 'unmodified', got '${statusAfter}'. File should be in HEAD after checkout.`)
   })
 
   it('ok:handle-stash-workdir-changes', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-stash')
-    await addUserConfig(fs, dir, gitdir)
-    const cache = {}
+    const { repo } = await makeFixture('test-stash')
+    await addUserConfig(repo)
+    const dir = repo.getWorktree()?.dir
+    if (!dir) throw new Error('Repository must have a worktree')
     
     // Get original content
-    const originalContent = await fs.read(`${dir}/a.txt`)
+    const originalContent = await repo.fs.read(`${dir}/a.txt`)
     
     // Make unstaged changes (index still matches HEAD)
-    await fs.write(`${dir}/a.txt`, 'unstaged changes')
+    await repo.fs.write(`${dir}/a.txt`, 'unstaged changes')
     
     // Stash should detect the workdir changes and stash them
-    await stash({ fs, dir, gitdir, cache })
+    await stash({ repo })
     
     // Verify file is restored to original
-    const restoredContent = await fs.read(`${dir}/a.txt`)
+    const restoredContent = await repo.fs.read(`${dir}/a.txt`)
+    assert.ok(restoredContent !== null, 'restoredContent should not be null')
+    assert.ok(originalContent !== null, 'originalContent should not be null')
     assert.strictEqual(restoredContent.toString(), originalContent.toString())
     
     // Verify status
-    const statusAfter = await status({ fs, dir, gitdir, filepath: 'a.txt', cache })
+    const statusAfter = await status({ repo, filepath: 'a.txt' })
     assert.strictEqual(statusAfter, 'unmodified')
   })
 })

@@ -8,7 +8,7 @@ import { verifyReflogEntry } from '@awesome-os/universal-git-test-helpers/helper
 test('branch', async (t) => {
   await t.test('ok:create-branch', async () => {
     // Setup
-    const { fs, dir, gitdir } = await makeFixture('test-branch')
+    const { repo } = await makeFixture('test-branch')
     // Get HEAD OID before creating branch
     const headOid = await resolveRef({ fs, gitdir, ref: 'HEAD' })
     // Test
@@ -31,7 +31,7 @@ test('branch', async (t) => {
 
   await t.test('param:object-start-point', async () => {
     // Setup
-    const { fs, dir, gitdir } = await makeFixture('test-branch-start-point')
+    const { repo } = await makeFixture('test-branch-start-point')
     // Get start-point OID before creating branch
     const startPointOid = await resolveRef({ fs, gitdir, ref: 'start-point' })
     // Test
@@ -70,7 +70,7 @@ test('branch', async (t) => {
 
   await t.test('param:force', async () => {
     // Setup
-    const { fs, dir, gitdir } = await makeFixture('test-branch')
+    const { repo } = await makeFixture('test-branch')
     let error: unknown = null
     // Test
     await branch({ fs, dir, gitdir, ref: 'test-branch' })
@@ -86,7 +86,7 @@ test('branch', async (t) => {
 
   await t.test('param:object-start-point-force', async () => {
     // Setup
-    const { fs, dir, gitdir } = await makeFixture('test-branch-start-point')
+    const { repo } = await makeFixture('test-branch-start-point')
     let error: unknown = null
     // Test
     await branch({ fs, dir, gitdir, ref: 'test-branch', object: 'start-point' })
@@ -105,7 +105,7 @@ test('branch', async (t) => {
 
   await t.test('param:checkout-true', async () => {
     // Setup
-    const { fs, dir, gitdir } = await makeFixture('test-branch')
+    const { repo } = await makeFixture('test-branch')
     // Get HEAD OID before creating branch
     const headOid = await resolveRef({ fs, gitdir, ref: 'HEAD' })
     // Test
@@ -141,7 +141,7 @@ test('branch', async (t) => {
 
   await t.test('error:invalid-branch-name', async () => {
     // Setup
-    const { fs, dir, gitdir } = await makeFixture('test-branch')
+    const { repo } = await makeFixture('test-branch')
     let error: unknown = null
     // Test
     try {
@@ -155,7 +155,7 @@ test('branch', async (t) => {
 
   await t.test('param:ref-missing', async () => {
     // Setup
-    const { fs, dir, gitdir } = await makeFixture('test-branch')
+    const { repo } = await makeFixture('test-branch')
     let error: unknown = null
     // Test
     try {
@@ -169,7 +169,7 @@ test('branch', async (t) => {
 
   await t.test('edge:empty-repo', async () => {
     // Setup
-    const { dir, fs, gitdir } = await makeFixture('test-branch-empty-repo')
+    const { repo } = await makeFixture('test-branch-empty-repo', { init: true })
     await init({ fs, dir, gitdir })
     let error: unknown = null
     // Test
@@ -185,7 +185,7 @@ test('branch', async (t) => {
 
   await t.test('edge:branch-name-same-as-remote', async () => {
     // Setup
-    const { fs, dir, gitdir } = await makeFixture('test-branch')
+    const { repo } = await makeFixture('test-branch')
     let error: unknown = null
     // Test
     try {
@@ -199,7 +199,7 @@ test('branch', async (t) => {
 
   await t.test('edge:branch-named-HEAD', async () => {
     // Setup
-    const { fs, dir, gitdir } = await makeFixture('test-branch')
+    const { repo } = await makeFixture('test-branch')
     let error: unknown = null
     // Test
     try {
@@ -212,7 +212,7 @@ test('branch', async (t) => {
   })
 
   await t.test('error:caller-property', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-branch')
+    const { repo } = await makeFixture('test-branch')
     
     let error: any = null
     try {
@@ -226,7 +226,7 @@ test('branch', async (t) => {
   })
 
   await t.test('error:branch-exists-force-false', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-branch')
+    const { repo } = await makeFixture('test-branch')
     
     // Create a branch first
     await branch({ fs, dir, gitdir, ref: 'existing-branch' })
@@ -248,7 +248,7 @@ test('branch', async (t) => {
   })
 
   await t.test('param:dir-undefined', async () => {
-    const { fs, gitdir } = await makeFixture('test-branch')
+    const { repo } = await makeFixture('test-branch')
     
     // When dir is undefined, gitdir must be explicitly provided
     await branch({ fs, gitdir, ref: 'no-dir-branch' })
@@ -257,7 +257,7 @@ test('branch', async (t) => {
   })
 
   await t.test('edge:empty-repo-checkout-false', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
     await init({ fs, dir, gitdir })
     
     // In an empty repo, oid will be undefined, but branch should still be created
@@ -272,7 +272,7 @@ test('branch', async (t) => {
   })
 
   await t.test('behavior:reflog-write-error', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-branch')
+    const { repo } = await makeFixture('test-branch')
     
     // Create branch - reflog write might fail but should not throw
     await branch({ fs, dir, gitdir, ref: 'reflog-test-branch' })
@@ -282,7 +282,7 @@ test('branch', async (t) => {
   })
 
   await t.test('behavior:no-HEAD-update-checkout-false', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-branch')
+    const { repo } = await makeFixture('test-branch')
     
     // Get current branch
     const currentBranchName = await currentBranch({ fs, dir, gitdir })
@@ -296,7 +296,7 @@ test('branch', async (t) => {
   })
 
   await t.test('param:object-instead-of-HEAD', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-branch')
+    const { repo } = await makeFixture('test-branch')
     
     // Get a specific commit OID
     const headOid = await resolveRef({ fs, gitdir, ref: 'HEAD' })
@@ -310,7 +310,7 @@ test('branch', async (t) => {
   })
 
   await t.test('edge:object-non-existent-ref', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-branch')
+    const { repo } = await makeFixture('test-branch')
     
     // Try to create branch with non-existent object
     // According to the code, when oid resolution fails, the branch is still created

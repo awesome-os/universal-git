@@ -6,13 +6,12 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 describe('readObject', () => {
   it('error:test-missing', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
     // Test
     let error = null
     try {
       await readObject({
-        fs,
-        gitdir,
+        repo,
         oid: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       })
     } catch (err) {
@@ -24,10 +23,11 @@ describe('readObject', () => {
   
   it('ok:parsed', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
+    const gitdir = await repo.getGitdir()
     // Test
     const ref = await readObject({
-      fs,
+      fs: repo.fs,
       gitdir,
       oid: 'e10ebb90d03eaacca84de1af0a59b444232da99e',
     })
@@ -42,10 +42,11 @@ describe('readObject', () => {
   
   it('ok:content', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
+    const gitdir = await repo.getGitdir()
     // Test
     const ref = await readObject({
-      fs,
+      fs: repo.fs,
       gitdir,
       oid: 'e10ebb90d03eaacca84de1af0a59b444232da99e',
       format: 'content',
@@ -58,10 +59,11 @@ describe('readObject', () => {
   
   it('ok:wrapped', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
+    const gitdir = await repo.getGitdir()
     // Test
     const ref = await readObject({
-      fs,
+      fs: repo.fs,
       gitdir,
       oid: 'e10ebb90d03eaacca84de1af0a59b444232da99e',
       format: 'wrapped',
@@ -74,10 +76,11 @@ describe('readObject', () => {
   
   it('ok:deflated', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
+    const gitdir = await repo.getGitdir()
     // Test
     const ref = await readObject({
-      fs,
+      fs: repo.fs,
       gitdir,
       oid: 'e10ebb90d03eaacca84de1af0a59b444232da99e',
       format: 'deflated',
@@ -90,10 +93,11 @@ describe('readObject', () => {
   
   it('ok:blob-with-encoding', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
+    const gitdir = await repo.getGitdir()
     // Test
     const ref = await readObject({
-      fs,
+      fs: repo.fs,
       gitdir,
       oid: '4551a1856279dde6ae9d65862a1dff59a5f199d8',
       format: 'parsed',
@@ -107,10 +111,11 @@ describe('readObject', () => {
 
   it('ok:from-packfile-deflated', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
+    const gitdir = await repo.getGitdir()
     // Test
     const ref = await readObject({
-      fs,
+      fs: repo.fs,
       gitdir,
       oid: '0b8faa11b353db846b40eb064dfb299816542a46',
       format: 'deflated',
@@ -126,10 +131,11 @@ describe('readObject', () => {
 
   it('ok:from-packfile-wrapped', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
+    const gitdir = await repo.getGitdir()
     // Test
     const ref = await readObject({
-      fs,
+      fs: repo.fs,
       gitdir,
       oid: '0b8faa11b353db846b40eb064dfb299816542a46',
       format: 'wrapped',
@@ -145,10 +151,11 @@ describe('readObject', () => {
 
   it('ok:from-packfile-content', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
+    const gitdir = await repo.getGitdir()
     // Test
     const ref = await readObject({
-      fs,
+      fs: repo.fs,
       gitdir,
       oid: '0b8faa11b353db846b40eb064dfb299816542a46',
       format: 'content',
@@ -162,10 +169,11 @@ describe('readObject', () => {
 
   it('ok:with-simple-filepath-to-blob', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
+    const gitdir = await repo.getGitdir()
     // Test
     const ref = await readObject({
-      fs,
+      fs: repo.fs,
       gitdir,
       oid: 'be1e63da44b26de8877a184359abace1cddcb739',
       format: 'parsed',
@@ -181,10 +189,11 @@ describe('readObject', () => {
 
   it('ok:with-deep-filepath-to-blob', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
+    const gitdir = await repo.getGitdir()
     // Test
     const ref = await readObject({
-      fs,
+      fs: repo.fs,
       gitdir,
       oid: 'be1e63da44b26de8877a184359abace1cddcb739',
       format: 'parsed',
@@ -199,10 +208,11 @@ describe('readObject', () => {
 
   it('ok:with-simple-filepath-to-tree', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
+    const gitdir = await repo.getGitdir()
     // Test
     const ref = await readObject({
-      fs,
+      fs: repo.fs,
       gitdir,
       oid: 'be1e63da44b26de8877a184359abace1cddcb739',
       format: 'parsed',
@@ -218,10 +228,11 @@ describe('readObject', () => {
 
   it('ok:with-deep-filepath-to-tree', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
+    const gitdir = await repo.getGitdir()
     // Test
     const ref = await readObject({
-      fs,
+      fs: repo.fs,
       gitdir,
       oid: 'be1e63da44b26de8877a184359abace1cddcb739',
       format: 'parsed',
@@ -239,13 +250,12 @@ describe('readObject', () => {
 
   it('error:with-erroneous-filepath-directory-is-a-file', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
     // Test
     let error: unknown = null
     try {
       await readObject({
-        fs,
-        gitdir,
+        repo,
         oid: 'be1e63da44b26de8877a184359abace1cddcb739',
         format: 'parsed',
         filepath: 'src/commands/clone.js/isntafolder.txt',
@@ -259,13 +269,12 @@ describe('readObject', () => {
 
   it('error:with-erroneous-filepath-no-such-directory', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
     // Test
     let error: unknown = null
     try {
       await readObject({
-        fs,
-        gitdir,
+        repo,
         oid: 'be1e63da44b26de8877a184359abace1cddcb739',
         format: 'parsed',
         filepath: 'src/isntafolder',
@@ -279,13 +288,12 @@ describe('readObject', () => {
 
   it('error:with-erroneous-filepath-leading-slash', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
     // Test
     let error: unknown = null
     try {
       await readObject({
-        fs,
-        gitdir,
+        repo,
         oid: 'be1e63da44b26de8877a184359abace1cddcb739',
         format: 'parsed',
         filepath: '/src',
@@ -302,13 +310,12 @@ describe('readObject', () => {
 
   it('error:with-erroneous-filepath-trailing-slash', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
     // Test
     let error: unknown = null
     try {
       await readObject({
-        fs,
-        gitdir,
+        repo,
         oid: 'be1e63da44b26de8877a184359abace1cddcb739',
         format: 'parsed',
         filepath: 'src/',
@@ -325,13 +332,11 @@ describe('readObject', () => {
 
   it('behavior:uses-getExternalRefDelta-for-packfile-deltas', async () => {
     // Test - line 57: getExternalRefDelta function
-    const { fs, gitdir } = await makeFixture('test-GitPackIndex')
+    const { repo } = await makeFixture('test-GitPackIndex')
     const cache: Record<string, unknown> = {}
     // This tests the getExternalRefDelta closure
     const result = await readObject({
-      fs,
-      cache,
-      gitdir,
+      repo,
       oid: '0b8faa11b353db846b40eb064dfb299816542a46',
       format: 'content',
     })
@@ -341,11 +346,9 @@ describe('readObject', () => {
 
   it('ok:handles-deflated-format-for-loose-objects', async () => {
     // Test - lines 105-107: inflate deflated loose object
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
     const result = await readObject({
-      fs,
-      cache: {},
-      gitdir,
+      repo,
       oid: 'e10ebb90d03eaacca84de1af0a59b444232da99e',
       format: 'deflated',
     })
@@ -355,11 +358,9 @@ describe('readObject', () => {
 
   it('ok:verifies-SHA-and-unwraps-wrapped-object', async () => {
     // Test - lines 120-121: SHA verification and unwrap
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
     const result = await readObject({
-      fs,
-      cache: {},
-      gitdir,
+      repo,
       oid: 'e10ebb90d03eaacca84de1af0a59b444232da99e',
       format: 'content',
     })
@@ -370,13 +371,11 @@ describe('readObject', () => {
 
   it('error:throws-error-for-invalid-format', async () => {
     // Test - line 130-131: throw InternalError for invalid format
-    const { fs, gitdir } = await makeFixture('test-readObject')
+    const { repo } = await makeFixture('test-readObject')
     let error: unknown = null
     try {
       await readObject({
-        fs,
-        cache: {},
-        gitdir,
+        repo,
         oid: 'e10ebb90d03eaacca84de1af0a59b444232da99e',
         // @ts-expect-error - intentionally invalid format
         format: 'invalid-format',
