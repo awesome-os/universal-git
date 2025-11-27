@@ -75,6 +75,10 @@ export class GitRemoteDaemon implements GitRemoteBackend {
     this.baseUrl = baseUrl
   }
 
+  getUrl(): string {
+    return this.baseUrl
+  }
+
   supportsRestApi(): boolean {
     return false
   }

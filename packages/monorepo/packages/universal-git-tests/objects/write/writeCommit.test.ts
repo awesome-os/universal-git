@@ -7,10 +7,9 @@ import { computeCommitOid } from '@awesome-os/universal-git-test-helpers/helpers
 test('writeCommit', async (t) => {
   await t.test('ok:parsed', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-writeCommit')
+    const { repo } = await makeFixture('test-writeCommit')
     // Test - Using helper function for OID computation only
-    const oid = await computeCommitOid(fs, {
-      gitdir,
+    const oid = await computeCommitOid(repo, {
       commit: {
         author: {
           email: 'wmhilton@gmail.com',
@@ -69,12 +68,11 @@ Qixh2bmPgr3h9nxq2Dmn
   })
 
   await t.test('param:commit-missing', async () => {
-    const { fs, gitdir } = await makeFixture('test-writeCommit')
+    const { repo } = await makeFixture('test-writeCommit')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await writeCommit({
-        fs,
-        gitdir,
+        repo,
       } as any)
       assert.fail('Should have thrown MissingParameterError')
     } catch (error) {
@@ -84,10 +82,9 @@ Qixh2bmPgr3h9nxq2Dmn
   })
 
   await t.test('param:dryRun', async () => {
-    const { fs, gitdir } = await makeFixture('test-writeCommit')
+    const { repo } = await makeFixture('test-writeCommit')
     const oid = await writeCommit({
-      fs,
-      gitdir,
+      repo,
       commit: {
         tree: 'e0b8f3574060ee24e03e4af3896f65dd208a60cc',
         author: { name: 'Test', email: 'test@example.com', timestamp: 1502484200, timezoneOffset: 240 },
@@ -101,7 +98,7 @@ Qixh2bmPgr3h9nxq2Dmn
     // Verify object was not written
     const { readObject } = await import('@awesome-os/universal-git-src/index.ts')
     try {
-      await readObject({ fs, gitdir, oid })
+      await readObject({ repo, oid })
       assert.fail('Object should not exist when dryRun is true')
     } catch (error) {
       // Expected - object should not exist
@@ -110,12 +107,9 @@ Qixh2bmPgr3h9nxq2Dmn
   })
 
   await t.test('param:repo-provided', async () => {
-    const { fs, gitdir, dir } = await makeFixture('test-writeCommit')
-    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const repo = await Repository.open({ fs, dir, gitdir })
+    const { repo } = await makeFixture('test-writeCommit')
     const oid = await writeCommit({
       repo,
-      gitdir, // Provide gitdir explicitly to work around default parameter bug
       commit: {
         tree: 'e0b8f3574060ee24e03e4af3896f65dd208a60cc',
         author: { name: 'Test', email: 'test@example.com', timestamp: 1502484200, timezoneOffset: 240 },
@@ -129,10 +123,9 @@ Qixh2bmPgr3h9nxq2Dmn
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { fs, dir } = await makeFixture('test-writeCommit')
+    const { repo } = await makeFixture('test-writeCommit')
     // Using helper function for OID computation only
-    const oid = await computeCommitOid(fs, {
-      dir,
+    const oid = await computeCommitOid(repo, {
       commit: {
         tree: 'e0b8f3574060ee24e03e4af3896f65dd208a60cc',
         author: { name: 'Test', email: 'test@example.com', timestamp: 1502484200, timezoneOffset: 240 },
@@ -145,12 +138,11 @@ Qixh2bmPgr3h9nxq2Dmn
   })
 
   await t.test('error:caller-property', async () => {
-    const { fs, gitdir } = await makeFixture('test-writeCommit')
+    const { repo } = await makeFixture('test-writeCommit')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await writeCommit({
-        fs,
-        gitdir,
+        repo,
       } as any)
       assert.fail('Should have thrown MissingParameterError')
     } catch (error: any) {
@@ -160,10 +152,9 @@ Qixh2bmPgr3h9nxq2Dmn
   })
 
   await t.test('ok:commit-multiple-parents', async () => {
-    const { fs, gitdir } = await makeFixture('test-writeCommit')
+    const { repo } = await makeFixture('test-writeCommit')
     // Using helper function for OID computation only
-    const oid = await computeCommitOid(fs, {
-      gitdir,
+    const oid = await computeCommitOid(repo, {
       commit: {
         tree: 'e0b8f3574060ee24e03e4af3896f65dd208a60cc',
         parent: ['b4f8206d9e359416b0f34238cbeb400f7da889a8', 'a1b2c3d4e5f6789012345678901234567890abcd'],
@@ -177,10 +168,9 @@ Qixh2bmPgr3h9nxq2Dmn
   })
 
   await t.test('ok:commit-no-parent', async () => {
-    const { fs, gitdir } = await makeFixture('test-writeCommit')
+    const { repo } = await makeFixture('test-writeCommit')
     // Using helper function for OID computation only
-    const oid = await computeCommitOid(fs, {
-      gitdir,
+    const oid = await computeCommitOid(repo, {
       commit: {
         tree: 'e0b8f3574060ee24e03e4af3896f65dd208a60cc',
         author: { name: 'Test', email: 'test@example.com', timestamp: 1502484200, timezoneOffset: 240 },

@@ -1,12 +1,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { getSubmoduleByPath, parseGitmodules } from '@awesome-os/universal-git-src/core-utils/filesystem/SubmoduleManager.ts'
-import { makeNodeFixture } from '../../helpers/makeNodeFixture.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
+import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
+import { join } from '@awesome-os/universal-git-src/core-utils/GitPath.ts'
 
 test('getSubmoduleByPath', async (t) => {
   await t.test('ok:finds-submodule-by-path', async () => {
-    const { fs, dir } = await makeNodeFixture('test-submodule-by-path')
+    const { repo } = await makeFixture('test-submodule-by-path', { init: true })
+    const dir = (await repo.getDir())!
     
     // Create .gitmodules file
     const gitmodulesContent = `[submodule "lib"]
@@ -17,12 +18,12 @@ test('getSubmoduleByPath', async (t) => {
 	path = docs
 	url = https://github.com/user/docs.git
 `
-    await fs.write(join(dir, '.gitmodules'), gitmodulesContent)
+    await repo.fs.write(join(dir, '.gitmodules'), gitmodulesContent)
     
     // Get by path
-    const libSubmodule = await getSubmoduleByPath({ fs, dir, path: 'lib' })
-    const docsSubmodule = await getSubmoduleByPath({ fs, dir, path: 'docs' })
-    const missingSubmodule = await getSubmoduleByPath({ fs, dir, path: 'nonexistent' })
+    const libSubmodule = await getSubmoduleByPath({ fs: repo.fs, dir, path: 'lib' })
+    const docsSubmodule = await getSubmoduleByPath({ fs: repo.fs, dir, path: 'docs' })
+    const missingSubmodule = await getSubmoduleByPath({ fs: repo.fs, dir, path: 'nonexistent' })
     
     // Assert
     assert.ok(libSubmodule)
@@ -38,18 +39,19 @@ test('getSubmoduleByPath', async (t) => {
   })
 
   await t.test('ok:handles-nested-paths', async () => {
-    const { fs, dir } = await makeNodeFixture('test-submodule-nested')
+    const { repo } = await makeFixture('test-submodule-nested', { init: true })
+    const dir = (await repo.getDir())!
     
     // Create .gitmodules file with nested path
     const gitmodulesContent = `[submodule "nested"]
 	path = lib/submodule
 	url = https://github.com/user/nested.git
 `
-    await fs.write(join(dir, '.gitmodules'), gitmodulesContent)
+    await repo.fs.write(join(dir, '.gitmodules'), gitmodulesContent)
     
     // Get by exact path
-    const nested = await getSubmoduleByPath({ fs, dir, path: 'lib/submodule' })
-    const notNested = await getSubmoduleByPath({ fs, dir, path: 'lib' })
+    const nested = await getSubmoduleByPath({ fs: repo.fs, dir, path: 'lib/submodule' })
+    const notNested = await getSubmoduleByPath({ fs: repo.fs, dir, path: 'lib' })
     
     // Assert
     assert.ok(nested)

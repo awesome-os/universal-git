@@ -17,6 +17,250 @@ Submodules enable you to:
 
 **Note**: Submodule support is fully implemented. All standard Git submodule operations are available and tested.
 
+## Repository-Based Architecture
+
+Universal Git uses a **Repository-based architecture** for submodules, where each submodule is represented by its own `Repository` instance with its own `GitBackend` and `WorktreeBackend`. This enables:
+
+- **Independent Operations**: Each submodule operates independently with its own backend
+- **Independent Remotes**: Each submodule can have its own remote configuration
+- **Multi-Backend Support**: Different submodules can use different backend types
+- **Unified Interface**: Access submodules through the parent `Repository` or directly
+
+### Submodule Repository Structure
+
+Each submodule has its own complete `Repository` instance:
+
+```typescript
+Parent Repository
+├── GitBackend (main repository)
+├── WorktreeBackend (main worktree)
+└── Submodule Repositories (cached in _submoduleRepos)
+    ├── Submodule 1 Repository
+    │   ├── GitBackend (submodule 1)
+    │   └── WorktreeBackend (submodule 1 worktree)
+    ├── Submodule 2 Repository
+    │   ├── GitBackend (submodule 2)
+    │   └── WorktreeBackend (submodule 2 worktree)
+    └── Nested Submodule Repository
+        ├── GitBackend (nested submodule)
+        └── WorktreeBackend (nested submodule worktree)
+```
+
+### Accessing Submodule Repositories
+
+```typescript
+import { Repository } from 'universal-git'
+
+const repo = await Repository.open({ fs, dir: '/path/to/repo' })
+
+// Get a submodule Repository by path or name
+const submoduleRepo = await repo.getSubmodule('libs/mylib')
+
+// Each submodule has its own GitBackend
+const submoduleGitBackend = submoduleRepo.gitBackend
+
+// Each submodule has its own WorktreeBackend
+const submoduleWorktree = await submoduleRepo.getWorktree()
+const submoduleWorktreeBackend = submoduleWorktree?.backend
+
+// Use submodule Repository for operations
+const submoduleHead = await submoduleRepo.resolveRef('HEAD')
+const submoduleFiles = await listFiles({ repo: submoduleRepo })
+```
+
+### Listing Submodules
+
+```typescript
+// List all submodules with their Repository instances
+const submodules = await repo.listSubmodules()
+
+for (const { name, path, url, repo: submoduleRepo } of submodules) {
+  if (submoduleRepo) {
+    console.log(`Submodule: ${name} at ${path}`)
+    console.log(`Repository: ${submoduleRepo.instanceId}`)
+    console.log(`GitBackend: ${submoduleRepo.gitBackend}`)
+    
+    // Access submodule's HEAD
+    const head = await submoduleRepo.resolveRef('HEAD')
+    console.log(`HEAD: ${head}`)
+  }
+}
+```
+
+## WorktreeBackend Submodule Awareness
+
+`WorktreeBackend` implementations are **multi-worktree aware** and automatically handle submodules by delegating operations to submodule `WorktreeBackend` instances.
+
+### Automatic Submodule Delegation
+
+When you perform file operations on a path that's inside a submodule, the `WorktreeBackend` automatically delegates to the submodule's `WorktreeBackend`:
+
+```typescript
+const repo = await Repository.open({ fs, dir: '/path/to/repo' })
+const worktreeBackend = repo.worktreeBackend
+
+// Reading a file in a submodule automatically delegates to submodule's WorktreeBackend
+const content = await worktreeBackend.read('libs/mylib/file.txt')
+// This internally:
+// 1. Detects that 'libs/mylib/file.txt' is in a submodule
+// 2. Gets the submodule's Repository via repo.getSubmodule('libs/mylib')
+// 3. Gets the submodule's WorktreeBackend
+// 4. Delegates the read operation with relative path 'file.txt'
+```
+
+### Adding Submodules
+
+You can programmatically add submodules to a `WorktreeBackend`:
+
+```typescript
+const repo = await Repository.open({ fs, dir: '/path/to/repo' })
+const worktreeBackend = repo.worktreeBackend
+
+// Create or open a submodule Repository
+const submoduleRepo = await Repository.open({
+  fs,
+  dir: '/path/to/repo/libs/my-module',
+  gitdir: '/path/to/repo/.git/modules/libs/my-module'
+})
+
+// Add the submodule to the worktree backend
+await worktreeBackend.addSubmodule('libs/my-module', submoduleRepo)
+
+// Now the submodule is registered and cached
+// File operations on 'libs/my-module/*' will automatically delegate to the submodule
+```
+
+### Submodule Path Resolution
+
+`WorktreeBackend` provides methods for submodule path resolution:
+
+```typescript
+// Check if a path is in a submodule
+const submodulePath = await worktreeBackend.getSubmoduleForPath('libs/mylib/file.txt')
+// Returns: 'libs/mylib' or null
+
+// Resolve a path across worktree boundaries
+const resolved = await worktreeBackend.resolvePath('libs/mylib/file.txt')
+// Returns: {
+//   worktree: GitWorktreeBackend,  // Submodule's WorktreeBackend
+//   relativePath: 'file.txt',       // Path relative to submodule root
+//   submodulePath: 'libs/mylib'     // Submodule path
+// }
+
+// Get submodule WorktreeBackend directly
+const submoduleBackend = await worktreeBackend.getSubmodule('libs/mylib')
+// Returns: GitWorktreeBackend for the submodule
+
+// List all submodule WorktreeBackends
+const submodules = await worktreeBackend.listSubmodules()
+// Returns: Array<{ path: string, backend: GitWorktreeBackend }>
+```
+
+### Recursive Submodule Support
+
+Submodule path resolution supports nested submodules recursively:
+
+```typescript
+// If 'libs/mylib' contains its own submodule 'nested-lib'
+const resolved = await worktreeBackend.resolvePath('libs/mylib/nested-lib/file.txt')
+// Automatically resolves through:
+// 1. Main worktree → detects 'libs/mylib' submodule
+// 2. Submodule worktree → detects 'nested-lib' submodule
+// 3. Nested submodule worktree → reads 'file.txt'
+```
+
+## Pushing Submodules
+
+Submodules can be pushed independently or as part of the main push operation. Each submodule uses its own `Repository` and `GitBackend`, allowing independent remote configuration.
+
+### Independent Submodule Push
+
+Push a specific submodule independently:
+
+```typescript
+import { pushSubmodule } from 'universal-git'
+
+const repo = await Repository.open({ fs, dir: '/path/to/repo' })
+
+// Push a specific submodule independently
+const result = await pushSubmodule(repo, 'libs/mylib', {
+  ref: 'main',
+  remote: 'origin',
+  http,
+  force: false
+})
+
+console.log('Submodule push result:', result.ok)
+```
+
+### Push All Submodules
+
+Push all submodules as part of the main push:
+
+```typescript
+import { push } from 'universal-git'
+
+const repo = await Repository.open({ fs, dir: '/path/to/repo' })
+
+// Push main repository and all submodules
+const result = await push({
+  repo,
+  ref: 'main',
+  remote: 'origin',
+  http,
+  includeSubmodules: true,  // Push submodules after main push succeeds
+  submoduleRecurse: true,   // Also push nested submodules
+})
+
+// Check submodule results
+if (result.submodules) {
+  for (const [path, submoduleResult] of Object.entries(result.submodules)) {
+    console.log(`Submodule ${path}: ${submoduleResult.ok ? 'OK' : 'FAILED'}`)
+  }
+}
+```
+
+### Push Submodules One by One
+
+```typescript
+const repo = await Repository.open({ fs, dir: '/path/to/repo' })
+const submodules = await repo.listSubmodules()
+
+for (const { path, repo: submoduleRepo } of submodules) {
+  if (submoduleRepo) {
+    // Push each submodule independently
+    const result = await push({
+      repo: submoduleRepo,
+      ref: 'main',
+      remote: 'origin',
+      http
+    })
+    
+    console.log(`${path}: ${result.ok ? 'pushed' : 'failed'}`)
+  }
+}
+```
+
+### Submodule Remote Configuration
+
+Each submodule can have its own remote configuration, independent of the parent repository:
+
+```typescript
+const submoduleRepo = await repo.getSubmodule('libs/mylib')
+const config = await submoduleRepo.getConfig()
+
+// Submodule can have different remote URL than parent
+await config.set('remote.origin.url', 'https://different-url.com/repo.git')
+
+// Push using submodule's own remote configuration
+await push({
+  repo: submoduleRepo,
+  ref: 'main',
+  remote: 'origin',  // Uses submodule's own remote config
+  http
+})
+```
+
 ## Basic Usage
 
 ### List Submodules

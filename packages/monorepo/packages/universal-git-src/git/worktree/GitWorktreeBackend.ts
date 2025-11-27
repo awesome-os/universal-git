@@ -19,6 +19,14 @@ import type { FileSystemProvider } from '../../models/FileSystem.ts'
  * Git repository data (refs, objects, config, etc.) is handled by GitBackend.
  */
 export interface GitWorktreeBackend {
+  /**
+   * The name of this worktree backend
+   * For the main worktree, this is typically a UUID (auto-generated)
+   * For linked worktrees, this is the worktree name (e.g., 'feature-worktree') or a UUID if not provided
+   * This name is used to identify and retrieve worktrees
+   */
+  readonly name: string
+
   // ============================================================================
   // File Operations
   // ============================================================================
@@ -156,6 +164,85 @@ export interface GitWorktreeBackend {
    * (e.g., some blob storage backends) should return null.
    */
   getDirectory?(): string | null
+
+  /**
+   * Gets the Repository instance associated with this worktree backend
+   * @returns Repository instance if available, null otherwise
+   * 
+   * This method allows the backend to access the Repository for submodule detection
+   * and delegation. When a path is a submodule, the backend can delegate to the
+   * submodule's WorktreeBackend.
+   * 
+   * The Repository reference is set by Repository when creating/opening the backend.
+   */
+  getRepository?(): import('../../core-utils/Repository.ts').Repository | null
+
+  // ============================================================================
+  // Submodule Operations
+  // ============================================================================
+
+  /**
+   * Add a submodule to this worktree backend
+   * @param normalizedPath - Normalized path to submodule (e.g., 'libs/submodule-name')
+   * @param submoduleRepo - Repository instance for the submodule
+   * @returns Promise resolving when submodule is added
+   * 
+   * This method registers a submodule Repository with this WorktreeBackend,
+   * allowing it to delegate operations to the submodule's WorktreeBackend.
+   * The submodule is cached for efficient future access.
+   * 
+   * @example
+   * ```typescript
+   * const submoduleRepo = await Repository.open({ fs, dir: '/path/to/submodule' })
+   * await worktreeBackend.addSubmodule('libs/my-module', submoduleRepo)
+   * ```
+   */
+  addSubmodule?(normalizedPath: string, submoduleRepo: import('../../core-utils/Repository.ts').Repository): Promise<void>
+
+  /**
+   * Get submodule worktree backend by path
+   * @param submodulePath - Path to submodule (e.g., 'libs/submodule-name')
+   * @returns WorktreeBackend for the submodule, or null if not found
+   * 
+   * This method enables multi-worktree awareness by allowing access to nested
+   * submodule worktrees. The submodule's WorktreeBackend can then use its Repository
+   * to access remote config and perform submodule-specific operations.
+   */
+  getSubmodule?(submodulePath: string): Promise<GitWorktreeBackend | null>
+
+  /**
+   * List all submodule worktrees
+   * @returns Array of { path: string, backend: GitWorktreeBackend } for each submodule
+   * 
+   * Returns all initialized submodules as WorktreeBackend instances, enabling
+   * efficient traversal and operations across multiple worktrees.
+   */
+  listSubmodules?(): Promise<Array<{ path: string; backend: GitWorktreeBackend }>>
+
+  /**
+   * Check if a path is within a submodule
+   * @param path - File path to check
+   * @returns Submodule path if within submodule, null otherwise
+   * 
+   * This method determines if a given path belongs to a submodule, enabling
+   * proper delegation to submodule WorktreeBackends.
+   */
+  getSubmoduleForPath?(path: string): Promise<string | null>
+
+  /**
+   * Resolve a path across worktree boundaries
+   * @param path - Path to resolve (e.g., 'libs/submodule/file.txt')
+   * @returns Resolved path information with target worktree and relative path
+   * 
+   * This method provides unified path resolution across nested worktrees,
+   * automatically delegating to the appropriate submodule WorktreeBackend
+   * when needed.
+   */
+  resolvePath?(path: string): Promise<{
+    worktree: GitWorktreeBackend
+    relativePath: string
+    submodulePath?: string
+  }>
 
   // ============================================================================
   // Worktree Config Operations

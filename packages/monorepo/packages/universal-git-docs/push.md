@@ -293,10 +293,118 @@ await push({
 })
 ```
 
+## Pushing Submodules
+
+Submodules can be pushed independently or as part of the main push operation. Each submodule uses its own `Repository` and `GitBackend`, allowing independent remote configuration.
+
+### Push All Submodules
+
+Push the main repository and all submodules together:
+
+```typescript
+import { push } from 'universal-git'
+import { Repository } from 'universal-git'
+
+const repo = await Repository.open({ fs, dir: '/path/to/repo' })
+
+// Push main repository and all submodules
+const result = await push({
+  repo,
+  ref: 'main',
+  remote: 'origin',
+  http,
+  includeSubmodules: true,  // Push submodules after main push succeeds
+  submoduleRecurse: true,   // Also push nested submodules
+})
+
+// Check submodule results
+if (result.submodules) {
+  for (const [path, submoduleResult] of Object.entries(result.submodules)) {
+    console.log(`Submodule ${path}: ${submoduleResult.ok ? 'OK' : 'FAILED'}`)
+    if (!submoduleResult.ok) {
+      console.error(`Error: ${JSON.stringify(submoduleResult.refs)}`)
+    }
+  }
+}
+```
+
+### Push a Specific Submodule
+
+Push a single submodule independently:
+
+```typescript
+import { pushSubmodule } from 'universal-git'
+import { Repository } from 'universal-git'
+
+const repo = await Repository.open({ fs, dir: '/path/to/repo' })
+
+// Push a specific submodule independently
+const result = await pushSubmodule(repo, 'libs/mylib', {
+  ref: 'main',
+  remote: 'origin',
+  http,
+  force: false
+})
+
+console.log('Submodule push result:', result.ok)
+```
+
+### Push Submodules One by One
+
+```typescript
+import { push } from 'universal-git'
+import { Repository } from 'universal-git'
+
+const repo = await Repository.open({ fs, dir: '/path/to/repo' })
+const submodules = await repo.listSubmodules()
+
+for (const { path, repo: submoduleRepo } of submodules) {
+  if (submoduleRepo) {
+    // Push each submodule independently
+    const result = await push({
+      repo: submoduleRepo,
+      ref: 'main',
+      remote: 'origin',
+      http
+    })
+    
+    console.log(`${path}: ${result.ok ? 'pushed' : 'failed'}`)
+  }
+}
+```
+
+### Submodule Remote Configuration
+
+Each submodule can have its own remote configuration, independent of the parent repository:
+
+```typescript
+const submoduleRepo = await repo.getSubmodule('libs/mylib')
+const config = await submoduleRepo.getConfig()
+
+// Submodule can have different remote URL than parent
+await config.set('remote.origin.url', 'https://different-url.com/repo.git')
+
+// Push using submodule's own remote configuration
+await push({
+  repo: submoduleRepo,
+  ref: 'main',
+  remote: 'origin',  // Uses submodule's own remote config
+  http
+})
+```
+
+**Key Points:**
+- Each submodule has its own `Repository` with its own `GitBackend`
+- Submodules can have different remote URLs than the parent
+- Submodule push failures don't abort the parent push (matches Git behavior)
+- Recursive submodule pushing is supported via `submoduleRecurse: true`
+
 ## See Also
 
 - [Fetch](./fetch.md) - Fetch from remote
 - [Clone](./clone.md) - Clone repository
 - [Merge](./merge.md) - Merge branches
+- [Submodules](./submodules.md) - Submodule management
+- [Repository](./repository.md) - Repository class documentation
 
 

@@ -7,7 +7,7 @@
 
 import { MissingParameterError } from '../errors/MissingParameterError.ts'
 import { createFileSystem } from './createFileSystem.ts'
-import { join } from './join.ts'
+import { join, normalize } from '../core-utils/GitPath.ts'
 import { Repository } from '../core-utils/Repository.ts'
 import type { FileSystemProvider } from '../models/FileSystem.ts'
 import type { BaseCommandOptions } from '../types/commandOptions.ts'
@@ -81,8 +81,12 @@ export async function normalizeCommandArgs<T extends Record<string, unknown>>(
     // repo is provided - extract everything from it
     repo = args.repo
     fs = repo.fs
-    gitdir = await repo.getGitdir()
-    dir = await repo.getDir() || args.dir
+    if (!fs) {
+      throw new MissingParameterError('fs (filesystem is required. Checkout to a WorktreeBackend first.)')
+    }
+    gitdir = normalize(await repo.getGitdir())
+    const repoDir = await repo.getDir()
+    dir = repoDir ? normalize(repoDir) : (args.dir ? normalize(args.dir) : undefined)
     cache = repo.cache
   } else {
     // No repo provided - need to create one
@@ -99,8 +103,11 @@ export async function normalizeCommandArgs<T extends Record<string, unknown>>(
       
       // Normalize fs first - this ensures consistent FileSystemProvider instance
       fs = createFileSystem(args.fs)
-      const effectiveGitdir = args.gitdir || join(args.dir!, '.git')
-      dir = args.dir
+      // Normalize paths to POSIX format (Git convention) for consistent handling across platforms
+      const normalizedDir = args.dir ? normalize(args.dir) : undefined
+      const normalizedGitdir = args.gitdir ? normalize(args.gitdir) : (normalizedDir ? normalize(join(normalizedDir, '.git')) : undefined)
+      const effectiveGitdir = normalizedGitdir!
+      dir = normalizedDir
       
       // Auto-create backends from legacy inputs
       // Use the same fs instance for both backends to ensure consistency
@@ -167,10 +174,13 @@ export async function normalizeCommandArgs<T extends Record<string, unknown>>(
     const ignoreSystemConfig = (args as any).ignoreSystemConfig !== undefined ? (args as any).ignoreSystemConfig : false
     
     // Open repository with backends (if provided) or legacy inputs
+    // Normalize paths before passing to Repository.open() for consistency
+    const normalizedDirForOpen = dir ? normalize(dir) : undefined
+    const normalizedGitdirForOpen = args.gitdir ? normalize(args.gitdir) : undefined
     repo = await Repository.open({
       fs,
-      dir,
-      gitdir: args.gitdir,
+      dir: normalizedDirForOpen,
+      gitdir: normalizedGitdirForOpen,
       cache,
       autoDetectConfig,
       ignoreSystemConfig,
@@ -178,13 +188,16 @@ export async function normalizeCommandArgs<T extends Record<string, unknown>>(
       worktree,
     })
     
-    gitdir = await repo.getGitdir()
+    // Normalize paths returned from repository
+    gitdir = normalize(await repo.getGitdir())
     // If worktree backend was provided, try to get dir from it
     if (!dir && worktree && worktree.getDirectory) {
-      dir = worktree.getDirectory() || undefined
+      const worktreeDir = worktree.getDirectory()
+      dir = worktreeDir ? normalize(worktreeDir) : undefined
     }
     // Fallback to repo.getDir() if still not set
-    dir = await repo.getDir() || dir
+    const repoDir = await repo.getDir()
+    dir = repoDir ? normalize(repoDir) : dir
     cache = repo.cache
     
     // CRITICAL: Ensure fs matches repo.fs for consistency

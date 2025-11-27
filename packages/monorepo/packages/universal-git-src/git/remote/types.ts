@@ -146,6 +146,59 @@ export type RemoteConnection = {
   statusMessage?: string
 }
 
+/**
+ * Options for creating a Git remote backend via `RemoteBackendRegistry.getBackend()`.
+ * 
+ * The registry automatically detects the protocol from the URL and creates the appropriate
+ * backend implementation (HTTP, SSH, Git daemon, etc.).
+ * 
+ * @property {string} url - The remote repository URL (required)
+ * @property {HttpClient} [http] - HTTP client for HTTP/HTTPS URLs (required for HTTP operations, optional if `urlOnly: true`)
+ * @property {SshClient} [ssh] - SSH client for SSH URLs (required for SSH operations, optional if `urlOnly: true`)
+ * @property {TcpClient} [tcp] - TCP client for git:// URLs (required for Git daemon operations, optional if `urlOnly: true`)
+ * @property {FileSystemProvider} [fs] - File system provider for file:// URLs
+ * @property {ForgeAuth} [auth] - Authentication credentials for forge APIs (GitHub, GitLab, etc.)
+ * @property {boolean} [useRestApi] - Whether to use REST API backends for supported forges
+ * @property {boolean} [urlOnly] - If `true`, allows creating backends without protocol clients for URL-only operations
+ * 
+ * **URL-Only Mode**:
+ * 
+ * When `urlOnly: true`, the registry will create backend instances without requiring
+ * protocol-specific clients (http, ssh, tcp). This is useful for operations that only
+ * need to read or display the remote URL, such as:
+ * - `listRemotes` - Listing configured remotes with their URLs
+ * - Displaying remote information in UI
+ * - Validating remote URLs
+ * 
+ * Backends created with `urlOnly: true` can still call `getUrl()` to retrieve the URL,
+ * but attempting to use `discover()` or `connect()` will fail if the required clients
+ * are not provided at that time.
+ * 
+ * **Full Mode** (default):
+ * 
+ * When `urlOnly` is `false` or `undefined`, the registry requires protocol-specific clients
+ * to be provided based on the URL protocol:
+ * - HTTP/HTTPS URLs require `http` client
+ * - SSH URLs (ssh:// or git@host:path) require `ssh` client
+ * - Git daemon URLs (git://) require `tcp` client
+ * 
+ * @example
+ * ```typescript
+ * // URL-only mode: Create backend just to get the URL
+ * const backend = RemoteBackendRegistry.getBackend({
+ *   url: 'git@github.com:user/repo.git',
+ *   urlOnly: true // No ssh client required
+ * })
+ * const url = backend.getUrl() // 'git@github.com:user/repo.git'
+ * 
+ * // Full mode: Create backend with client for actual operations
+ * const backendWithClient = RemoteBackendRegistry.getBackend({
+ *   url: 'https://github.com/user/repo.git',
+ *   http: httpClient // Required for discover()/connect()
+ * })
+ * const refs = await backendWithClient.discover({ service: 'git-upload-pack', url: '...' })
+ * ```
+ */
 export type RemoteBackendOptions = {
   url: string
   http?: HttpClient
@@ -154,6 +207,7 @@ export type RemoteBackendOptions = {
   fs?: FileSystemProvider
   auth?: ForgeAuth
   useRestApi?: boolean
+  urlOnly?: boolean
 }
 
 export type RemoteRestCapabilities = {

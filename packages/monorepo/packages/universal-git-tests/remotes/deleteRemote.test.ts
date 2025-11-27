@@ -43,23 +43,23 @@ test('deleteRemote', async (t) => {
   })
 
   await t.test('param:repo-provided', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-deleteRemote')
-    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const repo = await Repository.open({ fs, dir, gitdir })
+    const { repo } = await makeFixture('test-deleteRemote')
     await deleteRemote({ repo, remote: 'foo' })
-    const remotes = await listRemotes({ fs, dir, gitdir })
+    const remotes = await listRemotes({ repo })
     assert.deepStrictEqual(remotes, [{ remote: 'bar', url: 'git@github.com:bar/bar.git' }])
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-deleteRemote')
-    await deleteRemote({ fs, dir, gitdir, remote: 'foo' })
-    const remotes = await listRemotes({ fs, dir, gitdir })
+    const { repo } = await makeFixture('test-deleteRemote')
+    const dir = (await repo.getDir())!
+    await deleteRemote({ repo, dir, remote: 'foo' })
+    const remotes = await listRemotes({ repo })
     assert.deepStrictEqual(remotes, [{ remote: 'bar', url: 'git@github.com:bar/bar.git' }])
   })
 
   await t.test('error:caller-property', async () => {
-    const { fs, gitdir } = await makeFixture('test-deleteRemote')
+    const { repo } = await makeFixture('test-deleteRemote')
+    const gitdir = await repo.getGitdir()
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await deleteRemote({
@@ -74,10 +74,10 @@ test('deleteRemote', async (t) => {
   })
 
   await t.test('edge:non-existent-remote', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-deleteRemote')
+    const { repo } = await makeFixture('test-deleteRemote')
     try {
-      await deleteRemote({ fs, dir, gitdir, remote: 'nonexistent' })
-      // Should not throw - deleteRemote may be idempotent
+      await deleteRemote({ repo, remote: 'nonexistent' })
+      // Should not throw - deleteRemote is idempotent
     } catch (error) {
       // If it throws, that's also acceptable
       assert.ok(error instanceof Error)

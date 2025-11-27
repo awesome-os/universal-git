@@ -3,6 +3,7 @@ import { GitRemoteDaemon } from "../git/remote/GitRemoteDaemon.ts"
 import { RemoteBackendRegistry } from "../git/remote/RemoteBackendRegistry.ts"
 import { assertParameter } from "../utils/assertParameter.ts"
 import { formatInfoRefs } from "../utils/formatInfoRefs.ts"
+import type { Repository } from "../core-utils/Repository.ts"
 import type {
   HttpClient,
   AuthCallback,
@@ -40,6 +41,7 @@ export type GetRemoteInfoResult = {
  * If you just care about refs, use [`listServerRefs`](./listServerRefs.md)
  *
  * @param {object} args
+ * @param {Repository} [args.repo] - Optional repository instance. If provided, uses repo.gitBackend.getRemoteInfo()
  * @param {GitRemoteBackend} [args.remoteBackend] - Optional remote backend instance. If not provided, will be auto-detected from URL.
  * @param {HttpClient} [args.http] - HTTP client (required for HTTP/HTTPS URLs if remoteBackend not provided)
  * @param {TcpClient} [args.tcp] - TCP client (required for git:// URLs if remoteBackend not provided)
@@ -67,6 +69,7 @@ export type GetRemoteInfoResult = {
  *
  */
 export async function getRemoteInfo({
+  repo,
   remoteBackend,
   http,
   tcp,
@@ -81,6 +84,7 @@ export async function getRemoteInfo({
   forPush = false,
   protocolVersion = 2,
 }: {
+  repo?: Repository // Optional: use repo.gitBackend.getRemoteInfo() if provided
   remoteBackend?: GitRemoteBackend // Optional: use provided backend or auto-detect
   http?: HttpClient // Required for HTTP/HTTPS URLs if remoteBackend not provided
   tcp?: TcpClient // Required for git:// URLs if remoteBackend not provided
@@ -97,6 +101,23 @@ export async function getRemoteInfo({
 }): Promise<GetRemoteInfoResult> {
   try {
     assertParameter('url', url)
+
+    // If repo is provided, use GitBackend method
+    if (repo?.gitBackend) {
+      return repo.gitBackend.getRemoteInfo(url, {
+        http,
+        ssh,
+        tcp,
+        onAuth,
+        onAuthSuccess,
+        onAuthFailure,
+        onProgress,
+        corsProxy,
+        headers,
+        forPush,
+        protocolVersion,
+      })
+    }
 
     // Use provided backend or auto-detect from URL
     let backend: GitRemoteBackend

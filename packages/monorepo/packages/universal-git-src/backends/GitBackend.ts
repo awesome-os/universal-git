@@ -491,6 +491,69 @@ export type GitBackend = {
   deleteGitDaemonExportOk(): Promise<void>
 
   // ============================================================================
+  // Remote Info Operations
+  // ============================================================================
+
+  /**
+   * Get remote server capabilities and info
+   * 
+   * This method queries a remote Git server to determine what protocol version,
+   * commands, and features it supports. It doesn't require a local repository.
+   * 
+   * @param url - Remote repository URL
+   * @param options - Protocol-specific options
+   * @returns Remote server info (protocol version, capabilities, refs for v1)
+   */
+  getRemoteInfo(
+    url: string,
+    options?: {
+      http?: import('../git/remote/types.ts').HttpClient
+      ssh?: import('../ssh/SshClient.ts').SshClient
+      tcp?: import('../daemon/TcpClient.ts').TcpClient
+      fs?: import('../models/FileSystem.ts').FileSystemProvider
+      onAuth?: import('../git/remote/types.ts').AuthCallback
+      onAuthSuccess?: import('../git/remote/types.ts').AuthSuccessCallback
+      onAuthFailure?: import('../git/remote/types.ts').AuthFailureCallback
+      onProgress?: import('../git/remote/types.ts').ProgressCallback | import('../ssh/SshClient.ts').SshProgressCallback | import('../daemon/TcpClient.ts').TcpProgressCallback
+      corsProxy?: string
+      headers?: Record<string, string>
+      forPush?: boolean
+      protocolVersion?: 1 | 2
+    }
+  ): Promise<import('../commands/getRemoteInfo.ts').GetRemoteInfoResult>
+
+  /**
+   * List refs from a remote server
+   * 
+   * This method fetches a list of refs (branches, tags, etc.) from a remote Git server.
+   * It doesn't require a local repository.
+   * 
+   * @param url - Remote repository URL
+   * @param options - Protocol-specific options
+   * @returns Array of server refs
+   */
+  listServerRefs(
+    url: string,
+    options?: {
+      http?: import('../git/remote/types.ts').HttpClient
+      ssh?: import('../ssh/SshClient.ts').SshClient
+      tcp?: import('../daemon/TcpClient.ts').TcpClient
+      fs?: import('../models/FileSystem.ts').FileSystemProvider
+      onAuth?: import('../git/remote/types.ts').AuthCallback
+      onAuthSuccess?: import('../git/remote/types.ts').AuthSuccessCallback
+      onAuthFailure?: import('../git/remote/types.ts').AuthFailureCallback
+      onProgress?: import('../git/remote/types.ts').ProgressCallback | import('../ssh/SshClient.ts').SshProgressCallback | import('../daemon/TcpClient.ts').TcpProgressCallback
+      corsProxy?: string
+      headers?: Record<string, string>
+      forPush?: boolean
+      protocolVersion?: 1 | 2
+      prefix?: string
+      symrefs?: boolean
+      peelTags?: boolean
+    }
+  ): Promise<import('../git/refs/types.ts').ServerRef[]>
+
+  // ============================================================================
   // Utility Methods
   // ============================================================================
 
@@ -534,5 +597,58 @@ export type GitBackend = {
    * For other backends, it checks if the data exists in the storage.
    */
   existsFile(path: string): Promise<boolean>
+
+  // ============================================================================
+  // Merge Operations
+  // ============================================================================
+
+  /**
+   * Merges two branches (pure Git operation - works with bare repositories)
+   * 
+   * This is a pure GitBackend operation that:
+   * - Operates on Git objects (commits, trees, refs)
+   * - Works with bare repositories (no WorktreeBackend needed)
+   * - Stages conflicts in the index (index is stored in GitBackend)
+   * - Creates merge commit
+   * - Updates the target ref
+   * 
+   * **Note:** This does NOT write conflict markers to worktree files.
+   * For that, use WorktreeBackend.mergeTree() which calls this method
+   * and then writes conflict files to the worktree.
+   * 
+   * @param ours - The ref to merge into (e.g., 'refs/heads/main')
+   * @param theirs - The ref to merge from (e.g., 'refs/heads/feature')
+   * @param options - Merge options
+   * @param options.message - Merge commit message
+   * @param options.author - Author for merge commit
+   * @param options.committer - Committer for merge commit
+   * @param options.fastForward - Allow fast-forward merge (default: true)
+   * @param options.fastForwardOnly - Only allow fast-forward merge (default: false)
+   * @param options.abortOnConflict - Throw error on conflict instead of returning MergeConflictError (default: true)
+   * @param options.dryRun - Don't actually create commit or update ref (default: false)
+   * @param options.noUpdateBranch - Don't update the branch ref (default: false)
+   * @param options.allowUnrelatedHistories - Allow merging unrelated histories (default: false)
+   * @param options.cache - Optional cache for packfile indices
+   * @returns Merge result with commit OID, or MergeConflictError if conflicts occur
+   */
+  merge(
+    ours: string,
+    theirs: string,
+    options?: {
+      message?: string
+      author?: Partial<import('../models/GitCommit.ts').Author>
+      committer?: Partial<import('../models/GitCommit.ts').Author>
+      fastForward?: boolean
+      fastForwardOnly?: boolean
+      abortOnConflict?: boolean
+      dryRun?: boolean
+      noUpdateBranch?: boolean
+      allowUnrelatedHistories?: boolean
+      cache?: Record<string, unknown>
+    }
+  ): Promise<
+    | { oid: string; tree: string; mergeCommit: boolean; fastForward?: boolean; alreadyMerged?: boolean }
+    | import('../errors/MergeConflictError.ts').MergeConflictError
+  >
 }
 

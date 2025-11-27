@@ -1,9 +1,11 @@
 import type { FileSystem, FileSystemProvider } from '../../../models/FileSystem.ts'
 import type { ExtendedStat } from '../../../utils/statHelpers.ts'
 import type { GitWorktreeBackend } from '../GitWorktreeBackend.ts'
-import { join } from '../../../core-utils/GitPath.ts'
+import type { Repository } from '../../../core-utils/Repository.ts'
+import { join, normalize } from '../../../core-utils/GitPath.ts'
 import { UniversalBuffer } from '../../../utils/UniversalBuffer.ts'
 import { createFileSystem } from '../../../utils/createFileSystem.ts'
+import { SubmoduleCache, addSubmoduleToBackend, getSubmoduleFromBackend } from '../SubmoduleManager.ts'
 
 /**
  * GitWorktreeFs - Filesystem implementation of GitWorktreeBackend
@@ -11,20 +13,43 @@ import { createFileSystem } from '../../../utils/createFileSystem.ts'
  * This backend stores all working directory files using the traditional filesystem,
  * wrapping the FileSystem class to provide the GitWorktreeBackend interface.
  * 
+ * **Submodule Awareness**:
+ * 
+ * This backend is multi-worktree aware and handles submodules by delegating to
+ * the submodule's WorktreeBackend. When a path is inside a submodule, operations
+ * are delegated to the submodule's WorktreeBackend, which can then use its Repository
+ * to access remote config and other submodule-specific operations.
+ * 
  * This is the default implementation.
  */
 export class GitWorktreeFs implements GitWorktreeBackend {
+  readonly name: string
   private readonly fs: FileSystem
   private readonly dir: string
+  private _repo: Repository | null = null
+  private _submoduleCache: SubmoduleCache = new SubmoduleCache()
 
   constructor(
     fs: FileSystem | FileSystemProvider,
-    dir: string
+    dir: string,
+    name?: string | null
   ) {
     // CRITICAL: Normalize filesystem using factory function
     // This ensures consistent API, proper caching, and Repository instance caching
     this.fs = createFileSystem(fs)
     this.dir = dir
+    // Use provided name, or generate a UUID as default
+    this.name = name ?? crypto.randomUUID()
+  }
+
+  /**
+   * Sets the Repository instance for submodule detection and delegation
+   * Called by Repository when creating/opening the backend
+   */
+  setRepository(repo: Repository | null): void {
+    this._repo = repo
+    // Invalidate submodule cache when repository changes
+    this._submoduleCache.clear()
   }
 
   /**
@@ -64,6 +89,194 @@ export class GitWorktreeFs implements GitWorktreeBackend {
     return this.dir
   }
 
+  /**
+   * Gets the Repository instance (universal interface method)
+   * @returns Repository instance if available, null otherwise
+   */
+  getRepository(): Repository | null {
+    return this._repo
+  }
+
+  // ============================================================================
+  // Submodule Operations
+  // ============================================================================
+
+  /**
+   * Add a submodule to this worktree backend
+   */
+  async addSubmodule(normalizedPath: string, submoduleRepo: Repository): Promise<void> {
+    await addSubmoduleToBackend(this, normalizedPath, submoduleRepo, this._submoduleCache)
+  }
+
+  /**
+   * Get submodule worktree backend by path
+   */
+  async getSubmodule(submodulePath: string): Promise<GitWorktreeBackend | null> {
+    return await getSubmoduleFromBackend(
+      this,
+      submodulePath,
+      this._repo,
+      this._submoduleCache,
+      (path) => this.loadSubmoduleBackend(path)
+    )
+  }
+
+  /**
+   * List all submodule worktrees
+   */
+  async listSubmodules(): Promise<Array<{ path: string; backend: GitWorktreeBackend }>> {
+    if (!this._repo) {
+      return []
+    }
+
+    const { parseGitmodules } = await import('../../../core-utils/filesystem/SubmoduleManager.ts')
+    const submodules = await parseGitmodules({ repo: this._repo })
+    const results: Array<{ path: string; backend: GitWorktreeBackend }> = []
+
+    for (const [name, info] of submodules.entries()) {
+      const backend = await this.getSubmodule(info.path)
+      if (backend) {
+        results.push({
+          path: info.path,
+          backend,
+        })
+      }
+    }
+
+    // Also include any submodules added via addSubmodule() that aren't in .gitmodules
+    for (const cachedPath of this._submoduleCache.keys()) {
+      // Check if already in results
+      if (!results.some(r => normalize(r.path) === cachedPath)) {
+        const backend = this._submoduleCache.get(cachedPath)
+        if (backend) {
+          results.push({
+            path: cachedPath,
+            backend,
+          })
+        }
+      }
+    }
+
+    return results
+  }
+
+  /**
+   * Check if a path is within a submodule
+   */
+  async getSubmoduleForPath(path: string): Promise<string | null> {
+    if (!this._repo) {
+      return null
+    }
+
+    const normalizedPath = normalize(path)
+    const { parseGitmodules } = await import('../../../core-utils/filesystem/SubmoduleManager.ts')
+    const submodules = await parseGitmodules({ repo: this._repo })
+
+    for (const [name, info] of submodules.entries()) {
+      const submodulePath = normalize(info.path)
+      if (normalizedPath === submodulePath || normalizedPath.startsWith(submodulePath + '/')) {
+        return submodulePath
+      }
+    }
+
+    return null
+  }
+
+  /**
+   * Resolve a path across worktree boundaries
+   */
+  async resolvePath(path: string): Promise<{
+    worktree: GitWorktreeBackend
+    relativePath: string
+    submodulePath?: string
+  }> {
+    const normalizedPath = normalize(path)
+    const submodulePath = await this.getSubmoduleForPath(normalizedPath)
+
+    if (submodulePath) {
+      const submoduleBackend = await this.getSubmodule(submodulePath)
+      if (submoduleBackend) {
+        const relativePath = normalizedPath === submodulePath
+          ? '.'
+          : normalizedPath.substring(submodulePath.length + 1)
+        
+        // Recursively resolve in submodule (supports nested submodules)
+        if (submoduleBackend.resolvePath) {
+          return submoduleBackend.resolvePath(relativePath)
+        }
+        
+        return {
+          worktree: submoduleBackend,
+          relativePath,
+          submodulePath,
+        }
+      }
+    }
+
+    // Path is in current worktree
+    return {
+      worktree: this,
+      relativePath: normalizedPath,
+    }
+  }
+
+  /**
+   * Loads a submodule backend by path
+   */
+  private async loadSubmoduleBackend(submodulePath: string): Promise<GitWorktreeBackend | null> {
+    if (!this._repo) {
+      return null
+    }
+
+    try {
+      // Get submodule Repository
+      const submoduleRepo = await this._repo.getSubmodule(submodulePath)
+      
+      // Get the submodule's WorktreeBackend
+      const submoduleWorktree = await submoduleRepo.getWorktree()
+      if (!submoduleWorktree) {
+        return null
+      }
+      
+      const submoduleBackend = submoduleWorktree.backend
+      if (!submoduleBackend) {
+        return null
+      }
+
+      return submoduleBackend
+    } catch {
+      // Submodule not initialized or error accessing it
+      return null
+    }
+  }
+
+  /**
+   * Resolves a path to determine if it's inside a submodule
+   * If the path is inside a submodule, returns the submodule's WorktreeBackend and relative path
+   * Otherwise, returns null
+   * 
+   * @param path - File path relative to working directory root
+   * @returns Object with submodule WorktreeBackend and relative path, or null if not a submodule
+   */
+  private async resolveSubmodulePath(path: string): Promise<{ backend: GitWorktreeBackend; submodulePath: string } | null> {
+    if (!this._repo) {
+      return null
+    }
+
+    // Use the new resolvePath method for consistency
+    const resolved = await this.resolvePath(path)
+    
+    // If resolved to a different worktree, return it
+    if (resolved.worktree !== this) {
+      return {
+        backend: resolved.worktree,
+        submodulePath: resolved.relativePath,
+      }
+    }
+    
+    return null
+  }
+
   // ============================================================================
   // File Operations
   // ============================================================================
@@ -72,6 +285,12 @@ export class GitWorktreeFs implements GitWorktreeBackend {
     path: string,
     options?: { encoding?: string; autocrlf?: string } | string
   ): Promise<UniversalBuffer | string | null> {
+    // Check if path is in a submodule and delegate if so
+    const submodule = await this.resolveSubmodulePath(path)
+    if (submodule) {
+      return submodule.backend.read(submodule.submodulePath, options)
+    }
+    
     const fullPath = join(this.dir, path)
     return this.fs.read(fullPath, options)
   }
@@ -81,11 +300,23 @@ export class GitWorktreeFs implements GitWorktreeBackend {
     data: UniversalBuffer | Uint8Array | string,
     options?: Record<string, unknown> | string
   ): Promise<void> {
+    // Check if path is in a submodule and delegate if so
+    const submodule = await this.resolveSubmodulePath(path)
+    if (submodule) {
+      return submodule.backend.write(submodule.submodulePath, data, options)
+    }
+    
     const fullPath = join(this.dir, path)
     await this.fs.write(fullPath, data, options)
   }
 
   async exists(path: string, options?: Record<string, unknown>): Promise<boolean> {
+    // Check if path is in a submodule and delegate if so
+    const submodule = await this.resolveSubmodulePath(path)
+    if (submodule) {
+      return submodule.backend.exists(submodule.submodulePath, options)
+    }
+    
     const fullPath = join(this.dir, path)
     return this.fs.exists(fullPath, options)
   }
@@ -95,21 +326,45 @@ export class GitWorktreeFs implements GitWorktreeBackend {
   // ============================================================================
 
   async mkdir(path: string, options?: { recursive?: boolean }): Promise<void> {
+    // Check if path is in a submodule and delegate if so
+    const submodule = await this.resolveSubmodulePath(path)
+    if (submodule) {
+      return submodule.backend.mkdir(submodule.submodulePath, options)
+    }
+    
     const fullPath = join(this.dir, path)
     await this.fs.mkdir(fullPath, options)
   }
 
   async readdir(path: string): Promise<string[] | null> {
+    // Check if path is in a submodule and delegate if so
+    const submodule = await this.resolveSubmodulePath(path)
+    if (submodule) {
+      return submodule.backend.readdir(submodule.submodulePath)
+    }
+    
     const fullPath = join(this.dir, path)
     return this.fs.readdir(fullPath)
   }
 
   async readdirDeep(path: string): Promise<string[]> {
+    // Check if path is in a submodule and delegate if so
+    const submodule = await this.resolveSubmodulePath(path)
+    if (submodule) {
+      return submodule.backend.readdirDeep(submodule.submodulePath)
+    }
+    
     const fullPath = join(this.dir, path)
     return this.fs.readdirDeep(fullPath)
   }
 
   async rmdir(path: string, options?: { recursive?: boolean }): Promise<void> {
+    // Check if path is in a submodule and delegate if so
+    const submodule = await this.resolveSubmodulePath(path)
+    if (submodule) {
+      return submodule.backend.rmdir(submodule.submodulePath, options)
+    }
+    
     const fullPath = join(this.dir, path)
     await this.fs.rmdir(fullPath, options)
   }
@@ -119,6 +374,12 @@ export class GitWorktreeFs implements GitWorktreeBackend {
   // ============================================================================
 
   async rm(path: string, options?: { recursive?: boolean }): Promise<void> {
+    // Check if path is in a submodule and delegate if so
+    const submodule = await this.resolveSubmodulePath(path)
+    if (submodule) {
+      return submodule.backend.rm(submodule.submodulePath, options)
+    }
+    
     const fullPath = join(this.dir, path)
     await this.fs.rm(fullPath, options)
   }
@@ -128,11 +389,23 @@ export class GitWorktreeFs implements GitWorktreeBackend {
   // ============================================================================
 
   async stat(path: string): Promise<ExtendedStat | null> {
+    // Check if path is in a submodule and delegate if so
+    const submodule = await this.resolveSubmodulePath(path)
+    if (submodule) {
+      return submodule.backend.stat(submodule.submodulePath)
+    }
+    
     const fullPath = join(this.dir, path)
     return this.fs.stat(fullPath)
   }
 
   async lstat(path: string): Promise<ExtendedStat | null> {
+    // Check if path is in a submodule and delegate if so
+    const submodule = await this.resolveSubmodulePath(path)
+    if (submodule) {
+      return submodule.backend.lstat(submodule.submodulePath)
+    }
+    
     const fullPath = join(this.dir, path)
     return this.fs.lstat(fullPath)
   }
@@ -145,11 +418,23 @@ export class GitWorktreeFs implements GitWorktreeBackend {
     path: string,
     options?: { encoding?: string }
   ): Promise<UniversalBuffer | null> {
+    // Check if path is in a submodule and delegate if so
+    const submodule = await this.resolveSubmodulePath(path)
+    if (submodule) {
+      return submodule.backend.readlink(submodule.submodulePath, options)
+    }
+    
     const fullPath = join(this.dir, path)
     return this.fs.readlink(fullPath, options)
   }
 
   async writelink(path: string, target: string): Promise<void> {
+    // Check if path is in a submodule and delegate if so
+    const submodule = await this.resolveSubmodulePath(path)
+    if (submodule) {
+      return submodule.backend.writelink(submodule.submodulePath, target)
+    }
+    
     const fullPath = join(this.dir, path)
     // FileSystem.writelink expects a Buffer, but we accept string for convenience
     await this.fs.writelink(fullPath, UniversalBuffer.from(target, 'utf8'))

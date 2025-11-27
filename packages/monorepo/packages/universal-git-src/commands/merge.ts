@@ -473,7 +473,7 @@ export async function _merge({
       return result
     } : undefined
     mergeResult = await MergeStream.execute({
-      repo,
+      gitBackend: repo.gitBackend!,
       index,
       ourOid: ourTreeOid,
       baseOid: baseTreeOid,
@@ -481,6 +481,10 @@ export async function _merge({
       abortOnConflict,
       dryRun,
       mergeDriver: adaptedMergeDriver,
+      fs: repo.fs,
+      dir: repo.dir || undefined,
+      cache: repo.cache,
+      gitdir: await repo.getGitdir(),
     })
     
     // Only write index if merge succeeded (no conflicts) or if we're allowing conflicts

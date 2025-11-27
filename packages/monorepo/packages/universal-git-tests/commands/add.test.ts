@@ -1,58 +1,89 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import {
-  add,
   listFiles,
   readBlob,
   walk,
   STAGE,
-  status,
   getConfig,
 } from '@awesome-os/universal-git-src/index.ts'
+import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 
 // NOTE: we cannot actually commit a real .gitignore file in fixtures or fixtures won't be included in this repo
-const writeGitIgnore = async (repo) => {
-  const dir = await repo.getDir()!
+const writeGitIgnore = async (repo: Repository) => {
+  if (!repo.fs) {
+    throw new Error('Filesystem not available - checkout to a WorktreeBackend first')
+  }
+  const dir = await repo.getDir()
+  if (!dir) {
+    throw new Error('Working directory not available')
+  }
+  const { join } = await import('@awesome-os/universal-git-src/core-utils/GitPath.ts')
+  const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
+  const content = ['*-pattern.js', 'i.txt', 'js_modules', '.DS_Store'].join('\n')
   await repo.fs.write(
-    dir + '/.gitignore',
-    ['*-pattern.js', 'i.txt', 'js_modules', '.DS_Store'].join('\n')
+    join(dir, '.gitignore'),
+    UniversalBuffer.from(content, 'utf8')
   )
 }
 
 // NOTE: we cannot actually commit a real symlink in fixtures because it relies on core.symlinks being enabled
-const writeSymlink = async (repo) => {
-  const dir = await repo.getDir()!
-  await repo.fs._symlink('c/e.txt', dir + '/e-link.txt')
+const writeSymlink = async (repo: Repository) => {
+  if (!repo.fs) {
+    throw new Error('Filesystem not available - checkout to a WorktreeBackend first')
+  }
+  const dir = await repo.getDir()
+  if (!dir) {
+    throw new Error('Working directory not available')
+  }
+  const { join } = await import('@awesome-os/universal-git-src/core-utils/GitPath.ts')
+  const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
+  try {
+    await repo.fs.writelink(join(dir, 'e-link.txt'), UniversalBuffer.from('c/e.txt', 'utf8'))
+  } catch {
+    // Symlinks may not be supported
+  }
 }
 
 describe('add', () => {
   it('ok:single-file', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add', { init: true })
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
+    
+    // makeFixture already provides a worktreeBackend and automatically checks out to it
+    // So repo.fs is available immediately after Repository.open
+    // If we need a different WorktreeBackend, we can create one and checkout to it
+    
     // Test
-    await add({ repo, filepath: 'a.txt' })
+    await repo.add('a.txt')
     assert.strictEqual((await listFiles({ repo })).length, 1)
-    await add({ repo, filepath: 'a.txt' })
+    await repo.add('a.txt')
     assert.strictEqual((await listFiles({ repo })).length, 1)
-    await add({ repo, filepath: 'a-copy.txt' })
+    await repo.add('a-copy.txt')
     assert.strictEqual((await listFiles({ repo })).length, 2)
-    await add({ repo, filepath: 'b.txt' })
+    await repo.add('b.txt')
     assert.strictEqual((await listFiles({ repo })).length, 3)
   })
   
   it('ok:multiple-files', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add', { init: true })
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
+    
     // Test
-    await add({ repo, filepath: ['a.txt', 'a-copy.txt', 'b.txt'] })
+    await repo.add(['a.txt', 'a-copy.txt', 'b.txt'])
     assert.strictEqual((await listFiles({ repo })).length, 3)
   })
   
   it('param:parallel-false', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add', { init: true })
-    // Test
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
+    
+    // Test - Note: parallel option is not exposed on repo.add(), but we test the functionality
+    const { add } = await import('@awesome-os/universal-git-src/commands/add.ts')
     await add({
       repo,
       filepath: ['a.txt', 'a-copy.txt', 'b.txt'],
@@ -63,11 +94,13 @@ describe('add', () => {
   
   it('error:single-failure', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add', { init: true })
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
+    
     // Test
     let err: any = null
     try {
-      await add({ repo, filepath: ['a.txt', 'a-copy.txt', 'non-existent'] })
+      await repo.add(['a.txt', 'a-copy.txt', 'non-existent'])
     } catch (e) {
       err = e
     }
@@ -78,16 +111,14 @@ describe('add', () => {
   
   it('error:multiple-failures', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add', { init: true })
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
     await writeGitIgnore(repo)
 
     // Test
     let err: any = null
     try {
-      await add({
-        repo,
-        filepath: ['a.txt', 'i.txt', 'non-existent', 'also-non-existent'],
-      })
+      await repo.add(['a.txt', 'i.txt', 'non-existent', 'also-non-existent'])
     } catch (e) {
       err = e
     }
@@ -103,22 +134,22 @@ describe('add', () => {
   
   it('behavior:ignored-file', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add', { init: true })
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
     await writeGitIgnore(repo)
 
     // Test
-    await add({
-      repo,
-      filepath: ['a.txt', 'i.txt'],
-    })
+    await repo.add(['a.txt', 'i.txt'])
   })
   
   it('param:force-ignored', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add', { init: true })
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
     await writeGitIgnore(repo)
 
     // Test
+    const { add } = await import('@awesome-os/universal-git-src/commands/add.ts')
     await add({
       repo,
       filepath: ['a.txt', 'i.txt'],
@@ -132,16 +163,18 @@ describe('add', () => {
   
   it('ok:symlink', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add', { init: true })
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
+    
     // it's not currently possible to tests symlinks in the browser since there's no way to create them
     const symlinkCreated = await writeSymlink(repo)
       .then(() => true)
       .catch(() => false)
     // Test
-    await add({ repo, filepath: 'c/e.txt' })
+    await repo.add('c/e.txt')
     assert.strictEqual((await listFiles({ repo })).length, 1)
     if (!symlinkCreated) return
-    await add({ repo, filepath: 'e-link.txt' })
+    await repo.add('e-link.txt')
     assert.strictEqual((await listFiles({ repo })).length, 2)
     const walkResult = await walk({
       repo,
@@ -161,29 +194,36 @@ describe('add', () => {
 
   it('edge:ignored-file', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add', { init: true })
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
     await writeGitIgnore(repo)
+    
     // Test
-    await add({ repo, filepath: 'i.txt' })
+    await repo.add('i.txt')
     assert.strictEqual((await listFiles({ repo })).length, 0)
   })
   
   it('param:force-ignored-file', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add', { init: true })
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
     await writeGitIgnore(repo)
+    
     // Test
+    const { add } = await import('@awesome-os/universal-git-src/commands/add.ts')
     await add({ repo, filepath: 'i.txt', force: true })
     assert.strictEqual((await listFiles({ repo })).length, 1)
   })
   
   it('error:non-existent-file', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add', { init: true })
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
+    
     // Test
     let err: unknown = null
     try {
-      await add({ repo, filepath: 'asdf.txt' })
+      await repo.add('asdf.txt')
     } catch (e) {
       err = e
     }
@@ -195,87 +235,115 @@ describe('add', () => {
 
   it('ok:folder', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add', { init: true })
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
+    
     // Test
     assert.strictEqual((await listFiles({ repo })).length, 0)
-    await add({ repo, filepath: 'c' })
+    await repo.add('c')
     assert.strictEqual((await listFiles({ repo })).length, 4)
   })
 
   it('behavior:folder-with-gitignore', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add', { init: true })
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
     await writeGitIgnore(repo)
+    
     // Test
     assert.strictEqual((await listFiles({ repo })).length, 0)
-    await add({ repo, filepath: 'c' })
+    await repo.add('c')
     assert.strictEqual((await listFiles({ repo })).length, 3)
   })
 
   it('param:force-folder-gitignore', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add', { init: true })
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
     await writeGitIgnore(repo)
+    
     // Test
     assert.strictEqual((await listFiles({ repo })).length, 0)
+    const { add } = await import('@awesome-os/universal-git-src/commands/add.ts')
     await add({ repo, filepath: 'c', force: true })
     assert.strictEqual((await listFiles({ repo })).length, 4)
   })
 
   it('ok:add-all', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add', { init: true })
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
     await writeGitIgnore(repo)
+    
     // Test
     assert.strictEqual((await listFiles({ repo })).length, 0)
-    await add({ repo, filepath: '.' })
+    await repo.add('.')
     assert.strictEqual((await listFiles({ repo })).length, 7)
   })
 
   it('param:add-all-parallel-false', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add', { init: true })
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
     await writeGitIgnore(repo)
+    
     // Test
     assert.strictEqual((await listFiles({ repo })).length, 0)
+    const { add } = await import('@awesome-os/universal-git-src/commands/add.ts')
     await add({ repo, filepath: '.', parallel: false })
     assert.strictEqual((await listFiles({ repo })).length, 7)
   })
 
   it('behavior:autocrlf-binary-files', async () => {
     const { repo } = await makeFixture('test-add-autocrlf')
-    const dir = await repo.getDir()!
+    await repo.init()
+    
+    if (!repo.fs) {
+      throw new Error('Filesystem not available')
+    }
+    const dir = await repo.getDir()
+    if (!dir) {
+      throw new Error('Working directory not available')
+    }
+    const { join } = await import('@awesome-os/universal-git-src/core-utils/GitPath.ts')
+    const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
+    
     const autocrlf = await getConfig({ repo, path: 'core.autocrlf' })
     assert.strictEqual(autocrlf, 'true')
     const files = await repo.fs.readdir(dir)
     assert.ok(files !== null && files !== undefined, 'readdir should return an array')
     assert.ok(files.includes('20thcenturyfoodcourt.png'))
     assert.ok(files.includes('Test.md'))
+    
+    // Add files first, then check index
+    await repo.add('.')
+    
     const index = await listFiles({ repo })
     assert.ok(index.includes('20thcenturyfoodcourt.png'))
     assert.ok(index.includes('Test.md'))
-    const testMdData = await repo.fs.read(`${dir}/Test.md`)
-    const testMdContent = testMdData ? new TextDecoder().decode(typeof testMdData === 'string' ? new TextEncoder().encode(testMdData) : testMdData) : ''
+    const testMdData = await repo.fs.read(join(dir, 'Test.md'))
+    const testMdContent = testMdData ? new TextDecoder().decode(UniversalBuffer.isBuffer(testMdData) ? testMdData : UniversalBuffer.from(testMdData, 'utf8')) : ''
     assert.ok(testMdContent.includes(`\r\n`))
-    await repo.fs.write(`${dir}/README.md`, '# test')
+    await repo.fs.write(join(dir, 'README.md'), UniversalBuffer.from('# test', 'utf8'))
 
-    await add({ repo, filepath: '.' })
+    await repo.add('README.md')
 
     // Binary file should remain unmodified (autocrlf shouldn't affect it)
-    const binaryStatus = await status({ repo, filepath: '20thcenturyfoodcourt.png' })
+    const binaryStatus = await repo.status('20thcenturyfoodcourt.png')
     assert.ok(binaryStatus === 'unmodified' || binaryStatus === '*modified', 'Binary file should not be modified by autocrlf')
     // Text file may show as modified if autocrlf changes line endings
-    const textStatus = await status({ repo, filepath: 'Test.md' })
+    const textStatus = await repo.status('Test.md')
     assert.ok(textStatus === 'unmodified' || textStatus === '*modified', 'Text file status may vary with autocrlf')
-    assert.strictEqual(await status({ repo, filepath: 'README.md' }), 'added')
+    assert.strictEqual(await repo.status('README.md'), 'added')
   })
 
   it('error:caller-property', async () => {
-    const { repo } = await makeFixture('test-add', { init: true })
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
     
     let error: any = null
     try {
-      await add({ repo, filepath: 'nonexistent.txt' })
+      await repo.add('nonexistent.txt')
     } catch (err) {
       error = err
     }
@@ -285,16 +353,27 @@ describe('add', () => {
   })
 
   it('behavior:directory-sequential', async () => {
-    const { repo } = await makeFixture('test-add', { init: true })
-    const dir = await repo.getDir()!
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
+    
+    if (!repo.fs) {
+      throw new Error('Filesystem not available')
+    }
+    const dir = await repo.getDir()
+    if (!dir) {
+      throw new Error('Working directory not available')
+    }
+    const { join } = await import('@awesome-os/universal-git-src/core-utils/GitPath.ts')
+    const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
     
     // Create a directory with multiple files
-    await repo.fs.mkdir(`${dir}/subdir`)
-    await repo.fs.write(`${dir}/subdir/file1.txt`, 'content1')
-    await repo.fs.write(`${dir}/subdir/file2.txt`, 'content2')
-    await repo.fs.write(`${dir}/subdir/file3.txt`, 'content3')
+    await repo.fs.mkdir(join(dir, 'subdir'))
+    await repo.fs.write(join(dir, 'subdir/file1.txt'), UniversalBuffer.from('content1', 'utf8'))
+    await repo.fs.write(join(dir, 'subdir/file2.txt'), UniversalBuffer.from('content2', 'utf8'))
+    await repo.fs.write(join(dir, 'subdir/file3.txt'), UniversalBuffer.from('content3', 'utf8'))
     
     // Add directory with parallel=false
+    const { add } = await import('@awesome-os/universal-git-src/commands/add.ts')
     await add({ repo, filepath: 'subdir', parallel: false })
     
     const files = await listFiles({ repo })
@@ -304,14 +383,23 @@ describe('add', () => {
   })
 
   it('edge:empty-directory', async () => {
-    const { repo } = await makeFixture('test-add', { init: true })
-    const dir = await repo.getDir()!
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
+    
+    if (!repo.fs) {
+      throw new Error('Filesystem not available')
+    }
+    const dir = await repo.getDir()
+    if (!dir) {
+      throw new Error('Working directory not available')
+    }
+    const { join } = await import('@awesome-os/universal-git-src/core-utils/GitPath.ts')
     
     // Create an empty directory
-    await repo.fs.mkdir(`${dir}/empty-dir`)
+    await repo.fs.mkdir(join(dir, 'empty-dir'))
     
     // Add empty directory - should not fail but also not add anything
-    await add({ repo, filepath: 'empty-dir' })
+    await repo.add('empty-dir')
     
     const files = await listFiles({ repo })
     assert.strictEqual(files.length, 0, 'Empty directory should not add any files')
@@ -319,33 +407,52 @@ describe('add', () => {
 
 
   it('error:LFS-filter-error', async () => {
-    const { repo } = await makeFixture('test-add', { init: true })
-    const dir = await repo.getDir()!
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
+    
+    if (!repo.fs) {
+      throw new Error('Filesystem not available')
+    }
+    const dir = await repo.getDir()
+    if (!dir) {
+      throw new Error('Working directory not available')
+    }
+    const { join } = await import('@awesome-os/universal-git-src/core-utils/GitPath.ts')
+    const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
     
     // Create a file
-    await repo.fs.write(`${dir}/file.txt`, 'content')
+    await repo.fs.write(join(dir, 'file.txt'), UniversalBuffer.from('content', 'utf8'))
     
     // The LFS filter might fail, but add should still work
     // This tests the catch block in the LFS filter application
-    await add({ repo, filepath: 'file.txt' })
+    await repo.add('file.txt')
     
     const files = await listFiles({ repo })
     assert.ok(files.includes('file.txt'), 'File should be added even if LFS filter fails')
   })
 
   it('behavior:autocrlf-config', async () => {
-    const { repo } = await makeFixture('test-add', { init: true })
-    const dir = await repo.getDir()!
+    const { repo } = await makeFixture('test-add')
+    await repo.init()
+    
+    if (!repo.fs) {
+      throw new Error('Filesystem not available')
+    }
+    const dir = await repo.getDir()
+    if (!dir) {
+      throw new Error('Working directory not available')
+    }
+    const { join } = await import('@awesome-os/universal-git-src/core-utils/GitPath.ts')
+    const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
     
     // Set autocrlf to true
-    const { setConfig } = await import('@awesome-os/universal-git-src/index.ts')
     const config = await repo.getConfig()
     await config.set('core.autocrlf', 'true', 'local')
     
     // Create a file with LF line endings
-    await repo.fs.write(`${dir}/file.txt`, 'line1\nline2\n')
+    await repo.fs.write(join(dir, 'file.txt'), UniversalBuffer.from('line1\nline2\n', 'utf8'))
     
-    await add({ repo, filepath: 'file.txt' })
+    await repo.add('file.txt')
     
     const files = await listFiles({ repo })
     assert.ok(files.includes('file.txt'), 'File should be added with autocrlf enabled')

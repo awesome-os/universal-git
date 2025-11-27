@@ -24,6 +24,16 @@ export { GitWorktreeFs } from './fs/GitWorktreeFs.ts'
 // Export legacy name for backward compatibility during migration
 export { GitWorktreeFs as FilesystemGitWorktreeBackend } from './fs/GitWorktreeFs.ts'
 
+// Export other WorktreeBackend implementations
+export { GitWorktreeMemory } from './memory/GitWorktreeMemory.ts'
+export { GitWorktreeS3 } from './s3/GitWorktreeS3.ts'
+export { GitWorktreeSql } from './sql/GitWorktreeSql.ts'
+export { GitWorktreeBlob } from './blob/GitWorktreeBlob.ts'
+export { GitWorktreeIndexedDb } from './indexeddb/GitWorktreeIndexedDb.ts'
+
+// Export submodule management utilities
+export { SubmoduleCache, addSubmoduleToBackend, getSubmoduleFromBackend } from './SubmoduleManager.ts'
+
 // WorkdirManager exports
 export { WorkdirManager, analyzeCheckout, executeCheckout, getFileStatus, checkout } from './WorkdirManager.ts'
 
@@ -45,9 +55,10 @@ import { createFileSystem } from '../../utils/createFileSystem.ts'
 export function createGitWorktreeBackend(options: {
   fs: FileSystemProvider | RawFileSystemProvider
   dir: string
+  name?: string | null
 }): GitWorktreeBackend {
   // Normalize filesystem using factory pattern to ensure consistent caching and normalization
   const normalizedFs = createFileSystem(options.fs)
-  return new GitWorktreeFs(normalizedFs, options.dir)
+  return new GitWorktreeFs(normalizedFs, options.dir, options.name)
 }
 

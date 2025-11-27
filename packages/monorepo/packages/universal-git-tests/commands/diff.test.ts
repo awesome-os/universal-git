@@ -1,9 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { diff, init, commit, add, writeRef, resolveRef } from '@awesome-os/universal-git-src/index.ts'
+import { diff, commit, add, writeRef } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { MissingParameterError } from '@awesome-os/universal-git-src/errors/MissingParameterError.ts'
-import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 
 test('diff', async (t) => {
   await t.test('param:fs-missing', async () => {
@@ -19,10 +18,10 @@ test('diff', async (t) => {
   })
 
   await t.test('param:gitdir-or-dir-missing', async () => {
-    const { fs } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
     try {
       await diff({
-        fs,
+        fs: repo.fs,
       } as any)
       assert.fail('Should have thrown MissingParameterError')
     } catch (error) {
@@ -33,27 +32,19 @@ test('diff', async (t) => {
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { fs, dir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
-    
-    // Use Repository to ensure cache consistency
-    const cache: Record<string, unknown> = {}
-    const repo = await Repository.open({ fs, dir, cache })
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
     
     // Write file to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    await normalizedFs.write(`${dir}/file1.txt`, 'content1')
+    await repo.fs.write(`${dir}/file1.txt`, 'content1')
     
     // Create initial commit
-    await add({ fs, dir, filepath: 'file1.txt', cache: repo.cache })
-    await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await add({ repo, filepath: 'file1.txt' })
+    await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
-    // Diff should work with dir only
+    // Diff should work with repo
     const result = await diff({
-      fs,
-      dir,
-      cache: repo.cache,
+      repo,
     })
     
     assert.ok(Array.isArray(result.entries), 'Should return entries array')
@@ -61,27 +52,19 @@ test('diff', async (t) => {
   })
 
   await t.test('ok:empty-diff', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
-    
-    // Use Repository to ensure cache consistency
-    const cache: Record<string, unknown> = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache })
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
     
     // Write file to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    await normalizedFs.write(`${dir}/file.txt`, 'content')
+    await repo.fs.write(`${dir}/file.txt`, 'content')
     
     // Create initial commit
-    await add({ fs, dir, filepath: 'file.txt', cache: repo.cache })
-    await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await add({ repo, filepath: 'file.txt' })
+    await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
-    // Diff HEAD to HEAD should be empty - use dir to let diff resolve gitdir the same way commit does
+    // Diff HEAD to HEAD should be empty
     const result = await diff({
-      fs,
-      dir,
-      cache: repo.cache,
+      repo,
       refA: 'HEAD',
       refB: 'HEAD',
     })
@@ -90,32 +73,24 @@ test('diff', async (t) => {
   })
 
   await t.test('ok:detects-added', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
-    
-    // Use Repository to ensure cache consistency
-    const cache: Record<string, unknown> = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache })
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    await normalizedFs.write(`${dir}/file1.txt`, 'content1')
+    await repo.fs.write(`${dir}/file1.txt`, 'content1')
     
     // Create initial commit
-    await add({ fs, dir, filepath: 'file1.txt', cache: repo.cache })
-    const commit1 = await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await add({ repo, filepath: 'file1.txt' })
+    const commit1 = await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Add a new file
-    await normalizedFs.write(`${dir}/file2.txt`, 'content2')
-    await add({ fs, dir, filepath: 'file2.txt', cache: repo.cache })
-    const commit2 = await commit({ fs, dir, message: 'Add file2', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await repo.fs.write(`${dir}/file2.txt`, 'content2')
+    await add({ repo, filepath: 'file2.txt' })
+    const commit2 = await commit({ repo, message: 'Add file2', author: { name: 'Test', email: 'test@example.com' } })
     
-    // Diff between commits - use dir to let diff resolve gitdir the same way commit does
+    // Diff between commits
     const result = await diff({
-      fs,
-      dir,
-      cache: repo.cache,
+      repo,
       refA: commit1,
       refB: commit2,
     })
@@ -128,35 +103,27 @@ test('diff', async (t) => {
   })
 
   await t.test('ok:detects-deleted', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
-    
-    // Use Repository to ensure cache consistency
-    const cache: Record<string, unknown> = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache })
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    await normalizedFs.write(`${dir}/file1.txt`, 'content1')
-    await normalizedFs.write(`${dir}/file2.txt`, 'content2')
+    await repo.fs.write(`${dir}/file1.txt`, 'content1')
+    await repo.fs.write(`${dir}/file2.txt`, 'content2')
     
     // Create initial commit with two files
-    await add({ fs, dir, filepath: 'file1.txt', cache: repo.cache })
-    await add({ fs, dir, filepath: 'file2.txt', cache: repo.cache })
-    const commit1 = await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await add({ repo, filepath: 'file1.txt' })
+    await add({ repo, filepath: 'file2.txt' })
+    const commit1 = await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Remove a file from index - use remove command
-    await normalizedFs.rm(`${dir}/file2.txt`)
+    await repo.fs.rm(`${dir}/file2.txt`)
     const { remove } = await import('@awesome-os/universal-git-src/index.ts')
-    await remove({ fs, dir, filepath: 'file2.txt', cache: repo.cache })
-    const commit2 = await commit({ fs, dir, message: 'Remove file2', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await remove({ repo, filepath: 'file2.txt' })
+    const commit2 = await commit({ repo, message: 'Remove file2', author: { name: 'Test', email: 'test@example.com' } })
     
-    // Diff between commits - use dir to let diff resolve gitdir the same way commit does
+    // Diff between commits
     const result = await diff({
-      fs,
-      dir,
-      cache: repo.cache,
+      repo,
       refA: commit1,
       refB: commit2,
     })
@@ -168,32 +135,24 @@ test('diff', async (t) => {
   })
 
   await t.test('ok:detects-modified', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
-    
-    // Use Repository to ensure cache consistency
-    const cache: Record<string, unknown> = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache })
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    await normalizedFs.write(`${dir}/file.txt`, 'content1')
+    await repo.fs.write(`${dir}/file.txt`, 'content1')
     
     // Create initial commit
-    await add({ fs, dir, filepath: 'file.txt', cache: repo.cache })
-    const commit1 = await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await add({ repo, filepath: 'file.txt' })
+    const commit1 = await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Modify the file
-    await normalizedFs.write(`${dir}/file.txt`, 'content2')
-    await add({ fs, dir, filepath: 'file.txt', cache: repo.cache })
-    const commit2 = await commit({ fs, dir, message: 'Modify file', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await repo.fs.write(`${dir}/file.txt`, 'content2')
+    await add({ repo, filepath: 'file.txt' })
+    const commit2 = await commit({ repo, message: 'Modify file', author: { name: 'Test', email: 'test@example.com' } })
     
-    // Diff between commits - use dir to let diff resolve gitdir the same way commit does
+    // Diff between commits
     const result = await diff({
-      fs,
-      dir,
-      cache: repo.cache,
+      repo,
       refA: commit1,
       refB: commit2,
     })
@@ -206,32 +165,23 @@ test('diff', async (t) => {
   })
 
   await t.test('behavior:compares-workdir-HEAD', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
-    
-    // Use Repository to ensure cache consistency
-    const cache: Record<string, unknown> = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache })
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    await normalizedFs.write(`${dir}/file1.txt`, 'content1')
+    await repo.fs.write(`${dir}/file1.txt`, 'content1')
     
     // Create initial commit
-    await add({ fs, dir, filepath: 'file1.txt', cache: repo.cache })
-    await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await add({ repo, filepath: 'file1.txt' })
+    await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Add a new file in working directory (not committed)
-    await normalizedFs.write(`${dir}/file2.txt`, 'content2')
-    await add({ fs, dir, filepath: 'file2.txt', cache: repo.cache })
+    await repo.fs.write(`${dir}/file2.txt`, 'content2')
+    await add({ repo, filepath: 'file2.txt' })
     
     // Diff working directory vs HEAD
     const result = await diff({
-      fs,
-      dir,
-      gitdir,
-      cache: repo.cache,
+      repo,
     })
     
     assert.ok(Array.isArray(result.entries), 'Should return entries array')
@@ -241,32 +191,23 @@ test('diff', async (t) => {
   })
 
   await t.test('param:staged-true', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
-    
-    // Use Repository to ensure cache consistency
-    const cache: Record<string, unknown> = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache })
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    await normalizedFs.write(`${dir}/file1.txt`, 'content1')
+    await repo.fs.write(`${dir}/file1.txt`, 'content1')
     
     // Create initial commit
-    await add({ fs, dir, filepath: 'file1.txt', cache: repo.cache })
-    await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await add({ repo, filepath: 'file1.txt' })
+    await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Stage a new file
-    await normalizedFs.write(`${dir}/file2.txt`, 'content2')
-    await add({ fs, dir, filepath: 'file2.txt', cache: repo.cache })
+    await repo.fs.write(`${dir}/file2.txt`, 'content2')
+    await add({ repo, filepath: 'file2.txt' })
     
     // Diff staged changes
     const result = await diff({
-      fs,
-      dir,
-      gitdir,
-      cache: repo.cache,
+      repo,
       staged: true,
     })
     
@@ -275,36 +216,28 @@ test('diff', async (t) => {
   })
 
   await t.test('param:filepath-filter', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
-    
-    // Use Repository to ensure cache consistency
-    const cache: Record<string, unknown> = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache })
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    await normalizedFs.write(`${dir}/dir1/file1.txt`, 'content1')
-    await normalizedFs.write(`${dir}/dir2/file2.txt`, 'content2')
+    await repo.fs.write(`${dir}/dir1/file1.txt`, 'content1')
+    await repo.fs.write(`${dir}/dir2/file2.txt`, 'content2')
     
     // Create initial commit with multiple files
-    await add({ fs, dir, filepath: 'dir1/file1.txt', cache: repo.cache })
-    await add({ fs, dir, filepath: 'dir2/file2.txt', cache: repo.cache })
-    const commit1 = await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await add({ repo, filepath: 'dir1/file1.txt' })
+    await add({ repo, filepath: 'dir2/file2.txt' })
+    const commit1 = await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Modify both files
-    await normalizedFs.write(`${dir}/dir1/file1.txt`, 'content1-modified')
-    await normalizedFs.write(`${dir}/dir2/file2.txt`, 'content2-modified')
-    await add({ fs, dir, filepath: 'dir1/file1.txt', cache: repo.cache })
-    await add({ fs, dir, filepath: 'dir2/file2.txt', cache: repo.cache })
-    const commit2 = await commit({ fs, dir, message: 'Modify files', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await repo.fs.write(`${dir}/dir1/file1.txt`, 'content1-modified')
+    await repo.fs.write(`${dir}/dir2/file2.txt`, 'content2-modified')
+    await add({ repo, filepath: 'dir1/file1.txt' })
+    await add({ repo, filepath: 'dir2/file2.txt' })
+    const commit2 = await commit({ repo, message: 'Modify files', author: { name: 'Test', email: 'test@example.com' } })
     
-    // Diff with filepath filter - use dir to let diff resolve gitdir the same way commit does
+    // Diff with filepath filter
     const result = await diff({
-      fs,
-      dir,
-      cache: repo.cache,
+      repo,
       refA: commit1,
       refB: commit2,
       filepath: 'dir1/',
@@ -317,20 +250,12 @@ test('diff', async (t) => {
   })
 
   await t.test('edge:empty-repo-no-HEAD', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
-    
-    // Use Repository to ensure cache consistency
-    const cache: Record<string, unknown> = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache })
+    const { repo } = await makeFixture('test-empty', { init: true })
     
     // Diff in empty repo (no commits yet) - should handle gracefully
     try {
       const result = await diff({
-        fs,
-        dir,
-        gitdir,
-        cache,
+        repo,
       })
       
       // Should return empty diff or handle gracefully
@@ -343,31 +268,23 @@ test('diff', async (t) => {
   })
 
   await t.test('param:refA-only', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
-    
-    // Use Repository to ensure cache consistency
-    const cache: Record<string, unknown> = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache })
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    await normalizedFs.write(`${dir}/file1.txt`, 'content1')
+    await repo.fs.write(`${dir}/file1.txt`, 'content1')
     
     // Create initial commit
-    await add({ fs, dir, filepath: 'file1.txt', cache: repo.cache })
-    const commit1 = await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await add({ repo, filepath: 'file1.txt' })
+    const commit1 = await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Add a new file
-    await normalizedFs.write(`${dir}/file2.txt`, 'content2')
-    await add({ fs, dir, filepath: 'file2.txt', cache: repo.cache })
+    await repo.fs.write(`${dir}/file2.txt`, 'content2')
+    await add({ repo, filepath: 'file2.txt' })
     
-    // Diff with only refA - use dir to let diff resolve gitdir the same way commit does
+    // Diff with only refA
     const result = await diff({
-      fs,
-      dir,
-      cache: repo.cache,
+      repo,
       refA: commit1,
     })
     
@@ -376,35 +293,28 @@ test('diff', async (t) => {
   })
 
   await t.test('param:refB-only', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
-    
-    // Use Repository to ensure cache consistency
-    const cache: Record<string, unknown> = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache })
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    const gitdir = await repo.getGitdir()
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    await normalizedFs.write(`${dir}/file1.txt`, 'content1')
+    await repo.fs.write(`${dir}/file1.txt`, 'content1')
     
     // Create initial commit
-    await add({ fs, dir, filepath: 'file1.txt', cache: repo.cache })
-    const commit1 = await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await add({ repo, filepath: 'file1.txt' })
+    const commit1 = await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Create another commit
-    await normalizedFs.write(`${dir}/file2.txt`, 'content2')
-    await add({ fs, dir, filepath: 'file2.txt', cache: repo.cache })
-    const commit2 = await commit({ fs, dir, message: 'Second', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await repo.fs.write(`${dir}/file2.txt`, 'content2')
+    await add({ repo, filepath: 'file2.txt' })
+    const commit2 = await commit({ repo, message: 'Second', author: { name: 'Test', email: 'test@example.com' } })
     
     // Reset to first commit
-    await writeRef({ fs, gitdir, ref: 'HEAD', value: commit1 })
+    await writeRef({ repo, ref: 'HEAD', value: commit1 })
     
-    // Diff with only refB - use dir to let diff resolve gitdir the same way commit does
+    // Diff with only refB
     const result = await diff({
-      fs,
-      dir,
-      cache: repo.cache,
+      repo,
       refB: commit2,
     })
     
@@ -413,32 +323,24 @@ test('diff', async (t) => {
   })
 
   await t.test('ok:both-refA-refB', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
-    
-    // Use Repository to ensure cache consistency
-    const cache: Record<string, unknown> = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache })
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    await normalizedFs.write(`${dir}/file1.txt`, 'content1')
+    await repo.fs.write(`${dir}/file1.txt`, 'content1')
     
     // Create initial commit
-    await add({ fs, dir, filepath: 'file1.txt', cache: repo.cache })
-    const commit1 = await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await add({ repo, filepath: 'file1.txt' })
+    const commit1 = await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Create another commit
-    await normalizedFs.write(`${dir}/file2.txt`, 'content2')
-    await add({ fs, dir, filepath: 'file2.txt', cache: repo.cache })
-    const commit2 = await commit({ fs, dir, message: 'Second', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await repo.fs.write(`${dir}/file2.txt`, 'content2')
+    await add({ repo, filepath: 'file2.txt' })
+    const commit2 = await commit({ repo, message: 'Second', author: { name: 'Test', email: 'test@example.com' } })
     
-    // Diff between two commits - use dir to let diff resolve gitdir the same way commit does
+    // Diff between two commits
     const result = await diff({
-      fs,
-      dir,
-      cache: repo.cache,
+      repo,
       refA: commit1,
       refB: commit2,
     })
@@ -449,32 +351,24 @@ test('diff', async (t) => {
   })
 
   await t.test('behavior:mode-changes', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
-    
-    // Use Repository to ensure cache consistency
-    const cache: Record<string, unknown> = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache })
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
     
     // Write file to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    await normalizedFs.write(`${dir}/file.txt`, 'content1')
+    await repo.fs.write(`${dir}/file.txt`, 'content1')
     
     // Create initial commit
-    await add({ fs, dir, filepath: 'file.txt', cache: repo.cache })
-    const commit1 = await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await add({ repo, filepath: 'file.txt' })
+    const commit1 = await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Modify file (this might change mode depending on implementation)
-    await normalizedFs.write(`${dir}/file.txt`, 'content2')
-    await add({ fs, dir, filepath: 'file.txt', cache: repo.cache })
-    const commit2 = await commit({ fs, dir, message: 'Modify', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await repo.fs.write(`${dir}/file.txt`, 'content2')
+    await add({ repo, filepath: 'file.txt' })
+    const commit2 = await commit({ repo, message: 'Modify', author: { name: 'Test', email: 'test@example.com' } })
     
-    // Diff should detect mode changes if any - use dir to let diff resolve gitdir the same way commit does
+    // Diff should detect mode changes if any
     const result = await diff({
-      fs,
-      dir,
-      cache: repo.cache,
+      repo,
       refA: commit1,
       refB: commit2,
     })
@@ -489,23 +383,16 @@ test('diff', async (t) => {
   })
 
   await t.test('edge:no-trees-available', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
+    const { repo } = await makeFixture('test-empty', { init: true })
     
-    // Use Repository to ensure cache consistency
-    const cache: Record<string, unknown> = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache })
+    // Try to diff with non-existent refs
+    try {
+      const result = await diff({
+        repo,
+        refA: 'nonexistent1',
+        refB: 'nonexistent2',
+      })
     
-      // Try to diff with non-existent refs
-      try {
-        const result = await diff({
-          fs,
-          gitdir,
-          cache: repo.cache,
-          refA: 'nonexistent1',
-          refB: 'nonexistent2',
-        })
-      
       // Should return empty diff or throw
       assert.ok(Array.isArray(result.entries), 'Should return entries array')
     } catch (error) {
@@ -515,40 +402,32 @@ test('diff', async (t) => {
   })
 
   await t.test('param:filepath-subdirectories', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
-    await init({ fs, dir, defaultBranch: 'main' })
-    
-    // Use Repository to ensure cache consistency - pass cache to Repository.open
-    const cache: Record<string, unknown> = {}
-    const repo = await Repository.open({ fs, dir, gitdir, cache })
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    await normalizedFs.write(`${dir}/a/b/file1.txt`, 'content1')
-    await normalizedFs.write(`${dir}/a/c/file2.txt`, 'content2')
-    await normalizedFs.write(`${dir}/x/y/file3.txt`, 'content3')
+    await repo.fs.write(`${dir}/a/b/file1.txt`, 'content1')
+    await repo.fs.write(`${dir}/a/c/file2.txt`, 'content2')
+    await repo.fs.write(`${dir}/x/y/file3.txt`, 'content3')
     
-    // Create initial commit with nested structure - use repo.cache
-    await add({ fs, dir, filepath: 'a/b/file1.txt', cache: repo.cache })
-    await add({ fs, dir, filepath: 'a/c/file2.txt', cache: repo.cache })
-    await add({ fs, dir, filepath: 'x/y/file3.txt', cache: repo.cache })
-    const commit1 = await commit({ fs, dir, message: 'Initial', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    // Create initial commit with nested structure
+    await add({ repo, filepath: 'a/b/file1.txt' })
+    await add({ repo, filepath: 'a/c/file2.txt' })
+    await add({ repo, filepath: 'x/y/file3.txt' })
+    const commit1 = await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Modify files
-    await normalizedFs.write(`${dir}/a/b/file1.txt`, 'content1-modified')
-    await normalizedFs.write(`${dir}/a/c/file2.txt`, 'content2-modified')
-    await normalizedFs.write(`${dir}/x/y/file3.txt`, 'content3-modified')
-    await add({ fs, dir, filepath: 'a/b/file1.txt', cache: repo.cache })
-    await add({ fs, dir, filepath: 'a/c/file2.txt', cache: repo.cache })
-    await add({ fs, dir, filepath: 'x/y/file3.txt', cache: repo.cache })
-    const commit2 = await commit({ fs, dir, message: 'Modify', author: { name: 'Test', email: 'test@example.com' }, cache: repo.cache })
+    await repo.fs.write(`${dir}/a/b/file1.txt`, 'content1-modified')
+    await repo.fs.write(`${dir}/a/c/file2.txt`, 'content2-modified')
+    await repo.fs.write(`${dir}/x/y/file3.txt`, 'content3-modified')
+    await add({ repo, filepath: 'a/b/file1.txt' })
+    await add({ repo, filepath: 'a/c/file2.txt' })
+    await add({ repo, filepath: 'x/y/file3.txt' })
+    const commit2 = await commit({ repo, message: 'Modify', author: { name: 'Test', email: 'test@example.com' } })
     
-    // Filter by 'a/' prefix - use repo.cache and let diff resolve gitdir the same way commit does
+    // Filter by 'a/' prefix
     const result = await diff({
-      fs,
-      dir,
-      cache: repo.cache,
+      repo,
       refA: commit1,
       refB: commit2,
       filepath: 'a/',

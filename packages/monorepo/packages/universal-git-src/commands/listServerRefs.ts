@@ -5,6 +5,7 @@ import { assertParameter } from "../utils/assertParameter.ts"
 import { formatInfoRefs } from "../utils/formatInfoRefs.ts"
 import { parseListRefsResponse } from "../wire/parseListRefsResponse.ts"
 import { writeListRefsRequest } from "../wire/writeListRefsRequest.ts"
+import type { Repository } from "../core-utils/Repository.ts"
 import type {
   HttpClient,
   AuthCallback,
@@ -53,6 +54,7 @@ import type { TcpClient, TcpProgressCallback } from "../daemon/TcpClient.ts"
  * Otherwise, I recommend to use the default which is `protocolVersion: 2`.
  *
  * @param {object} args
+ * @param {Repository} [args.repo] - Optional repository instance. If provided, uses repo.gitBackend.listServerRefs()
  * @param {GitRemoteBackend} [args.remoteBackend] - Optional remote backend instance. If not provided, will be auto-detected from URL.
  * @param {HttpClient} [args.http] - HTTP client (required for HTTP/HTTPS URLs if remoteBackend not provided)
  * @param {TcpClient} [args.tcp] - TCP client (required for git:// URLs if remoteBackend not provided)
@@ -116,6 +118,7 @@ import type { TcpClient, TcpProgressCallback } from "../daemon/TcpClient.ts"
  *
  */
 export async function listServerRefs({
+  repo,
   remoteBackend,
   http,
   tcp,
@@ -133,6 +136,7 @@ export async function listServerRefs({
   symrefs,
   peelTags,
 }: {
+  repo?: Repository // Optional: use repo.gitBackend.listServerRefs() if provided
   remoteBackend?: GitRemoteBackend // Optional: use provided backend or auto-detect
   http?: HttpClient // Required for HTTP/HTTPS URLs if remoteBackend not provided
   tcp?: TcpClient // Required for git:// URLs if remoteBackend not provided
@@ -152,6 +156,26 @@ export async function listServerRefs({
 }): Promise<ServerRef[]> {
   try {
     assertParameter('url', url)
+
+    // If repo is provided, use GitBackend method
+    if (repo?.gitBackend) {
+      return repo.gitBackend.listServerRefs(url, {
+        http,
+        ssh,
+        tcp,
+        onAuth,
+        onAuthSuccess,
+        onAuthFailure,
+        onProgress,
+        corsProxy,
+        headers,
+        forPush,
+        protocolVersion,
+        prefix,
+        symrefs,
+        peelTags,
+      })
+    }
 
     // Use provided backend or auto-detect from URL
     let backend: GitRemoteBackend

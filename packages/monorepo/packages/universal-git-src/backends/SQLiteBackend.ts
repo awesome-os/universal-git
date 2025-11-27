@@ -1026,6 +1026,191 @@ export class SQLiteBackend implements GitBackend {
     return false
   }
 
+  // ============================================================================
+  // Remote Info Operations
+  // ============================================================================
+
+  async getRemoteInfo(
+    url: string,
+    options?: {
+      http?: import('../git/remote/types.ts').HttpClient
+      ssh?: import('../ssh/SshClient.ts').SshClient
+      tcp?: import('../daemon/TcpClient.ts').TcpClient
+      fs?: import('../models/FileSystem.ts').FileSystemProvider
+      onAuth?: import('../git/remote/types.ts').AuthCallback
+      onAuthSuccess?: import('../git/remote/types.ts').AuthSuccessCallback
+      onAuthFailure?: import('../git/remote/types.ts').AuthFailureCallback
+      onProgress?: import('../git/remote/types.ts').ProgressCallback | import('../ssh/SshClient.ts').SshProgressCallback | import('../daemon/TcpClient.ts').TcpProgressCallback
+      corsProxy?: string
+      headers?: Record<string, string>
+      forPush?: boolean
+      protocolVersion?: 1 | 2
+    }
+  ): Promise<import('../commands/getRemoteInfo.ts').GetRemoteInfoResult> {
+    // SQLiteBackend doesn't have a filesystem, so use provided fs or throw
+    const fs = options?.fs || null
+    if (!fs) {
+      throw new Error('SQLiteBackend.getRemoteInfo requires filesystem for remote operations. Provide fs option.')
+    }
+    
+    const { RemoteBackendRegistry } = await import('../git/remote/RemoteBackendRegistry.ts')
+    const { formatInfoRefs } = await import('../utils/formatInfoRefs.ts')
+    
+    // Get remote backend from registry
+    const backend = RemoteBackendRegistry.getBackend({
+      url,
+      http: options?.http,
+      ssh: options?.ssh,
+      tcp: options?.tcp,
+      fs,
+      useRestApi: false,
+    })
+    
+    // Call backend.discover() with protocol-agnostic options
+    const remote = await backend.discover({
+      service: options?.forPush ? 'git-receive-pack' : 'git-upload-pack',
+      url,
+      protocolVersion: options?.protocolVersion || 2,
+      onProgress: options?.onProgress,
+      http: options?.http,
+      headers: options?.headers,
+      corsProxy: options?.corsProxy,
+      onAuth: options?.onAuth,
+      onAuthSuccess: options?.onAuthSuccess,
+      onAuthFailure: options?.onAuthFailure,
+      ssh: options?.ssh,
+      tcp: options?.tcp,
+    })
+    
+    // Convert RemoteDiscoverResult to GetRemoteInfoResult format
+    if (remote.protocolVersion === 2) {
+      return {
+        protocolVersion: 2,
+        capabilities: remote.capabilities2,
+      }
+    }
+    
+    // Protocol version 1: convert Set to object and format refs
+    const capabilities: Record<string, string | true> = {}
+    for (const cap of remote.capabilities) {
+      const [key, value] = cap.split('=')
+      if (value) {
+        capabilities[key] = value
+      } else {
+        capabilities[key] = true
+      }
+    }
+    
+    return {
+      protocolVersion: 1,
+      capabilities,
+      refs: formatInfoRefs({ refs: remote.refs, symrefs: remote.symrefs }, '', true, true),
+    }
+  }
+
+  async listServerRefs(
+    url: string,
+    options?: {
+      http?: import('../git/remote/types.ts').HttpClient
+      ssh?: import('../ssh/SshClient.ts').SshClient
+      tcp?: import('../daemon/TcpClient.ts').TcpClient
+      fs?: import('../models/FileSystem.ts').FileSystemProvider
+      onAuth?: import('../git/remote/types.ts').AuthCallback
+      onAuthSuccess?: import('../git/remote/types.ts').AuthSuccessCallback
+      onAuthFailure?: import('../git/remote/types.ts').AuthFailureCallback
+      onProgress?: import('../git/remote/types.ts').ProgressCallback | import('../ssh/SshClient.ts').SshProgressCallback | import('../daemon/TcpClient.ts').TcpProgressCallback
+      corsProxy?: string
+      headers?: Record<string, string>
+      forPush?: boolean
+      protocolVersion?: 1 | 2
+      prefix?: string
+      symrefs?: boolean
+      peelTags?: boolean
+    }
+  ): Promise<import('../git/refs/types.ts').ServerRef[]> {
+    // SQLiteBackend doesn't have a filesystem, so use provided fs or throw
+    const fs = options?.fs || null
+    if (!fs) {
+      throw new Error('SQLiteBackend.listServerRefs requires filesystem for remote operations. Provide fs option.')
+    }
+    
+    const { RemoteBackendRegistry } = await import('../git/remote/RemoteBackendRegistry.ts')
+    const { formatInfoRefs } = await import('../utils/formatInfoRefs.ts')
+    const { writeListRefsRequest } = await import('../wire/writeListRefsRequest.ts')
+    const { parseListRefsResponse } = await import('../wire/parseListRefsResponse.ts')
+    
+    // Get remote backend from registry
+    const backend = RemoteBackendRegistry.getBackend({
+      url,
+      http: options?.http,
+      ssh: options?.ssh,
+      tcp: options?.tcp,
+      fs,
+      useRestApi: false,
+    })
+    
+    // Step 1: Discover capabilities and refs (for protocol v1)
+    const remote = await backend.discover({
+      service: options?.forPush ? 'git-receive-pack' : 'git-upload-pack',
+      url,
+      protocolVersion: options?.protocolVersion || 2,
+      onProgress: options?.onProgress,
+      http: options?.http,
+      headers: options?.headers,
+      corsProxy: options?.corsProxy,
+      onAuth: options?.onAuth,
+      onAuthSuccess: options?.onAuthSuccess,
+      onAuthFailure: options?.onAuthFailure,
+      ssh: options?.ssh,
+      tcp: options?.tcp,
+    })
+    
+    // For protocol v1, refs are in the discovery response
+    if (remote.protocolVersion === 1) {
+      return formatInfoRefs(
+        { refs: remote.refs, symrefs: remote.symrefs },
+        options?.prefix || '',
+        options?.symrefs || false,
+        options?.peelTags || false
+      )
+    }
+    
+    // Protocol Version 2 - use ls-refs command via connect()
+    const body = await writeListRefsRequest({
+      prefix: options?.prefix,
+      symrefs: options?.symrefs,
+      peelTags: options?.peelTags,
+    })
+    
+    // Create an async iterator that yields individual buffers as Uint8Array
+    const bodyIterator = (async function* () {
+      for (const buf of body) {
+        yield new Uint8Array(buf)
+      }
+    })()
+    
+    // Step 2: Connect and send ls-refs command
+    const res = await backend.connect({
+      service: options?.forPush ? 'git-receive-pack' : 'git-upload-pack',
+      url,
+      protocolVersion: 2,
+      command: 'ls-refs',
+      body: bodyIterator,
+      onProgress: options?.onProgress,
+      http: options?.http,
+      headers: options?.headers,
+      auth: remote.auth,
+      corsProxy: options?.corsProxy,
+      ssh: options?.ssh,
+      tcp: options?.tcp,
+    })
+    
+    if (!res.body) {
+      throw new Error('No response body from server')
+    }
+    return parseListRefsResponse(res.body)
+  }
+
   async close(): Promise<void> {
     if (this.db) {
       this.db.close()

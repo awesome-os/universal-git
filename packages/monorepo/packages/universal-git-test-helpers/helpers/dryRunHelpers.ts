@@ -1,5 +1,6 @@
 // FileSystemProvider is not exported as subpath, use relative path
 import type { FileSystemProvider } from '@awesome-os/universal-git-src/models/FileSystem.ts'
+import type { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 // Import write functions from source (not exported as subpath)
 import { writeBlob } from '@awesome-os/universal-git-src/commands/writeBlob.ts'
 import { writeCommit } from '@awesome-os/universal-git-src/commands/writeCommit.ts'
@@ -61,21 +62,28 @@ export async function computeBlobOid(
 /**
  * Compute commit OID without writing to disk
  * 
- * @param fs - File system client
- * @param params - Parameters for writeCommit (commit is required, gitdir/dir optional)
+ * @param repoOrFs - Repository instance (preferred) or FileSystemProvider (legacy)
+ * @param params - Parameters for writeCommit (commit is required, gitdir/dir optional if repo provided)
  * @returns Promise resolving to the computed OID
  * 
  * @example
  * ```typescript
+ * // Using repo (preferred)
+ * const { repo } = await makeFixture('test-name')
+ * const oid = await computeCommitOid(repo, {
+ *   commit: { message: 'Test', tree: 'abc123...', parent: [] }
+ * })
+ * 
+ * // Using fs (legacy)
+ * const { fs, gitdir } = await makeFixture('test-name')
  * const oid = await computeCommitOid(fs, {
  *   gitdir,
  *   commit: { message: 'Test', tree: 'abc123...', parent: [] }
  * })
- * assert.strictEqual(typeof oid, 'string')
  * ```
  */
 export async function computeCommitOid(
-  fs: FileSystemProvider,
+  repoOrFs: Repository | FileSystemProvider,
   params: {
     dir?: string
     gitdir?: string
@@ -100,11 +108,21 @@ export async function computeCommitOid(
     objectFormat?: 'sha1' | 'sha256'
   }
 ): Promise<string> {
-  return await writeCommit({
-    fs,
-    ...params,
-    dryRun: true,
-  })
+  if ('fs' in repoOrFs && 'getGitdir' in repoOrFs) {
+    // It's a Repository
+    return await writeCommit({
+      repo: repoOrFs as Repository,
+      ...params,
+      dryRun: true,
+    })
+  } else {
+    // It's a FileSystemProvider (legacy)
+    return await writeCommit({
+      fs: repoOrFs as FileSystemProvider,
+      ...params,
+      dryRun: true,
+    })
+  }
 }
 
 /**
@@ -147,12 +165,25 @@ export async function computeTreeOid(
 /**
  * Compute tag OID without writing to disk
  * 
- * @param fs - File system client
- * @param params - Parameters for writeTag (tag is required, gitdir/dir optional)
+ * @param repoOrFs - Repository instance (preferred) or FileSystemProvider (legacy)
+ * @param params - Parameters for writeTag (tag is required, gitdir/dir optional if repo provided)
  * @returns Promise resolving to the computed OID
  * 
  * @example
  * ```typescript
+ * // Using repo (preferred)
+ * const { repo } = await makeFixture('test-name')
+ * const oid = await computeTagOid(repo, {
+ *   tag: {
+ *     object: 'abc123...',
+ *     type: 'commit',
+ *     tag: 'v1.0.0',
+ *     message: 'Release 1.0.0'
+ *   }
+ * })
+ * 
+ * // Using fs (legacy)
+ * const { fs, gitdir } = await makeFixture('test-name')
  * const oid = await computeTagOid(fs, {
  *   gitdir,
  *   tag: {
@@ -162,11 +193,10 @@ export async function computeTreeOid(
  *     message: 'Release 1.0.0'
  *   }
  * })
- * assert.strictEqual(typeof oid, 'string')
  * ```
  */
 export async function computeTagOid(
-  fs: FileSystemProvider,
+  repoOrFs: Repository | FileSystemProvider,
   params: {
     dir?: string
     gitdir?: string
@@ -186,11 +216,21 @@ export async function computeTagOid(
     objectFormat?: 'sha1' | 'sha256'
   }
 ): Promise<string> {
-  return await writeTag({
-    fs,
-    ...params,
-    dryRun: true,
-  })
+  if ('fs' in repoOrFs && 'getGitdir' in repoOrFs) {
+    // It's a Repository
+    return await writeTag({
+      repo: repoOrFs as Repository,
+      ...params,
+      dryRun: true,
+    })
+  } else {
+    // It's a FileSystemProvider (legacy)
+    return await writeTag({
+      fs: repoOrFs as FileSystemProvider,
+      ...params,
+      dryRun: true,
+    })
+  }
 }
 
 /**

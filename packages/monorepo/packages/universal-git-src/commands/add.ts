@@ -107,6 +107,7 @@ export async function add({
       dir: finalDir,
       gitdir: effectiveGitdir,
       fs,
+      repo,
       filepath,
       index,
       force,
@@ -126,6 +127,7 @@ async function addToIndex({
   dir,
   gitdir,
   fs,
+  repo,
   filepath,
   index,
   force,
@@ -135,6 +137,7 @@ async function addToIndex({
   dir: string
   gitdir: string
   fs: ReturnType<typeof createFileSystem>
+  repo: Repository
   filepath: string | string[]
   index: import('../git/index/GitIndex.ts').GitIndex
   force: boolean
@@ -165,6 +168,7 @@ async function addToIndex({
             dir,
             gitdir,
             fs,
+            repo,
             filepath: join(currentFilepath, child),
             index,
             force,
@@ -179,6 +183,7 @@ async function addToIndex({
             dir,
             gitdir,
             fs,
+            repo,
             filepath: join(currentFilepath, child),
             index,
             force,
@@ -219,8 +224,9 @@ async function addToIndex({
       }
       
       // Write blob using writeBlob
+      // Use repo parameter to ensure fs is available from checked-out worktree
       const objectBuffer = UniversalBuffer.from(object as string | Uint8Array)
-      const oid = await writeBlob({ fs: fs as any, gitdir, blob: objectBuffer })
+      const oid = await writeBlob({ repo, fs: fs as any, gitdir, blob: objectBuffer })
       
       // Insert into index using GitIndex.insert() method
       index.insert({

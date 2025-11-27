@@ -6,11 +6,10 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('writeTag', async (t) => {
   await t.test('ok:annotated-tag', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-writeTag')
+    const { repo } = await makeFixture('test-writeTag')
     // Test
     const oid = await writeTag({
-      fs,
-      gitdir,
+      repo,
       tag: {
         object: 'af4d84a6a9fa7a74acdad07fddf9f17ff3a974ae',
         type: 'commit',
@@ -67,12 +66,11 @@ dBWrLc3kdnemrlhSRzR2
   })
 
   await t.test('param:tag-missing-parsed-format', async () => {
-    const { fs, gitdir } = await makeFixture('test-writeTag')
+    const { repo } = await makeFixture('test-writeTag')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await writeTag({
-        fs,
-        gitdir,
+        repo,
         format: 'parsed',
       } as any)
       assert.fail('Should have thrown MissingParameterError')
@@ -83,12 +81,11 @@ dBWrLc3kdnemrlhSRzR2
   })
 
   await t.test('param:tagBuffer-missing-content-format', async () => {
-    const { fs, gitdir } = await makeFixture('test-writeTag')
+    const { repo } = await makeFixture('test-writeTag')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await writeTag({
-        fs,
-        gitdir,
+        repo,
         format: 'content',
       } as any)
       assert.fail('Should have thrown MissingParameterError')
@@ -99,10 +96,9 @@ dBWrLc3kdnemrlhSRzR2
   })
 
   await t.test('param:dryRun', async () => {
-    const { fs, gitdir } = await makeFixture('test-writeTag')
+    const { repo } = await makeFixture('test-writeTag')
     const oid = await writeTag({
-      fs,
-      gitdir,
+      repo,
       tag: {
         object: 'af4d84a6a9fa7a74acdad07fddf9f17ff3a974ae',
         type: 'commit',
@@ -117,7 +113,7 @@ dBWrLc3kdnemrlhSRzR2
     // Verify object was not written
     const { readObject } = await import('@awesome-os/universal-git-src/index.ts')
     try {
-      await readObject({ fs, gitdir, oid })
+      await readObject({ repo, oid })
       assert.fail('Object should not exist when dryRun is true')
     } catch (error) {
       // Expected - object should not exist
@@ -126,12 +122,9 @@ dBWrLc3kdnemrlhSRzR2
   })
 
   await t.test('param:repo-provided', async () => {
-    const { fs, gitdir, dir } = await makeFixture('test-writeTag')
-    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const repo = await Repository.open({ fs, dir, gitdir })
+    const { repo } = await makeFixture('test-writeTag')
     const oid = await writeTag({
       repo,
-      gitdir, // Provide gitdir explicitly to work around default parameter bug
       tag: {
         object: 'af4d84a6a9fa7a74acdad07fddf9f17ff3a974ae',
         type: 'commit',
@@ -146,10 +139,9 @@ dBWrLc3kdnemrlhSRzR2
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { fs, dir } = await makeFixture('test-writeTag')
+    const { repo } = await makeFixture('test-writeTag')
     const oid = await writeTag({
-      fs,
-      dir,
+      repo,
       tag: {
         object: 'af4d84a6a9fa7a74acdad07fddf9f17ff3a974ae',
         type: 'commit',
@@ -164,12 +156,11 @@ dBWrLc3kdnemrlhSRzR2
   })
 
   await t.test('error:caller-property', async () => {
-    const { fs, gitdir } = await makeFixture('test-writeTag')
+    const { repo } = await makeFixture('test-writeTag')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await writeTag({
-        fs,
-        gitdir,
+        repo,
         format: 'parsed',
       } as any)
       assert.fail('Should have thrown MissingParameterError')
@@ -180,10 +171,9 @@ dBWrLc3kdnemrlhSRzR2
   })
 
   await t.test('ok:tag-without-message', async () => {
-    const { fs, gitdir } = await makeFixture('test-writeTag')
+    const { repo } = await makeFixture('test-writeTag')
     const oid = await writeTag({
-      fs,
-      gitdir,
+      repo,
       tag: {
         object: 'af4d84a6a9fa7a74acdad07fddf9f17ff3a974ae',
         type: 'commit',
@@ -197,10 +187,9 @@ dBWrLc3kdnemrlhSRzR2
   })
 
   await t.test('ok:tag-pointing-to-tree', async () => {
-    const { fs, gitdir } = await makeFixture('test-writeTag')
+    const { repo } = await makeFixture('test-writeTag')
     const oid = await writeTag({
-      fs,
-      gitdir,
+      repo,
       tag: {
         object: 'e0b8f3574060ee24e03e4af3896f65dd208a60cc',
         type: 'tree',

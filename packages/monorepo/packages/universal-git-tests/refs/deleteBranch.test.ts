@@ -51,7 +51,7 @@ test('deleteBranch', async (t) => {
     let error: unknown = null
     // Test
     try {
-      await deleteBranch({ fs, gitdir })
+      await deleteBranch({ repo } as any)
     } catch (err) {
       error = err
     }

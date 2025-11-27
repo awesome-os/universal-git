@@ -1,26 +1,28 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { initSubmodule, getSubmoduleGitdir } from '@awesome-os/universal-git-src/core-utils/filesystem/SubmoduleManager.ts'
-import { makeNodeFixture } from '../../helpers/makeNodeFixture.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
+import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
+import { join } from '@awesome-os/universal-git-src/core-utils/GitPath.ts'
 
 test('initSubmodule', async (t) => {
   await t.test('ok:initializes-submodule-configuration', async () => {
-    const { fs, dir, gitdir } = await makeNodeFixture('test-submodule-init')
+    const { repo } = await makeFixture('test-submodule-init', { init: true })
+    const dir = (await repo.getDir())!
+    const gitdir = await repo.getGitdir()
     
     // Create .gitmodules file
     const gitmodulesContent = `[submodule "lib"]
 	path = lib
 	url = https://github.com/user/lib.git
 `
-    await fs.write(join(dir, '.gitmodules'), gitmodulesContent)
+    await repo.fs.write(join(dir, '.gitmodules'), gitmodulesContent)
     
     // Initialize submodule
-    await initSubmodule({ fs, dir, gitdir, name: 'lib' })
+    await initSubmodule({ fs: repo.fs, dir, gitdir, name: 'lib' })
     
     // Verify URL was copied to config
     const { ConfigAccess } = await import('@awesome-os/universal-git-src/utils/configAccess.ts')
-    const configAccess = new ConfigAccess(fs, gitdir)
+    const configAccess = new ConfigAccess(repo.fs, gitdir)
     const url = await configAccess.getConfigValue('submodule.lib.url', 'local')
     
     // Assert
@@ -29,40 +31,44 @@ test('initSubmodule', async (t) => {
     // Verify directories were created
     const submoduleDir = join(dir, 'lib')
     const submoduleGitdir = getSubmoduleGitdir({ gitdir, path: 'lib' })
-    assert.ok(await fs.exists(submoduleDir))
-    assert.ok(await fs.exists(submoduleGitdir))
+    assert.ok(await repo.fs.exists(submoduleDir))
+    assert.ok(await repo.fs.exists(submoduleGitdir))
   })
 
   await t.test('ok:throws-error-for-non-existent-submodule', async () => {
-    const { fs, dir, gitdir } = await makeNodeFixture('test-submodule-init-error')
+    const { repo } = await makeFixture('test-submodule-init-error', { init: true })
+    const dir = (await repo.getDir())!
+    const gitdir = await repo.getGitdir()
     
     // Try to initialize non-existent submodule
     // This will throw an error because getSubmoduleByName returns null
     await assert.rejects(
       async () => {
-        await initSubmodule({ fs, dir, gitdir, name: 'nonexistent' })
+        await initSubmodule({ fs: repo.fs, dir, gitdir, name: 'nonexistent' })
       }
       // Error could be about submodule not found or config access issues
     )
   })
 
   await t.test('ok:does-not-overwrite-existing-config-URL', async () => {
-    const { fs, dir, gitdir } = await makeNodeFixture('test-submodule-init-no-overwrite')
+    const { repo } = await makeFixture('test-submodule-init-no-overwrite', { init: true })
+    const dir = (await repo.getDir())!
+    const gitdir = await repo.getGitdir()
     
     // Create .gitmodules file
     const gitmodulesContent = `[submodule "lib"]
 	path = lib
 	url = https://github.com/user/lib.git
 `
-    await fs.write(join(dir, '.gitmodules'), gitmodulesContent)
+    await repo.fs.write(join(dir, '.gitmodules'), gitmodulesContent)
     
     // Set URL in config first
     const { ConfigAccess } = await import('@awesome-os/universal-git-src/utils/configAccess.ts')
-    const configAccess = new ConfigAccess(fs, gitdir)
+    const configAccess = new ConfigAccess(repo.fs, gitdir)
     await configAccess.setConfigValue('submodule.lib.url', 'https://github.com/user/custom-lib.git', 'local')
     
     // Initialize submodule (should not overwrite existing URL)
-    await initSubmodule({ fs, dir, gitdir, name: 'lib' })
+    await initSubmodule({ fs: repo.fs, dir, gitdir, name: 'lib' })
     
     // Verify URL was not overwritten
     const url = await configAccess.getConfigValue('submodule.lib.url', 'local')
@@ -70,23 +76,25 @@ test('initSubmodule', async (t) => {
   })
 
   await t.test('ok:creates-directories-if-they-do-not-exist', async () => {
-    const { fs, dir, gitdir } = await makeNodeFixture('test-submodule-init-dirs')
+    const { repo } = await makeFixture('test-submodule-init-dirs', { init: true })
+    const dir = (await repo.getDir())!
+    const gitdir = await repo.getGitdir()
     
     // Create .gitmodules file
     const gitmodulesContent = `[submodule "lib"]
 	path = lib
 	url = https://github.com/user/lib.git
 `
-    await fs.write(join(dir, '.gitmodules'), gitmodulesContent)
+    await repo.fs.write(join(dir, '.gitmodules'), gitmodulesContent)
     
     // Initialize submodule (directories don't exist yet)
-    await initSubmodule({ fs, dir, gitdir, name: 'lib' })
+    await initSubmodule({ fs: repo.fs, dir, gitdir, name: 'lib' })
     
     // Verify directories were created
     const submoduleDir = join(dir, 'lib')
     const submoduleGitdir = getSubmoduleGitdir({ gitdir, path: 'lib' })
-    assert.ok(await fs.exists(submoduleDir))
-    assert.ok(await fs.exists(submoduleGitdir))
+    assert.ok(await repo.fs.exists(submoduleDir))
+    assert.ok(await repo.fs.exists(submoduleGitdir))
   })
 })
 

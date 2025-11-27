@@ -18,9 +18,42 @@ The `init` command:
 
 ## Basic Usage
 
-### Using Repository.open() (Recommended)
+### Using Repository.init() (Recommended)
 
-The recommended way to initialize a repository is using `Repository.open()` with the `init` option:
+The recommended way to initialize a repository is using the `init()` method on a `Repository` instance:
+
+```typescript
+import { Repository } from 'universal-git'
+
+// Open a repository (doesn't need to exist yet)
+const repo = await Repository.open({
+  fs,
+  dir: '/path/to/repo'
+})
+
+// Initialize the repository
+await repo.init()
+
+// Or with options
+await repo.init({
+  defaultBranch: 'main',
+  objectFormat: 'sha1'
+})
+
+// Repository is ready to use
+await repo.add('README.md')
+await repo.commit('Initial commit')
+```
+
+**Benefits:**
+- Git-like API (all commands on Repository instance)
+- Backend-agnostic (works with any backend type)
+- Can initialize after opening
+- Full control over initialization options
+
+### Using Repository.open() with init Option
+
+You can also initialize and open in one call:
 
 ```typescript
 import { Repository } from 'universal-git'
@@ -33,7 +66,7 @@ const repo = await Repository.open({
 })
 
 // Repository is ready to use
-await add({ repo, filepath: 'README.md' })
+await repo.add('README.md')
 ```
 
 **Benefits:**

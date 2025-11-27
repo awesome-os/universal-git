@@ -20,10 +20,10 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('param:gitdir-or-dir-missing', async () => {
-    const { fs } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
     try {
       await resetIndex({
-        fs,
+        fs: repo.fs,
         filepath: 'test.txt',
       } as any)
       assert.fail('Should have thrown MissingParameterError')
@@ -37,11 +37,10 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('param:filepath-missing', async () => {
-    const { fs, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
     try {
       await resetIndex({
-        fs,
-        gitdir,
+        repo,
       } as any)
       assert.fail('Should have thrown MissingParameterError')
     } catch (error) {
@@ -51,12 +50,11 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { fs, dir } = await makeFixture('test-empty')
-    // gitdir is derived from dir, so when dir is provided, gitdir should be join(dir, '.git')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    // gitdir is derived from dir, so when repo is provided, gitdir should be derived
     try {
       await resetIndex({
-        fs,
-        dir,
+        repo,
         // gitdir not provided, should default to join(dir, '.git')
         filepath: 'nonexistent.txt',
       })
@@ -69,13 +67,11 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('edge:missing-ref-new-repo', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
     // In a new repository without commits, resetIndex should not throw when ref is not provided
     try {
       await resetIndex({
-        fs,
-        dir,
-        gitdir,
+        repo,
         filepath: 'nonexistent.txt',
         // ref not provided, should default to 'HEAD' but handle gracefully if HEAD doesn't exist
       })
@@ -88,15 +84,15 @@ test('resetIndex', async (t) => {
   })
   await t.test('ok:modified-file', async () => {
     // Setup
-    const { fs, gitdir, dir } = await makeFixture('test-resetIndex')
+    const { repo } = await makeFixture('test-resetIndex', { init: true })
     // Test
-    const before = await listFiles({ fs, gitdir })
+    const before = await listFiles({ repo })
     assert.ok(Array.isArray(before))
     assert.ok(before.includes('a.txt'))
     assert.ok(before.includes('b.txt'))
     assert.ok(before.includes('d.txt'))
-    await resetIndex({ fs, dir, gitdir, filepath: 'a.txt' })
-    const after = await listFiles({ fs, gitdir })
+    await resetIndex({ repo, filepath: 'a.txt' })
+    const after = await listFiles({ repo })
     assert.ok(Array.isArray(after))
     assert.ok(after.includes('a.txt'))
     assert.ok(after.includes('b.txt'))
@@ -106,15 +102,15 @@ test('resetIndex', async (t) => {
 
   await t.test('ok:new-file', async () => {
     // Setup
-    const { fs, gitdir, dir } = await makeFixture('test-resetIndex')
+    const { repo } = await makeFixture('test-resetIndex', { init: true })
     // Test
-    const before = await listFiles({ fs, gitdir })
+    const before = await listFiles({ repo })
     assert.ok(Array.isArray(before))
     assert.ok(before.includes('a.txt'))
     assert.ok(before.includes('b.txt'))
     assert.ok(before.includes('d.txt'))
-    await resetIndex({ fs, dir, gitdir, filepath: 'd.txt' })
-    const after = await listFiles({ fs, gitdir })
+    await resetIndex({ repo, filepath: 'd.txt' })
+    const after = await listFiles({ repo })
     assert.ok(Array.isArray(after))
     assert.ok(after.includes('a.txt'))
     assert.ok(after.includes('b.txt'))
@@ -124,14 +120,14 @@ test('resetIndex', async (t) => {
 
   await t.test('ok:new-repository', async () => {
     // Setup
-    const { fs, gitdir, dir } = await makeFixture('test-resetIndex-new')
+    const { repo } = await makeFixture('test-resetIndex-new', { init: true })
     // Test
-    const before = await listFiles({ fs, gitdir })
+    const before = await listFiles({ repo })
     assert.ok(Array.isArray(before))
     assert.ok(before.includes('a.txt'))
     assert.ok(before.includes('b.txt'))
-    await resetIndex({ fs, dir, gitdir, filepath: 'b.txt' })
-    const after = await listFiles({ fs, gitdir })
+    await resetIndex({ repo, filepath: 'b.txt' })
+    const after = await listFiles({ repo })
     assert.ok(Array.isArray(after))
     assert.ok(after.includes('a.txt'))
     assert.ok(!after.includes('b.txt'))
@@ -140,9 +136,9 @@ test('resetIndex', async (t) => {
 
   await t.test('ok:reset-to-oid', async () => {
     // Setup
-    const { fs, gitdir, dir } = await makeFixture('test-resetIndex-oid')
+    const { repo } = await makeFixture('test-resetIndex-oid', { init: true })
     // Test
-    const before = await statusMatrix({ fs, dir, gitdir })
+    const before = await statusMatrix({ repo })
     assert.ok(Array.isArray(before))
     // Find b.txt in the status matrix
     const bBefore = before.find((entry: any) => entry[0] === 'b.txt')
@@ -153,13 +149,11 @@ test('resetIndex', async (t) => {
     assert.strictEqual(bBefore[2], 1) // INDEX
     assert.strictEqual(bBefore[3], 1) // WORKDIR
     await resetIndex({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: 'b.txt',
       ref: '572d5ec8ea719ed6780ef0e6a115a75999cb3091',
     })
-    const after = await statusMatrix({ fs, dir, gitdir })
+    const after = await statusMatrix({ repo })
     assert.ok(Array.isArray(after))
     // Find b.txt in the status matrix after reset
     const bAfter = after.find((entry: any) => entry[0] === 'b.txt')
@@ -171,15 +165,13 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('error:ref-cannot-be-resolved', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-resetIndex')
+    const { repo } = await makeFixture('test-resetIndex', { init: true })
     
     // Try to reset with invalid ref
     await assert.rejects(
       async () => {
         await resetIndex({
-          fs,
-          dir,
-          gitdir,
+          repo,
           filepath: 'a.txt',
           ref: 'nonexistent-ref',
         })
@@ -192,123 +184,104 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('edge:file-not-in-tree', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-resetIndex')
+    const { repo } = await makeFixture('test-resetIndex', { init: true })
     
     // Reset a file that doesn't exist in HEAD (should remove from index)
     await resetIndex({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: 'nonexistent.txt',
     })
     
     // File should not be in index after reset
-    const files = await listFiles({ fs, gitdir })
+    const files = await listFiles({ repo })
     assert.ok(!files.includes('nonexistent.txt'))
   })
 
   await t.test('behavior:workdir-stats-match', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-resetIndex')
-    const cache: Record<string, unknown> = {}
+    const { repo } = await makeFixture('test-resetIndex', { init: true })
+    const dir = await repo.getDir()!
     
     // Get file stats before reset
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    const beforeStats = await normalizedFs.lstat(join(dir, 'a.txt'))
+    const beforeStats = await repo.fs.lstat(join(dir, 'a.txt'))
     
     // Reset file (should use workdir stats if hash matches)
     await resetIndex({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: 'a.txt',
-      cache,
     })
     
     // Verify file is still in index
-    const files = await listFiles({ fs, gitdir, cache })
+    const files = await listFiles({ repo })
     assert.ok(files.includes('a.txt'))
     
     // The stats should match workdir stats (implementation detail, but we can verify file is still there)
-    const afterStats = await normalizedFs.lstat(join(dir, 'a.txt'))
+    const afterStats = await repo.fs.lstat(join(dir, 'a.txt'))
     assert.ok(afterStats)
   })
 
   await t.test('behavior:default-stats-no-match', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-resetIndex')
-    const cache: Record<string, unknown> = {}
+    const { repo } = await makeFixture('test-resetIndex', { init: true })
+    const dir = await repo.getDir()!
     
     // Modify file in workdir so hash doesn't match
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    await normalizedFs.write(join(dir, 'a.txt'), 'modified content')
+    await repo.fs.write(join(dir, 'a.txt'), 'modified content')
     
     // Reset file (should use default stats since hash doesn't match)
     await resetIndex({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: 'a.txt',
-      cache,
     })
     
     // Verify file is still in index
-    const files = await listFiles({ fs, gitdir, cache })
+    const files = await listFiles({ repo })
     assert.ok(files.includes('a.txt'))
   })
 
   await t.test('param:dir-not-provided', async () => {
-    const { fs, gitdir } = await makeFixture('test-resetIndex')
+    const { repo } = await makeFixture('test-resetIndex', { init: true })
     
     // Reset without dir (should skip workdir check)
     await resetIndex({
-      fs,
-      gitdir,
+      repo,
       filepath: 'a.txt',
     })
     
     // Verify file is still in index
-    const files = await listFiles({ fs, gitdir })
+    const files = await listFiles({ repo })
     assert.ok(files.includes('a.txt'))
   })
 
   await t.test('behavior:remove-when-oid-null', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-resetIndex')
+    const { repo } = await makeFixture('test-resetIndex', { init: true })
+    const dir = await repo.getDir()!
     
     // Add a new file to index first
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    await normalizedFs.write(join(dir, 'newfile.txt'), 'new content')
+    await repo.fs.write(join(dir, 'newfile.txt'), 'new content')
     const { add } = await import('@awesome-os/universal-git-src/index.ts')
-    const cache: Record<string, unknown> = {}
-    await add({ fs, dir, gitdir, filepath: 'newfile.txt', cache })
+    await add({ repo, filepath: 'newfile.txt' })
     
     // Verify file is in index
-    let files = await listFiles({ fs, gitdir, cache })
+    let files = await listFiles({ repo })
     assert.ok(files.includes('newfile.txt'))
     
     // Reset file that doesn't exist in HEAD (should remove from index)
     await resetIndex({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: 'newfile.txt',
-      cache,
     })
     
     // File should be removed from index
-    files = await listFiles({ fs, gitdir, cache })
+    files = await listFiles({ repo })
     assert.ok(!files.includes('newfile.txt'))
   })
 
   await t.test('error:caller-property', async () => {
-    const { fs, gitdir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
     
     // Try to reset with invalid ref (should set caller property)
     try {
       await resetIndex({
-        fs,
-        gitdir,
+        repo,
         filepath: 'test.txt',
         ref: 'invalid-ref',
       })
@@ -319,171 +292,141 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('param:custom-ref', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-resetIndex')
-    const cache: Record<string, unknown> = {}
+    const { repo } = await makeFixture('test-resetIndex', { init: true })
     
     // Get a valid commit OID from the repository
     const { readCommit } = await import('@awesome-os/universal-git-src/index.ts')
-    const { resolveRef } = await import('@awesome-os/universal-git-src/git/refs/readRef.ts')
-    const headOid = await resolveRef({ fs, gitdir, ref: 'HEAD' })
-    const commit = await readCommit({ fs, dir, gitdir, oid: headOid, cache })
+    const headOid = await repo.resolveRef('HEAD')
+    const commit = await readCommit({ repo, oid: headOid })
     
     // Reset to HEAD explicitly
     await resetIndex({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: 'a.txt',
       ref: 'HEAD',
-      cache,
     })
     
     // Verify file is still in index
-    const files = await listFiles({ fs, gitdir, cache })
+    const files = await listFiles({ repo })
     assert.ok(files.includes('a.txt'))
   })
 
   await t.test('edge:file-in-workdir-not-in-ref', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-resetIndex')
-    const cache: Record<string, unknown> = {}
+    const { repo } = await makeFixture('test-resetIndex', { init: true })
+    const dir = await repo.getDir()!
     
     // Create a new file in workdir
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    await normalizedFs.write(join(dir, 'workdir-only.txt'), 'workdir content')
+    await repo.fs.write(join(dir, 'workdir-only.txt'), 'workdir content')
     
     // Add to index
     const { add } = await import('@awesome-os/universal-git-src/index.ts')
-    await add({ fs, dir, gitdir, filepath: 'workdir-only.txt', cache })
+    await add({ repo, filepath: 'workdir-only.txt' })
     
     // Reset to HEAD (file doesn't exist in HEAD, so should be removed from index)
     await resetIndex({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: 'workdir-only.txt',
-      cache,
     })
     
     // File should be removed from index
-    const files = await listFiles({ fs, gitdir, cache })
+    const files = await listFiles({ repo })
     assert.ok(!files.includes('workdir-only.txt'))
   })
 
   await t.test('edge:nested-paths', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-resetIndex')
-    const cache: Record<string, unknown> = {}
+    const { repo } = await makeFixture('test-resetIndex', { init: true })
+    const dir = await repo.getDir()!
     
     // Create a nested file
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    await normalizedFs.mkdir(join(dir, 'subdir'), { recursive: true })
-    await normalizedFs.write(join(dir, 'subdir', 'nested.txt'), 'nested content')
+    await repo.fs.mkdir(join(dir, 'subdir'), { recursive: true })
+    await repo.fs.write(join(dir, 'subdir', 'nested.txt'), 'nested content')
     
     // Add to index
     const { add } = await import('@awesome-os/universal-git-src/index.ts')
-    await add({ fs, dir, gitdir, filepath: 'subdir/nested.txt', cache })
+    await add({ repo, filepath: 'subdir/nested.txt' })
     
     // Verify file is in index
-    let files = await listFiles({ fs, gitdir, cache })
+    let files = await listFiles({ repo })
     assert.ok(files.includes('subdir/nested.txt'))
     
     // Reset nested file
     await resetIndex({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: 'subdir/nested.txt',
-      cache,
     })
     
     // File should be removed from index (doesn't exist in HEAD)
-    files = await listFiles({ fs, gitdir, cache })
+    files = await listFiles({ repo })
     assert.ok(!files.includes('subdir/nested.txt'))
   })
 
   await t.test('edge:special-chars', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-resetIndex')
-    const cache: Record<string, unknown> = {}
+    const { repo } = await makeFixture('test-resetIndex', { init: true })
+    const dir = await repo.getDir()!
     
     // Create a file with special characters in name
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
-    await normalizedFs.write(join(dir, 'file with spaces.txt'), 'content')
+    await repo.fs.write(join(dir, 'file with spaces.txt'), 'content')
     
     // Add to index
     const { add } = await import('@awesome-os/universal-git-src/index.ts')
-    await add({ fs, dir, gitdir, filepath: 'file with spaces.txt', cache })
+    await add({ repo, filepath: 'file with spaces.txt' })
     
     // Verify file is in index
-    let files = await listFiles({ fs, gitdir, cache })
+    let files = await listFiles({ repo })
     assert.ok(files.includes('file with spaces.txt'))
     
     // Reset file
     await resetIndex({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: 'file with spaces.txt',
-      cache,
     })
     
     // File should be removed from index (doesn't exist in HEAD)
-    files = await listFiles({ fs, gitdir, cache })
+    files = await listFiles({ repo })
     assert.ok(!files.includes('file with spaces.txt'))
   })
 
   await t.test('error:resolveFilepath-non-NotFoundError', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-resetIndex')
-    const cache: Record<string, unknown> = {}
+    const { repo } = await makeFixture('test-resetIndex', { init: true })
     
     // This test verifies that errors from resolveFilepath are caught and handled
     // by setting oid to null (deleted state)
     // We can't easily simulate a non-NotFoundError from resolveFilepath,
     // but we can verify the behavior when file doesn't exist in tree
     await resetIndex({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: 'nonexistent-in-tree.txt',
-      cache,
     })
     
     // File should not be in index
-    const files = await listFiles({ fs, gitdir, cache })
+    const files = await listFiles({ repo })
     assert.ok(!files.includes('nonexistent-in-tree.txt'))
   })
 
   await t.test('edge:file-in-index-not-in-workdir', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-resetIndex')
-    const cache: Record<string, unknown> = {}
+    const { repo } = await makeFixture('test-resetIndex', { init: true })
     
     // File exists in index and HEAD, but not in workdir
     // Reset should still work (uses default stats)
     await resetIndex({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: 'a.txt',
-      cache,
     })
     
     // File should still be in index
-    const files = await listFiles({ fs, gitdir, cache })
+    const files = await listFiles({ repo })
     assert.ok(files.includes('a.txt'))
   })
 
   await t.test('edge:empty-filepath', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-resetIndex')
+    const { repo } = await makeFixture('test-resetIndex', { init: true })
     
     // Empty filepath might be accepted (empty string is truthy in JavaScript)
     // The operation might succeed or fail depending on implementation
     // Let's just verify it doesn't crash
     try {
       await resetIndex({
-        fs,
-        dir,
-        gitdir,
+        repo,
         filepath: '',
       })
       // If it succeeds, that's okay - empty filepath might be valid
@@ -494,14 +437,14 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('error:Repository-open-fails', async () => {
-    const { fs } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
     
     // Try to reset with invalid gitdir
     // Repository.open might not fail immediately, but operations later might fail
     // Let's verify that an error is thrown and has the caller property
     try {
       await resetIndex({
-        fs,
+        fs: repo.fs,
         gitdir: '/nonexistent/gitdir',
         filepath: 'test.txt',
       })
@@ -515,79 +458,70 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('error:index-operations-fail', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-resetIndex')
+    const { repo } = await makeFixture('test-resetIndex', { init: true })
     
     // This test verifies error handling in index operations
     // We can't easily simulate index operation failures, but we can verify
     // that the operation completes successfully in normal cases
     await resetIndex({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: 'a.txt',
     })
     
     // Operation should complete
-    const files = await listFiles({ fs, gitdir })
+    const files = await listFiles({ repo })
     assert.ok(Array.isArray(files))
   })
 
   await t.test('edge:forward-slashes', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-resetIndex')
-    const cache: Record<string, unknown> = {}
+    const { repo } = await makeFixture('test-resetIndex', { init: true })
+    const dir = await repo.getDir()!
     
     // Create nested file - ensure parent directories exist
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
-    const normalizedFs = createFileSystem(fs)
     const nestedPath = join(dir, 'dir1', 'dir2')
     const filePath = join(nestedPath, 'deep.txt')
     
     // Create parent directories first if they don't exist
     try {
-      await normalizedFs.mkdir(nestedPath, { recursive: true })
+      await repo.fs.mkdir(nestedPath, { recursive: true })
     } catch (err: any) {
       // If mkdir fails, try creating parent directories one by one
       if (err.code === 'ENOENT') {
-        await normalizedFs.mkdir(join(dir, 'dir1'), { recursive: true })
-        await normalizedFs.mkdir(nestedPath, { recursive: true })
+        await repo.fs.mkdir(join(dir, 'dir1'), { recursive: true })
+        await repo.fs.mkdir(nestedPath, { recursive: true })
       } else {
         throw err
       }
     }
-    await normalizedFs.write(filePath, 'deep content')
+    await repo.fs.write(filePath, 'deep content')
     
     // Add to index
     const { add } = await import('@awesome-os/universal-git-src/index.ts')
-    await add({ fs, dir, gitdir, filepath: 'dir1/dir2/deep.txt', cache })
+    await add({ repo, filepath: 'dir1/dir2/deep.txt' })
     
     // Reset with nested path
     await resetIndex({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: 'dir1/dir2/deep.txt',
-      cache,
     })
     
     // File should be removed from index
-    const files = await listFiles({ fs, gitdir, cache })
+    const files = await listFiles({ repo })
     assert.ok(!files.includes('dir1/dir2/deep.txt'))
   })
 
   await t.test('edge:workdir-read-null', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-resetIndex')
+    const { repo } = await makeFixture('test-resetIndex', { init: true })
     
     // When dir is provided but file doesn't exist, fs.read returns null
     // This should be handled gracefully (uses default stats)
     await resetIndex({
-      fs,
-      dir,
-      gitdir,
+      repo,
       filepath: 'nonexistent-workdir-file.txt',
     })
     
     // File should not be in index
-    const files = await listFiles({ fs, gitdir })
+    const files = await listFiles({ repo })
     assert.ok(!files.includes('nonexistent-workdir-file.txt'))
   })
 })

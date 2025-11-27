@@ -9,17 +9,18 @@ test('branch', async (t) => {
   await t.test('ok:create-branch', async () => {
     // Setup
     const { repo } = await makeFixture('test-branch')
+    const gitdir = await repo.getGitdir()
     // Get HEAD OID before creating branch
-    const headOid = await resolveRef({ fs, gitdir, ref: 'HEAD' })
+    const headOid = await resolveRef({ repo, ref: 'HEAD' })
     // Test
-    await branch({ fs, dir, gitdir, ref: 'test-branch' })
-    const files = await fs.readdir(path.resolve(gitdir, 'refs', 'heads'))
+    await branch({ repo, ref: 'test-branch' })
+    const files = await repo.fs.readdir(path.resolve(gitdir, 'refs', 'heads'))
     assert.deepStrictEqual(files, ['master', 'test-branch'])
-    assert.strictEqual(await currentBranch({ fs, dir, gitdir }), 'master')
+    assert.strictEqual(await currentBranch({ repo }), 'master')
     
     // Verify reflog entry was created for the new branch
     await verifyReflogEntry({
-      fs,
+      fs: repo.fs,
       gitdir,
       ref: 'refs/heads/test-branch',
       expectedOldOid: '0000000000000000000000000000000000000000',
@@ -32,33 +33,34 @@ test('branch', async (t) => {
   await t.test('param:object-start-point', async () => {
     // Setup
     const { repo } = await makeFixture('test-branch-start-point')
+    const gitdir = await repo.getGitdir()
     // Get start-point OID before creating branch
-    const startPointOid = await resolveRef({ fs, gitdir, ref: 'start-point' })
+    const startPointOid = await resolveRef({ repo, ref: 'start-point' })
     // Test
-    let files = await fs.readdir(path.resolve(gitdir, 'refs', 'heads'))
+    let files = await repo.fs.readdir(path.resolve(gitdir, 'refs', 'heads'))
     assert.deepStrictEqual(files, ['main', 'start-point'])
-    await branch({ fs, dir, gitdir, ref: 'test-branch', object: 'start-point' })
-    files = await fs.readdir(path.resolve(gitdir, 'refs', 'heads'))
+    await branch({ repo, ref: 'test-branch', object: 'start-point' })
+    files = await repo.fs.readdir(path.resolve(gitdir, 'refs', 'heads'))
     assert.deepStrictEqual(files, ['main', 'start-point', 'test-branch'])
-    assert.strictEqual(await currentBranch({ fs, dir, gitdir }), 'main')
+    assert.strictEqual(await currentBranch({ repo }), 'main')
     assert.strictEqual(
-      await fs.read(
+      await repo.fs.read(
         path.resolve(gitdir, 'refs', 'heads', 'test-branch'),
         'utf8'
       ),
-      await fs.read(
+      await repo.fs.read(
         path.resolve(gitdir, 'refs', 'heads', 'start-point'),
         'utf8'
       )
     )
-    assert.deepStrictEqual(await listFiles({ fs, dir, gitdir, ref: 'HEAD' }), [
+    assert.deepStrictEqual(await listFiles({ repo, ref: 'HEAD' }), [
       'new-file.txt',
     ])
-    assert.deepStrictEqual(await listFiles({ fs, dir, gitdir, ref: 'test-branch' }), [])
+    assert.deepStrictEqual(await listFiles({ repo, ref: 'test-branch' }), [])
     
     // Verify reflog entry was created for the new branch with correct start point
     await verifyReflogEntry({
-      fs,
+      fs: repo.fs,
       gitdir,
       ref: 'refs/heads/test-branch',
       expectedOldOid: '0000000000000000000000000000000000000000',
@@ -71,13 +73,14 @@ test('branch', async (t) => {
   await t.test('param:force', async () => {
     // Setup
     const { repo } = await makeFixture('test-branch')
+    const gitdir = await repo.getGitdir()
     let error: unknown = null
     // Test
-    await branch({ fs, dir, gitdir, ref: 'test-branch' })
-    assert.strictEqual(await currentBranch({ fs, dir, gitdir }), 'master')
-    assert.ok(await fs.exists(path.resolve(gitdir, 'refs/heads/test-branch')))
+    await branch({ repo, ref: 'test-branch' })
+    assert.strictEqual(await currentBranch({ repo }), 'master')
+    assert.ok(await repo.fs.exists(path.resolve(gitdir, 'refs/heads/test-branch')))
     try {
-      await branch({ fs, dir, gitdir, ref: 'test-branch', force: true })
+      await branch({ repo, ref: 'test-branch', force: true })
     } catch (err) {
       error = err
     }
@@ -87,18 +90,19 @@ test('branch', async (t) => {
   await t.test('param:object-start-point-force', async () => {
     // Setup
     const { repo } = await makeFixture('test-branch-start-point')
+    const gitdir = await repo.getGitdir()
     let error: unknown = null
     // Test
-    await branch({ fs, dir, gitdir, ref: 'test-branch', object: 'start-point' })
-    assert.strictEqual(await currentBranch({ fs, dir, gitdir }), 'main')
-    assert.ok(await fs.exists(path.resolve(gitdir, 'refs/heads/test-branch')))
+    await branch({ repo, ref: 'test-branch', object: 'start-point' })
+    assert.strictEqual(await currentBranch({ repo }), 'main')
+    assert.ok(await repo.fs.exists(path.resolve(gitdir, 'refs/heads/test-branch')))
     try {
-      await branch({ fs, dir, gitdir, ref: 'test-branch', force: true })
+      await branch({ repo, ref: 'test-branch', force: true })
     } catch (err) {
       error = err
     }
     assert.strictEqual(error, null)
-    assert.deepStrictEqual(await listFiles({ fs, dir, gitdir, ref: 'test-branch' }), [
+    assert.deepStrictEqual(await listFiles({ repo, ref: 'test-branch' }), [
       'new-file.txt',
     ])
   })
@@ -106,15 +110,16 @@ test('branch', async (t) => {
   await t.test('param:checkout-true', async () => {
     // Setup
     const { repo } = await makeFixture('test-branch')
+    const gitdir = await repo.getGitdir()
     // Get HEAD OID before creating branch
-    const headOid = await resolveRef({ fs, gitdir, ref: 'HEAD' })
+    const headOid = await resolveRef({ repo, ref: 'HEAD' })
     // Test
-    await branch({ fs, dir, gitdir, ref: 'test-branch', checkout: true })
-    assert.strictEqual(await currentBranch({ fs, dir, gitdir }), 'test-branch')
+    await branch({ repo, ref: 'test-branch', checkout: true })
+    assert.strictEqual(await currentBranch({ repo }), 'test-branch')
     
     // Verify reflog entry was created for the new branch
     await verifyReflogEntry({
-      fs,
+      fs: repo.fs,
       gitdir,
       ref: 'refs/heads/test-branch',
       expectedOldOid: '0000000000000000000000000000000000000000',
@@ -126,10 +131,10 @@ test('branch', async (t) => {
     // Verify HEAD reflog entry was created (from checkout)
     // Note: HEAD reflog might not exist if reflog is disabled, so we check if it exists first
     const { readLog } = await import('@awesome-os/universal-git-src/git/logs/readLog.ts')
-    const headReflog = await readLog({ fs, gitdir, ref: 'HEAD', parsed: true })
+    const headReflog = await readLog({ fs: repo.fs, gitdir, ref: 'HEAD', parsed: true })
     if (headReflog && headReflog.length > 0) {
       await verifyReflogEntry({
-        fs,
+        fs: repo.fs,
         gitdir,
         ref: 'HEAD',
         expectedNewOid: headOid,
@@ -145,7 +150,7 @@ test('branch', async (t) => {
     let error: unknown = null
     // Test
     try {
-      await branch({ fs, dir, gitdir, ref: 'inv@{id..branch.lock' })
+      await branch({ repo, ref: 'inv@{id..branch.lock' })
     } catch (err) {
       error = err
     }
@@ -159,7 +164,7 @@ test('branch', async (t) => {
     let error: unknown = null
     // Test
     try {
-      await branch({ fs, dir, gitdir })
+      await branch({ repo } as any)
     } catch (err) {
       error = err
     }
@@ -170,45 +175,47 @@ test('branch', async (t) => {
   await t.test('edge:empty-repo', async () => {
     // Setup
     const { repo } = await makeFixture('test-branch-empty-repo', { init: true })
-    await init({ fs, dir, gitdir })
+    const gitdir = await repo.getGitdir()
     let error: unknown = null
     // Test
     try {
-      await branch({ fs, dir, gitdir, ref: 'test-branch', checkout: true })
+      await branch({ repo, ref: 'test-branch', checkout: true })
     } catch (err) {
       error = err
     }
     assert.strictEqual(error, null)
-    const file = await fs.read(path.resolve(gitdir, 'HEAD'), 'utf8')
+    const file = await repo.fs.read(path.resolve(gitdir, 'HEAD'), 'utf8')
     assert.strictEqual(file, `ref: refs/heads/test-branch\n`)
   })
 
   await t.test('edge:branch-name-same-as-remote', async () => {
     // Setup
     const { repo } = await makeFixture('test-branch')
+    const gitdir = await repo.getGitdir()
     let error: unknown = null
     // Test
     try {
-      await branch({ fs, dir, gitdir, ref: 'origin' })
+      await branch({ repo, ref: 'origin' })
     } catch (err) {
       error = err
     }
     assert.strictEqual(error, null)
-    assert.ok(await fs.exists(path.resolve(gitdir, 'refs/heads/origin')))
+    assert.ok(await repo.fs.exists(path.resolve(gitdir, 'refs/heads/origin')))
   })
 
   await t.test('edge:branch-named-HEAD', async () => {
     // Setup
     const { repo } = await makeFixture('test-branch')
+    const gitdir = await repo.getGitdir()
     let error: unknown = null
     // Test
     try {
-      await branch({ fs, dir, gitdir, ref: 'HEAD' })
+      await branch({ repo, ref: 'HEAD' })
     } catch (err) {
       error = err
     }
     assert.strictEqual(error, null)
-    assert.ok(await fs.exists(path.resolve(gitdir, 'refs/heads/HEAD')))
+    assert.ok(await repo.fs.exists(path.resolve(gitdir, 'refs/heads/HEAD')))
   })
 
   await t.test('error:caller-property', async () => {
@@ -216,7 +223,7 @@ test('branch', async (t) => {
     
     let error: any = null
     try {
-      await branch({ fs, dir, gitdir, ref: 'inv@{id..branch.lock' })
+      await branch({ repo, ref: 'inv@{id..branch.lock' })
     } catch (err) {
       error = err
     }
@@ -229,12 +236,12 @@ test('branch', async (t) => {
     const { repo } = await makeFixture('test-branch')
     
     // Create a branch first
-    await branch({ fs, dir, gitdir, ref: 'existing-branch' })
+    await branch({ repo, ref: 'existing-branch' })
     
     // Try to create it again without force
     let error: any = null
     try {
-      await branch({ fs, dir, gitdir, ref: 'existing-branch', force: false })
+      await branch({ repo, ref: 'existing-branch', force: false })
     } catch (err) {
       error = err
     }
@@ -249,23 +256,24 @@ test('branch', async (t) => {
 
   await t.test('param:dir-undefined', async () => {
     const { repo } = await makeFixture('test-branch')
+    const gitdir = await repo.getGitdir()
     
     // When dir is undefined, gitdir must be explicitly provided
-    await branch({ fs, gitdir, ref: 'no-dir-branch' })
+    await branch({ repo, ref: 'no-dir-branch' })
     
-    assert.ok(await fs.exists(path.resolve(gitdir, 'refs/heads/no-dir-branch')))
+    assert.ok(await repo.fs.exists(path.resolve(gitdir, 'refs/heads/no-dir-branch')))
   })
 
   await t.test('edge:empty-repo-checkout-false', async () => {
     const { repo } = await makeFixture('test-empty', { init: true })
-    await init({ fs, dir, gitdir })
+    const gitdir = await repo.getGitdir()
     
     // In an empty repo, oid will be undefined, but branch should still be created
     // (though it won't point to anything)
-    await branch({ fs, dir, gitdir, ref: 'empty-branch', checkout: false })
+    await branch({ repo, ref: 'empty-branch', checkout: false })
     
     // Branch ref should exist (even if empty)
-    const branchExists = await fs.exists(path.resolve(gitdir, 'refs/heads/empty-branch'))
+    const branchExists = await repo.fs.exists(path.resolve(gitdir, 'refs/heads/empty-branch'))
     // In an empty repo, the branch might not be created if oid is undefined
     // This tests the branch where oid is undefined
     // The branch creation might fail silently or succeed depending on implementation
@@ -273,25 +281,26 @@ test('branch', async (t) => {
 
   await t.test('behavior:reflog-write-error', async () => {
     const { repo } = await makeFixture('test-branch')
+    const gitdir = await repo.getGitdir()
     
     // Create branch - reflog write might fail but should not throw
-    await branch({ fs, dir, gitdir, ref: 'reflog-test-branch' })
+    await branch({ repo, ref: 'reflog-test-branch' })
     
     // Branch should still be created even if reflog write fails
-    assert.ok(await fs.exists(path.resolve(gitdir, 'refs/heads/reflog-test-branch')))
+    assert.ok(await repo.fs.exists(path.resolve(gitdir, 'refs/heads/reflog-test-branch')))
   })
 
   await t.test('behavior:no-HEAD-update-checkout-false', async () => {
     const { repo } = await makeFixture('test-branch')
     
     // Get current branch
-    const currentBranchName = await currentBranch({ fs, dir, gitdir })
+    const currentBranchName = await currentBranch({ repo })
     
     // Create branch with checkout=false (default)
-    await branch({ fs, dir, gitdir, ref: 'no-checkout-branch', checkout: false })
+    await branch({ repo, ref: 'no-checkout-branch', checkout: false })
     
     // HEAD should still point to the original branch
-    const newBranchName = await currentBranch({ fs, dir, gitdir })
+    const newBranchName = await currentBranch({ repo })
     assert.strictEqual(newBranchName, currentBranchName, 'HEAD should not change when checkout is false')
   })
 
@@ -299,27 +308,28 @@ test('branch', async (t) => {
     const { repo } = await makeFixture('test-branch')
     
     // Get a specific commit OID
-    const headOid = await resolveRef({ fs, gitdir, ref: 'HEAD' })
+    const headOid = await resolveRef({ repo, ref: 'HEAD' })
     
     // Create branch pointing to HEAD explicitly
-    await branch({ fs, dir, gitdir, ref: 'explicit-head-branch', object: 'HEAD' })
+    await branch({ repo, ref: 'explicit-head-branch', object: 'HEAD' })
     
     // Verify branch points to HEAD
-    const branchOid = await resolveRef({ fs, gitdir, ref: 'refs/heads/explicit-head-branch' })
+    const branchOid = await resolveRef({ repo, ref: 'refs/heads/explicit-head-branch' })
     assert.strictEqual(branchOid, headOid, 'Branch should point to HEAD')
   })
 
   await t.test('edge:object-non-existent-ref', async () => {
     const { repo } = await makeFixture('test-branch')
+    const gitdir = await repo.getGitdir()
     
     // Try to create branch with non-existent object
     // According to the code, when oid resolution fails, the branch is still created
     // but without an oid (empty branch)
-    await branch({ fs, dir, gitdir, ref: 'bad-object-branch', object: 'nonexistent-ref' })
+    await branch({ repo, ref: 'bad-object-branch', object: 'nonexistent-ref' })
     
     // Branch should be created even if object doesn't exist (but it won't point to anything)
     // This tests the branch where oid is undefined
-    const branchExists = await fs.exists(path.resolve(gitdir, 'refs/heads/bad-object-branch'))
+    const branchExists = await repo.fs.exists(path.resolve(gitdir, 'refs/heads/bad-object-branch'))
     // The branch might or might not exist depending on implementation
     // The important thing is that no error is thrown (tests the catch block)
   })

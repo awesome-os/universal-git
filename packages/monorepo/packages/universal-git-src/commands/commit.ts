@@ -349,7 +349,7 @@ export async function _commit({
       if (!inode) {
         throw new Error('Root inode not found')
       }
-      tree = await constructTree({ fs, gitdir, inode, dryRun, cache, objectFormat })
+      tree = await constructTree({ repo, fs, gitdir, inode, dryRun, cache, objectFormat })
     }
 
     // Determine parents of this commit
@@ -582,10 +582,12 @@ export async function _commit({
 
     // Write commit object using writeCommit with dryRun support
     const oid = await writeCommit({
+      repo,
       fs,
       gitdir,
       commit: commitObj,
       dryRun,
+      cache,
     })
 
     if (!noUpdateBranch && !dryRun) {
@@ -792,6 +794,7 @@ type Inode = {
  * Constructs a tree from an inode structure
  */
 async function constructTree({
+  repo,
   fs,
   gitdir,
   inode,
@@ -799,6 +802,7 @@ async function constructTree({
   cache,
   objectFormat = 'sha1',
 }: {
+  repo?: Repository
   fs: FileSystem
   gitdir: string
   inode: Inode  
@@ -815,7 +819,7 @@ async function constructTree({
       if (!child.children) {
         child.children = []
       }
-      child.metadata.oid = await constructTree({ fs, gitdir, inode: child as Inode, dryRun, cache, objectFormat })
+      child.metadata.oid = await constructTree({ repo, fs, gitdir, inode: child as Inode, dryRun, cache, objectFormat })
     }
   }
   const entries = children.map(child => ({
@@ -826,11 +830,13 @@ async function constructTree({
   }))
   // Write tree using writeTree with dryRun support
   const oid = await writeTree({
+    repo,
     fs,
     gitdir,
     tree: entries,
     objectFormat,
     dryRun,
+    cache,
   })
   return oid
 }

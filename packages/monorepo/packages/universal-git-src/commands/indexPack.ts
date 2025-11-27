@@ -6,6 +6,8 @@ import { createFileSystem } from '../utils/createFileSystem.ts'
 import { assertParameter } from "../utils/assertParameter.ts"
 import { join } from "../utils/join.ts"
 import { Repository } from "../core-utils/Repository.ts"
+import { basename } from "../utils/basename.ts"
+import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
 import type { FileSystemProvider } from "../models/FileSystem.ts"
 import type { ProgressCallback } from "../git/remote/types.ts"
 import type { CommandWithFilepathOptions } from "../types/commandOptions.ts"
@@ -69,18 +71,19 @@ export async function indexPack({
 
     assertParameter('filepath', filepath)
 
-    // _indexPack requires dir to be the base directory for filepath resolution
-    // If dir is not provided, use gitdir as the base (for bare repos or when filepath is relative to gitdir)
-    const baseDir = effectiveDir || effectiveGitdir
-    if (!baseDir) {
-      throw new MissingParameterError('dir')
+    if (!repo) {
+      throw new MissingParameterError('repo (required for pack file operations via GitBackend)')
+    }
+
+    if (!repo.gitBackend) {
+      throw new MissingParameterError('repo.gitBackend (required for pack file operations)')
     }
 
     return await _indexPack({
-      fs: fs as any,
+      repo,
+      fs: fs as any, // Still needed for readObject calls (external ref deltas)
       cache: effectiveCache,
       onProgress,
-      dir: baseDir,
       gitdir: effectiveGitdir,
       filepath,
     })
@@ -92,35 +95,54 @@ export async function indexPack({
 
 /**
  * Index a pack file
+ * Uses GitBackend methods to read/write pack files (works with any backend: filesystem, SQLite, etc.)
  */
 export async function _indexPack({
+  repo,
   fs,
   cache,
   onProgress,
-  dir,
   gitdir,
   filepath,
 }: {
-  fs: FileSystemProvider
+  repo: Repository
+  fs: FileSystemProvider // Still needed for readObject calls (external ref deltas)
   cache: Record<string, unknown>
   onProgress?: ProgressCallback
-  dir: string
   gitdir: string
   filepath: string
 }): Promise<{ oids: string[] }> {
   try {
-    const fullPath = join(dir, filepath)
-    const pack = await fs.read(fullPath)
-    if (!pack) {
-      throw new Error('Failed to read pack file')
+    // Extract pack file name from filepath (e.g., "objects/pack/pack-abc123.pack" -> "pack-abc123.pack")
+    const packFileName = basename(filepath)
+    if (!packFileName.endsWith('.pack')) {
+      throw new Error(`Invalid pack file path: ${filepath} (must end with .pack)`)
     }
+
+    // Read pack file via GitBackend (works with any backend: filesystem, SQLite, etc.)
+    const gitBackend = repo.gitBackend!
+    const pack = await gitBackend.readPackfile(packFileName)
+    if (!pack) {
+      throw new Error(`Failed to read pack file: ${packFileName}`)
+    }
+
+    // Convert to Uint8Array for GitPackIndex.fromPack
+    const packBuffer = UniversalBuffer.isBuffer(pack) ? pack : UniversalBuffer.from(pack)
+    const packArray = packBuffer instanceof Uint8Array ? packBuffer : new Uint8Array(packBuffer)
+
+    // Create index from pack file
     const getExternalRefDelta = (oid: string) => readObject({ fs, cache, gitdir, oid })
     const idx = await GitPackIndex.fromPack({
-      pack: pack as Uint8Array,
+      pack: packArray,
       getExternalRefDelta,
       onProgress,
     })
-    await fs.write(fullPath.replace(/\.pack$/, '.idx'), await idx.toBuffer())
+
+    // Write index file via GitBackend (works with any backend)
+    const indexFileName = packFileName.replace(/\.pack$/, '.idx')
+    const indexBuffer = await idx.toBuffer()
+    await gitBackend.writePackIndex(indexFileName, UniversalBuffer.from(indexBuffer))
+
     return {
       oids: [...idx.hashes],
     }

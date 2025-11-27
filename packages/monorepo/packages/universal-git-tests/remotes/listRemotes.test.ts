@@ -6,9 +6,9 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('listRemotes', async (t) => {
   await t.test('ok:basic', async () => {
     // Setup
-    const { fs, dir, gitdir } = await makeFixture('test-listRemotes')
+    const { repo } = await makeFixture('test-listRemotes')
     // Test
-    const a = await listRemotes({ fs, dir, gitdir })
+    const a = await listRemotes({ repo })
     assert.deepStrictEqual(a, [
       { remote: 'foo', url: 'git@github.com:foo/foo.git' },
       { remote: 'bar', url: 'git@github.com:bar/bar.git' },
@@ -29,23 +29,23 @@ test('listRemotes', async (t) => {
   })
 
   await t.test('param:repo-provided', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-listRemotes')
-    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const repo = await Repository.open({ fs, dir, gitdir })
+    const { repo } = await makeFixture('test-listRemotes')
     const remotes = await listRemotes({ repo })
     assert.ok(Array.isArray(remotes))
     assert.ok(remotes.length >= 0)
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { fs, dir } = await makeFixture('test-listRemotes')
-    const remotes = await listRemotes({ fs, dir })
+    const { repo } = await makeFixture('test-listRemotes')
+    const dir = (await repo.getDir())!
+    const remotes = await listRemotes({ repo, dir })
     assert.ok(Array.isArray(remotes))
     assert.ok(remotes.length >= 0)
   })
 
   await t.test('error:caller-property', async () => {
-    const { fs, gitdir } = await makeFixture('test-listRemotes')
+    const { repo } = await makeFixture('test-listRemotes')
+    const gitdir = await repo.getGitdir()
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await listRemotes({
@@ -59,10 +59,8 @@ test('listRemotes', async (t) => {
   })
 
   await t.test('edge:no-remotes', async () => {
-    const { fs, dir } = await makeFixture('test-empty')
-    const { init } = await import('@awesome-os/universal-git-src/index.ts')
-    await init({ fs, dir })
-    const remotes = await listRemotes({ fs, dir })
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const remotes = await listRemotes({ repo })
     assert.ok(Array.isArray(remotes))
     assert.strictEqual(remotes.length, 0)
   })

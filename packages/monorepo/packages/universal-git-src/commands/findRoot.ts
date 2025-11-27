@@ -1,7 +1,7 @@
 import { MissingParameterError } from "../errors/MissingParameterError.ts"
 import { NotFoundError } from "../errors/NotFoundError.ts"
 import { dirname } from "../utils/dirname.ts"
-import { join } from "../utils/join.ts"
+import { join, normalize } from "../core-utils/GitPath.ts"
 import { createFileSystem } from '../utils/createFileSystem.ts'
 import { assertParameter } from "../utils/assertParameter.ts"
 import type { FileSystemProvider } from "../models/FileSystem.ts"
@@ -42,14 +42,34 @@ export async function findRoot({
     assertParameter('filepath', filepath)
 
     const fs = createFileSystem(_fs)
-    if (await fs.exists(join(filepath, '.git'))) {
-      return filepath
-    } else {
-      const parent = dirname(filepath)
-      if (parent === filepath) {
+    
+    // Normalize the starting path to POSIX format (Git convention)
+    // This ensures consistent path handling across platforms, especially Windows
+    let currentPath = normalize(filepath)
+    
+    // Track visited paths to avoid infinite loops (using normalized POSIX paths)
+    const visited = new Set<string>()
+    
+    while (true) {
+      // Check if we've visited this path before (infinite loop protection)
+      if (visited.has(currentPath)) {
         throw new NotFoundError(`git root for ${filepath}`)
       }
-      return findRoot({ fs, filepath: parent })
+      visited.add(currentPath)
+      
+      // Check if .git exists in current directory
+      const gitPath = join(currentPath, '.git')
+      if (await fs.exists(gitPath)) {
+        return currentPath
+      }
+      
+      // Move to parent directory
+      const parent = normalize(dirname(currentPath))
+      if (parent === currentPath) {
+        // Reached filesystem root
+        throw new NotFoundError(`git root for ${filepath}`)
+      }
+      currentPath = parent
     }
   } catch (err) {
     ;(err as { caller?: string }).caller = 'git.findRoot'

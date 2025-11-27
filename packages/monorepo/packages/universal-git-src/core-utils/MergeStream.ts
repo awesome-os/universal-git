@@ -9,8 +9,9 @@
 import { MergeConflictError } from '../errors/MergeConflictError.ts'
 import { UnmergedPathsError } from '../errors/UnmergedPathsError.ts'
 import { getStateMutationStream } from './StateMutationStream.ts'
-import type { Repository } from './Repository.ts'
+import type { GitBackend } from '../backends/GitBackend.ts'
 import type { GitIndex } from '../git/index/GitIndex.ts'
+import type { FileSystemProvider } from '../models/FileSystem.ts'
 
 export type MergeStreamEvent =
   | { type: 'start'; data: { ourOid: string; baseOid: string; theirOid: string } }
@@ -21,7 +22,7 @@ export type MergeStreamEvent =
   | { type: 'error'; data: { error: Error } }
 
 export interface MergeStreamOptions {
-  repo: Repository
+  gitBackend: GitBackend
   index: GitIndex
   ourOid: string
   baseOid: string
@@ -36,6 +37,11 @@ export interface MergeStreamOptions {
     contents: [string, string, string]
     path: string
   }) => { cleanMerge: boolean; mergedText: string }
+  // Optional: for worktree operations (writing conflict files)
+  fs?: FileSystemProvider | null
+  dir?: string | null
+  cache?: Record<string, unknown>
+  gitdir?: string
 }
 
 /**
@@ -100,33 +106,44 @@ export class MergeStream extends ReadableStream<MergeStreamEvent> {
       this.controller.enqueue(event)
       // Also record in state mutation stream for audit trail
       const mutationStream = getStateMutationStream()
-      // CRITICAL: Check if repo is defined before accessing it
-      if (!this.options?.repo) {
-        // Skip state mutation recording if repo is not available
-        return
+      // Get gitdir from options or GitBackend
+      let gitdir: string | undefined
+      if (this.options.gitdir) {
+        gitdir = this.options.gitdir
+      } else if (this.options.gitBackend.getFileSystem) {
+        // Try to get gitdir from FilesystemBackend
+        const fs = this.options.gitBackend.getFileSystem()
+        if (fs) {
+          // For FilesystemBackend, we can extract gitdir from the fs instance
+          // This is a bit of a hack, but necessary for state mutation tracking
+          // In practice, gitdir should be provided in options
+          gitdir = undefined // Can't reliably extract from GitBackend alone
+        }
       }
-      const gitdir = await this.options.repo.getGitdir()
-      const { normalize } = await import('./GitPath.ts')
-      const normalizedGitdir = normalize(gitdir)
       
-      if (event.type === 'merge-complete') {
-        mutationStream.record({
-          type: 'object-write',
-          gitdir: normalizedGitdir,
-          data: { treeOid: event.data.treeOid, operation: 'merge' },
-        })
-      } else if (event.type === 'merge-conflict') {
-        // Safely extract filepaths from the error
-        const error = event.data.error as any
-        const filepaths = error?.data?.filepaths || error?.filepaths || []
-        mutationStream.record({
-          type: 'index-write',
-          gitdir: normalizedGitdir,
-          data: { 
-            operation: 'merge-conflict',
-            conflictedFiles: filepaths,
-          },
-        })
+      if (gitdir) {
+        const { normalize } = await import('./GitPath.ts')
+        const normalizedGitdir = normalize(gitdir)
+        
+        if (event.type === 'merge-complete') {
+          mutationStream.record({
+            type: 'object-write',
+            gitdir: normalizedGitdir,
+            data: { treeOid: event.data.treeOid, operation: 'merge' },
+          })
+        } else if (event.type === 'merge-conflict') {
+          // Safely extract filepaths from the error
+          const error = event.data.error as any
+          const filepaths = error?.data?.filepaths || error?.filepaths || []
+          mutationStream.record({
+            type: 'index-write',
+            gitdir: normalizedGitdir,
+            data: { 
+              operation: 'merge-conflict',
+              conflictedFiles: filepaths,
+            },
+          })
+        }
       }
     } catch (err) {
       // Stream might be closed, ignore
@@ -134,12 +151,7 @@ export class MergeStream extends ReadableStream<MergeStreamEvent> {
   }
 
   private async startMerge(): Promise<void> {
-    const { repo, index, ourOid, baseOid, theirOid } = this.options
-
-    // CRITICAL: Validate repo is defined
-    if (!repo) {
-      throw new Error('Repository instance is required for merge')
-    }
+    const { gitBackend, index, ourOid, baseOid, theirOid } = this.options
 
     // Emit start event
     await this.emit({
@@ -174,7 +186,7 @@ export class MergeStream extends ReadableStream<MergeStreamEvent> {
 
     try {
       const result = await mergeTree({
-        repo,
+        gitBackend,
         index,
         ourOid,
         baseOid,
@@ -185,6 +197,10 @@ export class MergeStream extends ReadableStream<MergeStreamEvent> {
         abortOnConflict: this.options.abortOnConflict,
         dryRun: this.options.dryRun,
         mergeDriver: this.options.mergeDriver,
+        fs: this.options.fs,
+        dir: this.options.dir,
+        cache: this.options.cache,
+        gitdir: this.options.gitdir,
       })
 
       if (typeof result === 'string') {

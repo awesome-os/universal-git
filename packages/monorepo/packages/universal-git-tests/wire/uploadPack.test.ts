@@ -46,8 +46,7 @@ test('uploadPack', async (t) => {
 
   await t.test('empty repository', async () => {
     const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const dir = repo.getWorktree()?.dir
-    if (!dir) throw new Error('Repository must have a worktree')
+    const dir = (await repo.getDir())!
     
     // Create an initial commit so HEAD exists
     await repo.fs.write(join(dir, 'file.txt'), 'content')
@@ -70,8 +69,7 @@ test('uploadPack', async (t) => {
 
   await t.test('repository with multiple branches', async () => {
     const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const dir = repo.getWorktree()?.dir
-    if (!dir) throw new Error('Repository must have a worktree')
+    const dir = (await repo.getDir())!
     
     // Create initial commit
     await repo.fs.write(join(dir, 'file1.txt'), 'content1')
@@ -84,16 +82,21 @@ test('uploadPack', async (t) => {
     
     // Ensure main branch ref exists (commit should have created it, but verify)
     // Read HEAD to get the current branch OID
-    const headOid = await repo.gitBackend!.readRef('HEAD')
+    let headOid: string | null = null
+    try {
+      headOid = await repo.resolveRef('HEAD')
+    } catch {
+      // HEAD doesn't exist yet
+    }
     if (headOid) {
       // Ensure refs/heads/main exists and points to the commit
-      await repo.gitBackend!.writeRef('refs/heads/main', headOid)
+      await repo.writeRefDirect('refs/heads/main', headOid)
       // Create a new branch from the same commit
-      await repo.gitBackend!.writeRef('refs/heads/feature', headOid)
+      await repo.writeRefDirect('refs/heads/feature', headOid)
     } else {
       // If HEAD doesn't resolve, use the commit OID directly
-      await repo.gitBackend!.writeRef('refs/heads/main', commitOid)
-      await repo.gitBackend!.writeRef('refs/heads/feature', commitOid)
+      await repo.writeRefDirect('refs/heads/main', commitOid)
+      await repo.writeRefDirect('refs/heads/feature', commitOid)
     }
     
     const res = await uploadPack({ repo, advertiseRefs: true })
@@ -108,8 +111,7 @@ test('uploadPack', async (t) => {
 
   await t.test('repository with tags', async () => {
     const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const dir = repo.getWorktree()?.dir
-    if (!dir) throw new Error('Repository must have a worktree')
+    const dir = (await repo.getDir())!
     
     // Create initial commit
     await repo.fs.write(join(dir, 'file1.txt'), 'content1')
@@ -120,8 +122,8 @@ test('uploadPack', async (t) => {
       author: { name: 'Test', email: 'test@example.com' } 
     })
     
-    // Create a tag - use backend to write ref
-    await repo.gitBackend!.writeRef('refs/tags/v1.0.0', commitOid)
+    // Create a tag - use repo to write ref
+    await repo.writeRefDirect('refs/tags/v1.0.0', commitOid)
     
     const res = await uploadPack({ repo, advertiseRefs: true })
     
@@ -143,8 +145,7 @@ test('uploadPack', async (t) => {
   await t.test('uses dir parameter to compute gitdir', async () => {
     // Create a repository
     const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const dir = repo.getWorktree()?.dir
-    if (!dir) throw new Error('Repository must have a worktree')
+    const dir = (await repo.getDir())!
     
     // Create an initial commit so HEAD exists
     await repo.fs.write(join(dir, 'file.txt'), 'content')
@@ -213,7 +214,7 @@ test('uploadPack', async (t) => {
     const { FilesystemBackend } = await import('@awesome-os/universal-git-src/backends/FilesystemBackend.ts')
     const invalidBackend = new FilesystemBackend(repo.fs, '/nonexistent/gitdir')
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const invalidRepo = new Repository({
+    const invalidRepo = await Repository.open({
       fs: repo.fs,
       gitBackend: invalidBackend,
       cache: {},

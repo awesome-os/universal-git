@@ -1,12 +1,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { getSubmoduleByName } from '@awesome-os/universal-git-src/core-utils/filesystem/SubmoduleManager.ts'
-import { makeNodeFixture } from '../../helpers/makeNodeFixture.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
+import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
+import { join } from '@awesome-os/universal-git-src/core-utils/GitPath.ts'
 
 test('getSubmoduleByName', async (t) => {
   await t.test('ok:finds-submodule-by-name', async () => {
-    const { fs, dir } = await makeNodeFixture('test-submodule-by-name')
+    const { repo } = await makeFixture('test-submodule-by-name', { init: true })
+    const dir = (await repo.getDir())!
     
     // Create .gitmodules file
     const gitmodulesContent = `[submodule "lib"]
@@ -17,12 +18,12 @@ test('getSubmoduleByName', async (t) => {
 	path = docs
 	url = https://github.com/user/docs.git
 `
-    await fs.write(join(dir, '.gitmodules'), gitmodulesContent)
+    await repo.fs.write(join(dir, '.gitmodules'), gitmodulesContent)
     
     // Get by name
-    const libSubmodule = await getSubmoduleByName({ fs, dir, name: 'lib' })
-    const docsSubmodule = await getSubmoduleByName({ fs, dir, name: 'docs' })
-    const missingSubmodule = await getSubmoduleByName({ fs, dir, name: 'nonexistent' })
+    const libSubmodule = await getSubmoduleByName({ fs: repo.fs, dir, name: 'lib' })
+    const docsSubmodule = await getSubmoduleByName({ fs: repo.fs, dir, name: 'docs' })
+    const missingSubmodule = await getSubmoduleByName({ fs: repo.fs, dir, name: 'nonexistent' })
     
     // Assert
     assert.ok(libSubmodule)

@@ -135,13 +135,21 @@ const worktree2 = await repo.createWorktree(
 // Get worktree by name
 const worktree = repo.getWorktreeByName('feature-worktree')
 
-// List all worktrees
+// Get worktree by the ref it's checked out to
+const worktreeByRef = await repo.getWorktree('feature-branch')
+// Searches all worktrees (main + linked) to find which one has 'feature-branch' checked out
+
+// Get worktree by directory path
+const worktreeByPath = repo.getWorktreeByPath('/path/to/worktree')
+
+// List all worktrees (returns array)
 const allWorktrees = repo.listWorktrees()
-// Returns: Map<string, Worktree> - keyed by worktree name
+// Or use the property getter
+const worktrees = repo.worktrees
 
 // Access worktree properties
-for (const [name, worktree] of allWorktrees) {
-  console.log(`Worktree: ${name}, Dir: ${worktree.dir}`)
+for (const worktree of allWorktrees) {
+  console.log(`Worktree: ${worktree.getName() || 'main'}, Dir: ${worktree.dir}`)
 }
 ```
 

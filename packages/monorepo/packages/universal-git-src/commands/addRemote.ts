@@ -12,27 +12,64 @@ import { join } from "../utils/join.ts"
 import type { FileSystemProvider } from "../models/FileSystem.ts"
 
 /**
- * Add or update a remote
- *
- * @param {object} args
- * @param {FileSystemProvider} args.fs - a file system implementation
- * @param {string} [args.dir] - The [working tree](dir-vs-gitdir.md) directory path
- * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
- * @param {string} args.remote - The name of the remote
- * @param {string} args.url - The URL of the remote
- * @param {boolean} [args.force = false] - Instead of throwing an error if a remote named `remote` already exists, overwrite the existing remote.
- *
- * @returns {Promise<void>} Resolves successfully when filesystem operations are complete
- *
+ * Add or update a remote repository configuration.
+ * 
+ * This command adds or updates a remote in `.git/config` and automatically invalidates
+ * the Repository's remote backend cache to ensure `Repository.getRemote()` picks up
+ * the new or updated remote URL.
+ * 
+ * **Repository Integration**:
+ * 
+ * When a `repo` parameter is provided, this command uses `Repository.getConfig()` to
+ * update the config and automatically calls `repo.invalidateRemoteCache()` after adding
+ * the remote. This ensures that:
+ * - `Repository.getRemote(name)` will use the new URL
+ * - `Repository.listRemotes()` will include the new remote
+ * - The URL-indexed backend cache in `RemoteBackendRegistry` will be used for the new URL
+ * 
+ * **URL-Indexed Architecture**:
+ * 
+ * After adding a remote, the URL is stored in config and can be used to look up or create
+ * a backend via `RemoteBackendRegistry.getBackend(url)`. The registry uses URL-indexed
+ * caching, so multiple remotes with the same URL will share the same backend instance.
+ * 
+ * @param args - Command options
+ * @param args.repo - Repository instance (preferred, automatically invalidates cache)
+ * @param args.fs - File system client (required if `repo` not provided)
+ * @param args.dir - The [working tree](dir-vs-gitdir.md) directory path (optional if `repo` provided)
+ * @param args.gitdir - The [git directory](dir-vs-gitdir.md) path (optional, defaults to `join(dir, '.git')`)
+ * @param args.remote - The name of the remote (required)
+ * @param args.url - The URL of the remote (required)
+ * @param args.force - If `true`, overwrite existing remote instead of throwing error (optional, default: `false`)
+ * @param args.cache - Cache object (optional)
+ * 
+ * @returns Promise resolving when remote is added/updated
+ * 
+ * @throws AlreadyExistsError if remote already exists and `force` is `false`
+ * @throws InvalidRefNameError if remote name is invalid
+ * @throws MissingParameterError if required parameters are missing
+ * 
  * @example
- * await git.addRemote({
+ * ```typescript
+ * // Using Repository (preferred)
+ * const repo = await Repository.open({ fs, dir: '/path/to/repo' })
+ * await addRemote({ repo, remote: 'origin', url: 'https://github.com/user/repo.git' })
+ * 
+ * // Remote cache is automatically invalidated
+ * const originBackend = await repo.getRemote('origin') // Uses new URL
+ * 
+ * // Using fs and dir (legacy)
+ * await addRemote({
  *   fs,
  *   dir: '/tutorial',
  *   remote: 'upstream',
  *   url: 'https://github.com/awesome-os/universal-git'
  * })
- * console.log('done')
- *
+ * ```
+ * 
+ * @see {@link Repository.getRemote} For getting remote backends after adding
+ * @see {@link Repository.listRemotes} For listing all remotes
+ * @see {@link Repository.invalidateRemoteCache} For manual cache invalidation
  */
 export async function addRemote({
   repo: _repo,
@@ -93,6 +130,10 @@ export async function addRemote({
       'local',
       false
     )
+    
+    // Invalidate remote cache since we've added/updated a remote
+    // This ensures Repository.getRemote() will pick up the new URL
+    repo.invalidateRemoteCache()
   } catch (err) {
     ;(err as { caller?: string }).caller = 'git.addRemote'
     throw err

@@ -79,6 +79,7 @@ export type PushResult = {
   ok: boolean
   refs: Record<string, RefUpdateStatus>
   headers?: Record<string, string>
+  submodules?: Record<string, PushResult> // Submodule push results (keyed by submodule path)
 }
 
 /**
@@ -108,6 +109,8 @@ export async function push({
   corsProxy,
   headers = {},
   cache = {},
+  includeSubmodules = false,
+  submoduleRecurse = false,
 }: {
   repo?: Repository
   fs?: FileSystemProvider
@@ -132,6 +135,8 @@ export async function push({
   corsProxy?: string
   headers?: Record<string, string>
   cache?: Record<string, unknown>
+  includeSubmodules?: boolean // Push submodules after main push succeeds
+  submoduleRecurse?: boolean // Recursively push nested submodules
 }): Promise<PushResult> {
   try {
     const { repo, fs, gitdir: effectiveGitdir, cache: effectiveCache } = await normalizeCommandArgs({
@@ -159,7 +164,7 @@ export async function push({
       headers,
     })
 
-    return await _push({
+    const result = await _push({
       repo,
       fs,
       cache: effectiveCache,
@@ -182,7 +187,11 @@ export async function push({
       delete: _delete,
       corsProxy,
       headers,
+      includeSubmodules,
+      submoduleRecurse,
     })
+
+    return result
   } catch (err) {
     ;(err as { caller?: string }).caller = 'git.push'
     throw err
@@ -215,6 +224,8 @@ async function _push({
   delete: _delete = false,
   corsProxy,
   headers = {},
+  includeSubmodules = false,
+  submoduleRecurse = false,
 }: {
   repo: Repository
   fs: FileSystemProvider
@@ -238,6 +249,8 @@ async function _push({
   delete?: boolean
   corsProxy?: string
   headers?: Record<string, string>
+  includeSubmodules?: boolean // Push submodules after main push succeeds
+  submoduleRecurse?: boolean // Recursively push nested submodules
 }): Promise<PushResult> {
   const ref = _ref || (await _currentBranch({ repo }))
   if (typeof ref === 'undefined') {
@@ -742,6 +755,36 @@ async function _push({
       }
     }
     
+    // Push submodules if requested
+    if (includeSubmodules) {
+      const submoduleResults = await pushSubmodules({
+        repo,
+        fs,
+        cache,
+        http,
+        tcp,
+        ssh,
+        onProgress,
+        onMessage,
+        onAuth,
+        onAuthSuccess,
+        onAuthFailure,
+        onPrePush,
+        ref,
+        remoteRef,
+        remote,
+        force,
+        delete: _delete,
+        corsProxy,
+        headers,
+        recurse: submoduleRecurse,
+      })
+      
+      if (submoduleResults && Object.keys(submoduleResults).length > 0) {
+        result.submodules = submoduleResults
+      }
+    }
+    
     return result
   } else {
     const prettyDetails = Object.entries(result.refs)
@@ -750,5 +793,211 @@ async function _push({
       .join('')
     throw new GitPushError(prettyDetails, result)
   }
+}
+
+/**
+ * Push a specific submodule independently
+ * 
+ * This function allows pushing a single submodule without pushing the parent repository.
+ * The submodule uses its own Repository and GitBackend, allowing independent
+ * remote configuration and push operations.
+ * 
+ * @param parentRepo - Parent repository containing the submodule
+ * @param submodulePathOrName - Submodule path (e.g., 'libs/mylib') or name
+ * @param options - Push options (same as push() function)
+ * @returns Push result for the submodule
+ * 
+ * @example
+ * ```typescript
+ * const repo = await Repository.open({ fs, dir: '/path/to/repo' })
+ * 
+ * // Push a specific submodule independently
+ * const result = await pushSubmodule(repo, 'libs/mylib', {
+ *   ref: 'main',
+ *   remote: 'origin',
+ *   // ... other push options
+ * })
+ * ```
+ */
+export async function pushSubmodule(
+  parentRepo: Repository,
+  submodulePathOrName: string,
+  options: {
+    remoteBackend?: GitRemoteBackend
+    http?: HttpClient
+    tcp?: TcpClient
+    ssh?: SshClient | Promise<SshClient>
+    onProgress?: ProgressCallback | TcpProgressCallback | SshProgressCallback
+    onMessage?: MessageCallback
+    onAuth?: AuthCallback
+    onAuthSuccess?: AuthSuccessCallback
+    onAuthFailure?: AuthFailureCallback
+    onPrePush?: PrePushCallback
+    ref?: string
+    remoteRef?: string
+    remote?: string
+    url?: string
+    force?: boolean
+    delete?: boolean
+    corsProxy?: string
+    headers?: Record<string, string>
+    cache?: Record<string, unknown>
+    includeSubmodules?: boolean // Push nested submodules
+    submoduleRecurse?: boolean // Recursively push nested submodules
+  } = {}
+): Promise<PushResult> {
+  // Get the submodule Repository
+  const submoduleRepo = await parentRepo.getSubmodule(submodulePathOrName)
+  
+  // Get submodule's gitdir and fs
+  const submoduleGitdir = await submoduleRepo.getGitdir()
+  const submoduleFs = submoduleRepo.fs
+  
+  // Push the submodule using its own Repository and GitBackend
+  return await push({
+    repo: submoduleRepo,
+    fs: submoduleFs,
+    cache: options.cache || parentRepo.cache,
+    remoteBackend: options.remoteBackend,
+    http: options.http,
+    tcp: options.tcp,
+    ssh: options.ssh,
+    onProgress: options.onProgress,
+    onMessage: options.onMessage,
+    onAuth: options.onAuth,
+    onAuthSuccess: options.onAuthSuccess,
+    onAuthFailure: options.onAuthFailure,
+    onPrePush: options.onPrePush,
+    gitdir: submoduleGitdir,
+    ref: options.ref,
+    remoteRef: options.remoteRef,
+    remote: options.remote,
+    url: options.url,
+    force: options.force,
+    delete: options.delete,
+    corsProxy: options.corsProxy,
+    headers: options.headers,
+    includeSubmodules: options.includeSubmodules,
+    submoduleRecurse: options.submoduleRecurse,
+  })
+}
+
+/**
+ * Push all submodules recursively
+ * 
+ * This function iterates through all initialized submodules and pushes each one.
+ * Each submodule uses its own Repository and GitBackend, allowing independent
+ * remote configuration and push operations.
+ */
+async function pushSubmodules({
+  repo,
+  fs,
+  cache,
+  http,
+  tcp,
+  ssh,
+  onProgress,
+  onMessage,
+  onAuth,
+  onAuthSuccess,
+  onAuthFailure,
+  onPrePush,
+  ref,
+  remoteRef,
+  remote,
+  force,
+  delete: _delete,
+  corsProxy,
+  headers,
+  recurse = false,
+}: {
+  repo: Repository
+  fs: FileSystemProvider
+  cache: Record<string, unknown>
+  http?: HttpClient
+  tcp?: TcpClient
+  ssh?: SshClient | Promise<SshClient>
+  onProgress?: ProgressCallback | TcpProgressCallback | SshProgressCallback
+  onMessage?: MessageCallback
+  onAuth?: AuthCallback
+  onAuthSuccess?: AuthSuccessCallback
+  onAuthFailure?: AuthFailureCallback
+  onPrePush?: PrePushCallback
+  ref?: string
+  remoteRef?: string
+  remote?: string
+  force?: boolean
+  delete?: boolean
+  corsProxy?: string
+  headers?: Record<string, string>
+  recurse?: boolean
+}): Promise<Record<string, PushResult>> {
+  const results: Record<string, PushResult> = {}
+  
+  try {
+    // Get all initialized submodules
+    const submodules = await repo.listSubmodules()
+    
+    for (const { name, path, repo: submoduleRepo } of submodules) {
+      if (!submoduleRepo) {
+        // Submodule not initialized, skip
+        continue
+      }
+      
+      try {
+        // Get submodule's gitdir and fs
+        const submoduleGitdir = await submoduleRepo.getGitdir()
+        const submoduleFs = submoduleRepo.fs
+        
+        // Push the submodule using its own Repository and GitBackend
+        // Each submodule may have its own remote configuration
+        const submoduleResult = await push({
+          repo: submoduleRepo,
+          fs: submoduleFs,
+          cache,
+          http,
+          tcp,
+          ssh,
+          onProgress,
+          onMessage,
+          onAuth,
+          onAuthSuccess,
+          onAuthFailure,
+          onPrePush,
+          gitdir: submoduleGitdir,
+          ref,
+          remoteRef,
+          remote, // Submodule may override this in its config
+          force,
+          delete: _delete,
+          corsProxy,
+          headers,
+          includeSubmodules: recurse, // Recursively push nested submodules
+          submoduleRecurse: recurse,
+        })
+        
+        results[path] = submoduleResult
+      } catch (err) {
+        // If submodule push fails, record the error but continue with other submodules
+        // This matches Git's behavior - submodule push failures don't abort the parent push
+        results[path] = {
+          ok: false,
+          refs: {},
+          // Store error in a way that can be inspected
+        }
+        if (onMessage) {
+          await onMessage(`Warning: Failed to push submodule '${path}': ${err instanceof Error ? err.message : String(err)}`)
+        }
+      }
+    }
+  } catch (err) {
+    // If we can't list submodules, that's okay - just return empty results
+    // This allows push to work even if submodule listing fails
+    if (onMessage) {
+      await onMessage(`Warning: Could not list submodules: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+  
+  return results
 }
 

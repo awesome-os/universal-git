@@ -15,7 +15,6 @@ import { _pack } from './pack.ts'
 import { writeBundle } from '../git/bundle/writeBundle.ts'
 import { parseBundle, parseBundleHeader } from '../git/bundle/parseBundle.ts'
 import { readObject } from '../git/objects/readObject.ts'
-import { writeRef } from '../git/refs/writeRef.ts'
 import { readRef } from '../git/refs/readRef.ts'
 import { detectObjectFormat } from '../utils/detectObjectFormat.ts'
 import { Repository } from '../core-utils/Repository.ts'
@@ -325,10 +324,24 @@ export async function unbundle({
 
   assertParameter('filepath', filepath)
   
+  if (!repo) {
+    throw new MissingParameterError('repo (required for pack file operations via GitBackend)')
+  }
+
+  if (!repo.gitBackend) {
+    throw new MissingParameterError('repo.gitBackend (required for pack file operations)')
+  }
+
+  // For reading the bundle file (external file, not in gitdir), we still need fs
+  // But for pack file operations, we use GitBackend
+  if (!fs) {
+    throw new MissingParameterError('fs (required for reading bundle file)')
+  }
+  
   // Detect object format
   const objectFormat = await detectObjectFormat(fs, effectiveGitdir)
   
-  // Read and parse bundle
+  // Read and parse bundle (external file, not in gitdir)
   const bundleData = await fs.read(filepath)
   if (!bundleData) {
     throw new Error(`Bundle file not found: ${filepath}`)
@@ -346,36 +359,21 @@ export async function unbundle({
     throw new Error('No refs to import')
   }
   
-  // Write packfile to objects/pack/
-  // Ensure pack directory exists
-  const packDir = join(effectiveGitdir, 'objects', 'pack')
-  try {
-    await fs.mkdir(packDir, { recursive: true })
-  } catch {
-    // Directory might already exist
-  }
-  
   // Extract packfile hash from packfile (last 20 bytes for SHA-1, 32 for SHA-256)
   const oidLength = objectFormat === 'sha256' ? 64 : 40
   const packfileHash = packfile.subarray(packfile.length - oidLength / 2).toString('hex')
-  const packfileName = `pack-${packfileHash}`
-  const packfilePath = join(packDir, `${packfileName}.pack`)
+  const packfileName = `pack-${packfileHash}.pack`
   
-  // Write packfile
-  await fs.write(packfilePath, packfile)
+  // Write packfile via GitBackend (works with any backend: filesystem, SQLite, etc.)
+  await repo.gitBackend.writePackfile(packfileName, UniversalBuffer.from(packfile))
   
-  // Create packfile index (.idx file)
+  // Create packfile index (.idx file) via GitBackend
   const { indexPack } = await import('./indexPack.ts')
-  // indexPack expects filepath relative to dir
-  // Since we're writing to gitdir/objects/pack/, we need to use a path relative to gitdir
-  // For bare repositories, pass gitBackend if available, otherwise use dir/gitdir
-  const relativePackPath = join('objects', 'pack', `${packfileName}.pack`)
-  // Try to get gitBackend from repo if available (for bare repos, dir should equal gitdir)
-  const repoGitBackend = repo ? (repo as any)._gitBackend : undefined
+  // indexPack now uses GitBackend, so we just need to pass the pack file name
+  const relativePackPath = join('objects', 'pack', packfileName)
   await indexPack({
-    fs,
-    gitBackend: repoGitBackend,
-    dir: effectiveGitdir, // Use gitdir as the base directory (bare repo)
+    repo,
+    fs, // Still needed for readObject calls (external ref deltas)
     gitdir: effectiveGitdir,
     filepath: relativePackPath,
     cache: effectiveCache,
@@ -387,11 +385,10 @@ export async function unbundle({
   // Import refs
   for (const bundleRef of refsToImport) {
     try {
-      // Check if ref already exists
+      // Check if ref already exists via Repository
       let currentOid: string | undefined
       try {
-        const refValue = await readRef({ fs, gitdir: effectiveGitdir, ref: bundleRef.ref })
-        currentOid = refValue || undefined
+        currentOid = await repo.resolveRef(bundleRef.ref) || undefined
       } catch {
         // Ref doesn't exist - that's fine
       }
@@ -405,14 +402,8 @@ export async function unbundle({
         continue
       }
       
-      // Write ref
-      await writeRef({
-        fs,
-        gitdir: effectiveGitdir,
-        ref: bundleRef.ref,
-        value: bundleRef.oid,
-        objectFormat,
-      })
+      // Write ref via Repository (uses GitBackend internally)
+      await repo.writeRef(bundleRef.ref, bundleRef.oid, false) // skipReflog=false: create reflog entry
       
       imported.set(bundleRef.ref, bundleRef.oid)
     } catch (err: any) {

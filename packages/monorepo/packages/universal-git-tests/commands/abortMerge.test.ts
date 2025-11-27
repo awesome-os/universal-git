@@ -7,6 +7,7 @@ import {
   resolveRef,
   abortMerge,
   add,
+  checkout,
   STAGE,
   TREE,
   WORKDIR,
@@ -22,6 +23,9 @@ describe('abortMerge', () => {
   it('ok:conflicted-files-different-stages', async () => {
     // Setup
     const { repo } = await makeFixture('test-abortMerge')
+    
+    // Checkout branch 'a' first to ensure HEAD is on the correct branch
+    await checkout({ repo, ref: 'a' })
 
     const branchA = await resolveRef({ repo, ref: 'a' })
     const branchB = await resolveRef({ repo, ref: 'b' })
@@ -113,13 +117,15 @@ describe('abortMerge', () => {
   it('ok:abort-merge', async () => {
     // Setup
     const { repo } = await makeFixture('test-abortMerge')
+    
+    // Checkout branch 'a' first to ensure HEAD is on the correct branch
+    await checkout({ repo, ref: 'a' })
 
     // Test
     let error: unknown = null
     try {
       await merge({
         repo,
-        ours: 'a',
         theirs: 'b',
         abortOnConflict: false,
         author: {
@@ -163,6 +169,10 @@ describe('abortMerge', () => {
   it('ok:abort-after-modifying-files', async () => {
     // Setup
     const { repo } = await makeFixture('test-abortMerge')
+    
+    // Checkout branch 'a' first to ensure HEAD is on the correct branch
+    await checkout({ repo, ref: 'a' })
+    
     const dir = await repo.getDir()!
 
     // Test
@@ -170,7 +180,6 @@ describe('abortMerge', () => {
     try {
       await merge({
         repo,
-        ours: 'a',
         theirs: 'b',
         abortOnConflict: false,
         author: {
@@ -224,6 +233,10 @@ describe('abortMerge', () => {
   it('behavior:workdir-ne-index-eq-head', async () => {
     // Setup
     const { repo } = await makeFixture('test-abortMerge')
+    
+    // Checkout branch 'a' first to ensure HEAD is on the correct branch
+    await checkout({ repo, ref: 'a' })
+    
     const dir = await repo.getDir()!
 
     const head = await resolveRef({ repo, ref: 'HEAD' })
@@ -248,7 +261,6 @@ describe('abortMerge', () => {
     try {
       await merge({
         repo,
-        ours: 'a',
         theirs: 'b',
         abortOnConflict: false,
         author: {

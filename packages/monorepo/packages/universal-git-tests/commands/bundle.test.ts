@@ -8,8 +8,6 @@ import * as os from 'os'
 import * as path from 'path'
 import { promises as nodeFs } from 'fs'
 import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
-import { createBackend } from '@awesome-os/universal-git-src/backends/index.ts'
-import { createGitWorktreeBackend } from '@awesome-os/universal-git-src/git/worktree/index.ts'
 
 test('bundle', async (t) => {
   await t.test('creates bundle with specific refs', async () => {
@@ -60,6 +58,7 @@ test('bundle', async (t) => {
       assert.ok(result.objectCount > 0, 'Should have objects')
       
       // Verify bundle file exists
+      if (!repo.fs) throw new Error('Filesystem not available')
       const exists = await repo.fs.exists(bundlePath)
       assert.strictEqual(exists, true, 'Bundle file should exist')
       
@@ -146,14 +145,18 @@ test('bundle', async (t) => {
       assert.ok(result.objectCount > 0, 'Should have objects')
       
       // Verify the HEAD ref is included
-      const headRef = await repo.gitBackend!.readRef('HEAD')
-      if (headRef && !headRef.startsWith('ref: ')) {
-        // Detached HEAD
-        assert.ok(result.refs.has('HEAD') || result.refs.has(headRef), 'Should include HEAD')
-      } else if (headRef && headRef.startsWith('ref: ')) {
-        // Symbolic HEAD
-        const branchRef = headRef.slice(5)
-        assert.ok(result.refs.has(branchRef), `Should include ${branchRef}`)
+      try {
+        const headRef = await repo.resolveRef('HEAD', 1) // depth 1 to get ref name from symbolic ref
+        if (headRef && headRef.startsWith('refs/')) {
+          // Symbolic HEAD - headRef is a ref path
+          assert.ok(result.refs.has(headRef), `Should include ${headRef}`)
+        } else {
+          // Detached HEAD - headRef is an OID, check for HEAD or the OID
+          assert.ok(result.refs.has('HEAD') || (headRef && result.refs.has(headRef)), 'Should include HEAD')
+        }
+      } catch {
+        // HEAD might not resolve, check if HEAD is in the bundle
+        assert.ok(result.refs.has('HEAD'), 'Should include HEAD')
       }
     } finally {
       try {
@@ -216,6 +219,7 @@ test('verifyBundle', async (t) => {
       })
       
       // Verify bundle
+      if (!repo.fs) throw new Error('Filesystem not available')
       const result = await verifyBundle({
         fs: repo.fs,
         filepath: bundlePath,
@@ -241,6 +245,7 @@ test('verifyBundle', async (t) => {
     try {
       await nodeFs.writeFile(bundlePath, 'invalid bundle content')
       
+      if (!repo.fs) throw new Error('Filesystem not available')
       const result = await verifyBundle({
         fs: repo.fs,
         filepath: bundlePath,
@@ -262,6 +267,7 @@ test('verifyBundle', async (t) => {
     
     const bundlePath = join(os.tmpdir(), `bundle-nonexistent-${Date.now()}.bundle`)
     
+    if (!repo.fs) throw new Error('Filesystem not available')
     const result = await verifyBundle({
       fs: repo.fs,
       filepath: bundlePath,
@@ -317,6 +323,7 @@ test('unbundle', async (t) => {
       const destDir = join(os.tmpdir(), `unbundle-dest-${Date.now()}`)
       await nodeFs.mkdir(destDir, { recursive: true })
       try {
+        if (!sourceRepo.fs) throw new Error('Filesystem not available')
         const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
         const destRepo = await Repository.open({
           fs: sourceRepo.fs,
@@ -325,23 +332,10 @@ test('unbundle', async (t) => {
           cache: {},
           autoDetectConfig: true,
         })
-        const destGitdir = await destRepo.getGitdir()
-        
-        // Create backends for destination repo
-        const destGitBackend = createBackend({
-          type: 'filesystem',
-          fs: sourceRepo.fs,
-          gitdir: destGitdir,
-        })
-        const destWorktree = createGitWorktreeBackend({
-          fs: sourceRepo.fs,
-          dir: destDir,
-        })
         
         // Unbundle into destination
         const result = await unbundle({
-          gitBackend: destGitBackend,
-          worktree: destWorktree,
+          repo: destRepo,
           filepath: bundlePath,
         })
         
@@ -353,19 +347,20 @@ test('unbundle', async (t) => {
         assert.ok(result.imported.has('refs/tags/v1.0.0'), 'Should have imported tag')
         
         // Verify refs were imported correctly
-        const masterOid = await destRepo.gitBackend!.readRef('refs/heads/master')
-        const featureOid = await destRepo.gitBackend!.readRef('refs/heads/feature')
-        const tagOid = await destRepo.gitBackend!.readRef('refs/tags/v1.0.0')
+        const masterOid = await destRepo.resolveRef('refs/heads/master')
+        const featureOid = await destRepo.resolveRef('refs/heads/feature')
+        const tagOid = await destRepo.resolveRef('refs/tags/v1.0.0')
         
         assert.ok(masterOid, 'Master ref should exist')
         assert.ok(featureOid, 'Feature ref should exist')
         assert.ok(tagOid, 'Tag ref should exist')
         
         // Verify objects are accessible
-        const masterCommit = await destRepo.gitBackend!.readObject(masterOid!)
+        const { readObject } = await import('@awesome-os/universal-git-src/commands/readObject.ts')
+        const masterCommit = await readObject({ repo: destRepo, oid: masterOid })
         assert.ok(masterCommit, 'Master commit should be readable')
         
-        const featureCommit = await destRepo.gitBackend!.readObject(featureOid!)
+        const featureCommit = await readObject({ repo: destRepo, oid: featureOid })
         assert.ok(featureCommit, 'Feature commit should be readable')
       } finally {
         // Cleanup destination
@@ -414,6 +409,7 @@ test('unbundle', async (t) => {
       const destDir = join(os.tmpdir(), `unbundle-specific-${Date.now()}`)
       await nodeFs.mkdir(destDir, { recursive: true })
       try {
+        if (!sourceRepo.fs) throw new Error('Filesystem not available')
         const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
         const destRepo = await Repository.open({
           fs: sourceRepo.fs,
@@ -422,23 +418,10 @@ test('unbundle', async (t) => {
           cache: {},
           autoDetectConfig: true,
         })
-        const destGitdir = await destRepo.getGitdir()
-        
-        // Create backends for destination repo
-        const destGitBackend = createBackend({
-          type: 'filesystem',
-          fs: sourceRepo.fs,
-          gitdir: destGitdir,
-        })
-        const destWorktree = createGitWorktreeBackend({
-          fs: sourceRepo.fs,
-          dir: destDir,
-        })
         
         // Unbundle only master
         const result = await unbundle({
-          gitBackend: destGitBackend,
-          worktree: destWorktree,
+          repo: destRepo,
           filepath: bundlePath,
           refs: ['refs/heads/master'],
         })
@@ -490,6 +473,7 @@ test('unbundle', async (t) => {
       const destDir = join(os.tmpdir(), `unbundle-conflict-${Date.now()}`)
       await nodeFs.mkdir(destDir, { recursive: true })
       try {
+        if (!sourceRepo.fs) throw new Error('Filesystem not available')
         const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
         const destRepo = await Repository.open({
           fs: sourceRepo.fs,
@@ -508,21 +492,9 @@ test('unbundle', async (t) => {
           author: { name: 'Test', email: 'test@example.com' },
         })
         
-        // Create backends for destination repo
-        const destGitBackend = createBackend({
-          type: 'filesystem',
-          fs: sourceRepo.fs,
-          gitdir: destGitdir,
-        })
-        const destWorktree = createGitWorktreeBackend({
-          fs: sourceRepo.fs,
-          dir: destDir,
-        })
-        
         // Try to unbundle (should reject master since it exists with different OID)
         const result = await unbundle({
-          gitBackend: destGitBackend,
-          worktree: destWorktree,
+          repo: destRepo,
           filepath: bundlePath,
         })
         
@@ -588,6 +560,7 @@ test('bundle format parsing', async (t) => {
       })
       
       // Read and parse bundle
+      if (!repo.fs) throw new Error('Filesystem not available')
       const bundleData = await repo.fs.read(bundlePath)
       const buffer = UniversalBuffer.isBuffer(bundleData) ? bundleData : UniversalBuffer.from(bundleData)
       

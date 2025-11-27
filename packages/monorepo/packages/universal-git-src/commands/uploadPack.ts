@@ -9,6 +9,7 @@ import type { FileSystemProvider } from "../models/FileSystem.ts"
 import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
 import type { BaseCommandOptions } from "../types/commandOptions.ts"
 import { NotFoundError } from "../errors/NotFoundError.ts"
+import { setErrorCaller } from "../utils/errorHandler.ts"
 
 export type UploadPackOptions = BaseCommandOptions & {
   advertiseRefs?: boolean
@@ -41,8 +42,12 @@ export async function uploadPack({
       effectiveGitdir = normalized.gitdir
     } catch (err: any) {
       // Ensure caller is set even for errors from normalizeCommandArgs
-      err.caller = 'git.uploadPack'
-      throw err
+      const errorWithCaller = setErrorCaller(err, 'git.uploadPack')
+      // Double-check caller is set (in case setErrorCaller wrapped the error)
+      if (!errorWithCaller.caller) {
+        errorWithCaller.caller = 'git.uploadPack'
+      }
+      throw errorWithCaller
     }
 
     if (advertiseRefs) {
@@ -60,14 +65,24 @@ export async function uploadPack({
       
       // Use backend's listRefs if available, otherwise fall back to direct filesystem function
       let keys: string[]
-      if (repo.gitBackend) {
-        keys = await repo.gitBackend.listRefs('refs')
-      } else {
-        keys = await listRefsDirect({
-          fs,
-          gitdir: effectiveGitdir,
-          filepath: 'refs',
-        })
+      try {
+        if (repo.gitBackend) {
+          keys = await repo.gitBackend.listRefs('refs')
+        } else {
+          keys = await listRefsDirect({
+            fs,
+            gitdir: effectiveGitdir,
+            filepath: 'refs',
+          })
+        }
+      } catch (err: any) {
+        // Ensure caller is set for listRefs errors
+        const errorWithCaller = setErrorCaller(err, 'git.uploadPack')
+        // Double-check caller is set (in case setErrorCaller wrapped the error)
+        if (!errorWithCaller.caller) {
+          errorWithCaller.caller = 'git.uploadPack'
+        }
+        throw errorWithCaller
       }
       
       keys = keys.map(ref => `refs/${ref}`)
@@ -95,29 +110,45 @@ export async function uploadPack({
               continue
             }
           }
-        } catch (err) {
+        } catch (err: any) {
           // Skip invalid refs (e.g., .gitkeep files)
           // Only skip NotFoundError for non-HEAD refs
           if (key !== 'HEAD' && err && typeof err === 'object' && 'code' in err && (err as any).code === 'NotFoundError') {
             continue
           }
-          throw err
+          // Ensure caller is set before re-throwing
+          const errorWithCaller = setErrorCaller(err, 'git.uploadPack')
+          // Double-check caller is set (in case setErrorCaller wrapped the error)
+          if (!errorWithCaller.caller) {
+            errorWithCaller.caller = 'git.uploadPack'
+          }
+          throw errorWithCaller
         }
       }
       const symrefs: Record<string, string> = {}
       // Use backend's readRef for HEAD if available
-      if (repo.gitBackend) {
-        const headResolved = await repo.gitBackend.readRef('HEAD', 2)
-        if (headResolved) {
-          symrefs.HEAD = headResolved
+      try {
+        if (repo.gitBackend) {
+          const headResolved = await repo.gitBackend.readRef('HEAD', 2)
+          if (headResolved) {
+            symrefs.HEAD = headResolved
+          }
+        } else {
+          symrefs.HEAD = await resolveRef({
+            fs,
+            gitdir: effectiveGitdir,
+            ref: 'HEAD',
+            depth: 2,
+          })
         }
-      } else {
-        symrefs.HEAD = await resolveRef({
-          fs,
-          gitdir: effectiveGitdir,
-          ref: 'HEAD',
-          depth: 2,
-        })
+      } catch (err: any) {
+        // Ensure caller is set for HEAD readRef errors
+        const errorWithCaller = setErrorCaller(err, 'git.uploadPack')
+        // Double-check caller is set (in case setErrorCaller wrapped the error)
+        if (!errorWithCaller.caller) {
+          errorWithCaller.caller = 'git.uploadPack'
+        }
+        throw errorWithCaller
       }
       return writeRefsAdResponse({
         capabilities,
@@ -126,8 +157,13 @@ export async function uploadPack({
       })
     }
   } catch (err: any) {
-    err.caller = 'git.uploadPack'
-    throw err
+    // Ensure caller is set on all error types
+    const errorWithCaller = setErrorCaller(err, 'git.uploadPack')
+    // Double-check caller is set (in case setErrorCaller wrapped the error)
+    if (!errorWithCaller.caller) {
+      errorWithCaller.caller = 'git.uploadPack'
+    }
+    throw errorWithCaller
   }
 }
 
