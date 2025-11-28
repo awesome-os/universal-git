@@ -424,6 +424,70 @@ export class FilesystemBackend implements GitBackend {
   // loose and packed objects. Other backends (SQLite, InMemory) will implement
   // these using their own storage.
 
+  /**
+   * Get the object format (SHA-1 or SHA-256) from config
+   * @param cache - Optional cache to avoid repeated config reads
+   * @returns 'sha1' or 'sha256' (defaults to 'sha1' if not set)
+   */
+  async getObjectFormat(cache?: Record<string, unknown>): Promise<'sha1' | 'sha256'> {
+    // OPTIMIZATION: Cache object format per gitdir to avoid repeated config reads
+    const cacheKey = 'objectFormat'
+    if (cache && cache[cacheKey]) {
+      return cache[cacheKey] as 'sha1' | 'sha256'
+    }
+    
+    try {
+      const configBuffer = await this.readConfig()
+      if (configBuffer.length === 0) {
+        const format: 'sha1' | 'sha256' = 'sha1'
+        if (cache) cache[cacheKey] = format
+        return format
+      }
+      
+      const configContent = configBuffer.toString('utf8')
+      const lines = configContent.split('\n')
+      let inExtensions = false
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (trimmed === '[extensions]') {
+          inExtensions = true
+        } else if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+          inExtensions = false
+        } else if (inExtensions && trimmed.startsWith('objectformat')) {
+          const match = trimmed.match(/objectformat\s*=\s*(\w+)/i)
+          if (match && match[1].toLowerCase() === 'sha256') {
+            const format: 'sha1' | 'sha256' = 'sha256'
+            if (cache) cache[cacheKey] = format
+            return format
+          }
+        }
+      }
+    } catch {
+      // Config file doesn't exist or can't be read, default to SHA-1
+    }
+    
+    const format: 'sha1' | 'sha256' = 'sha1'
+    if (cache) cache[cacheKey] = format
+    return format
+  }
+
+  /**
+   * Set the object format (SHA-1 or SHA-256) in config
+   * @param objectFormat - 'sha1' or 'sha256'
+   */
+  async setObjectFormat(objectFormat: 'sha1' | 'sha256'): Promise<void> {
+    const { LocalConfigProvider } = await import('../git/config/LocalConfigProvider.ts')
+    const configProvider = new LocalConfigProvider(this)
+    await configProvider.setConfigValue('extensions.objectformat', objectFormat, 'local')
+    
+    // Also set repository format version
+    if (objectFormat === 'sha256') {
+      await configProvider.setConfigValue('core.repositoryformatversion', '1', 'local')
+    } else {
+      await configProvider.setConfigValue('core.repositoryformatversion', '0', 'local')
+    }
+  }
+
   async readObject(
     oid: string,
     format: 'deflated' | 'wrapped' | 'content' = 'content',
@@ -436,9 +500,7 @@ export class FilesystemBackend implements GitBackend {
     oid?: string
   }> {
     const { readObject } = await import('../git/objects/readObject.ts')
-    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
-    // Use gitBackend parameter for detectObjectFormat (this is the FilesystemBackend instance)
-    const objectFormat = await detectObjectFormat(undefined, undefined, cache, this)
+    const objectFormat = await this.getObjectFormat(cache)
     return readObject({
       fs: this.fs,
       cache,
@@ -458,8 +520,7 @@ export class FilesystemBackend implements GitBackend {
     cache: Record<string, unknown> = {}
   ): Promise<string> {
     const { writeObject } = await import('../git/objects/writeObject.ts')
-    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
-    const objectFormat = await detectObjectFormat(this.fs, this.gitdir, cache)
+    const objectFormat = await this.getObjectFormat(cache)
     return writeObject({
       fs: this.fs,
       gitdir: this.gitdir,
@@ -1057,8 +1118,7 @@ export class FilesystemBackend implements GitBackend {
     // Write HEAD in worktree gitdir
     const worktreeGitdirPath = worktreeGitdir.getPath()
     const { writeRef } = await import('../git/refs/writeRef.ts')
-    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
-    const objectFormat = await detectObjectFormat(this.fs, worktreeGitdirPath, {})
+    const objectFormat = await this.getObjectFormat({})
     await writeRef({
       fs: this.fs,
       gitdir: worktreeGitdirPath,
@@ -1576,7 +1636,7 @@ export class FilesystemBackend implements GitBackend {
     }
 
     // Find merge base using the internal algorithm
-    const objectFormat = await detectObjectFormat(this.fs, this.gitdir, cache)
+    const objectFormat = await this.getObjectFormat(cache)
     const { findMergeBase: findMergeBaseInternal } = await import('../core-utils/algorithms/CommitGraphWalker.ts')
     const { parse: parseCommitInternal } = await import('../core-utils/parsers/Commit.ts')
     const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
@@ -2109,7 +2169,7 @@ export class FilesystemBackend implements GitBackend {
 
     // Parse index
     let index: InstanceType<typeof GitIndex>
-    const objectFormat = await detectObjectFormat(this.fs, this.gitdir)
+    const objectFormat = await this.getObjectFormat({})
     if (indexBuffer.length === 0) {
       index = new GitIndex(null, undefined, 2)
     } else {
