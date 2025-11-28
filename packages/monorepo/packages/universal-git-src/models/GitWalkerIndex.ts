@@ -2,7 +2,8 @@ import { compareStrings } from "../utils/compareStrings.ts"
 import { flatFileListToDirectoryStructure } from "../utils/flatFileListToDirectoryStructure.ts"
 import { mode2type } from "../utils/mode2type.ts"
 import { normalizeStats } from "../utils/normalizeStats.ts"
-import type { FileSystemProvider, Stat } from './FileSystem.ts'
+import type { Stat } from './FileSystem.ts'
+import type { GitBackend } from '../backends/GitBackend.ts'
 
 type StageEntry = {
   _fullpath: string
@@ -24,26 +25,19 @@ type Inode = {
 }
 
 export class GitWalkerIndex {
-  private repo: Awaited<ReturnType<typeof import('../core-utils/Repository.ts').Repository.open>>
-  fs: FileSystemProvider
-  gitdir: string
-  dir?: string
+  private gitBackend: GitBackend
   cache: Record<string, unknown>
   ConstructEntry: new (fullpath: string) => StageEntry
 
   constructor({
-    repo,
+    gitBackend,
+    cache = {},
   }: {
-    repo: Awaited<ReturnType<typeof import('../core-utils/Repository.ts').Repository.open>>
+    gitBackend: GitBackend
+    cache?: Record<string, unknown>
   }) {
-    this.repo = repo
-    // Store these for compatibility with methods that expect them
-    this.fs = repo.fs
-    // Initialize gitdir - will be resolved when first accessed if needed
-    // For now, we can try to get it synchronously if _gitdir is already set
-    this.gitdir = (repo as any)._gitdir || ''
-    this.dir = repo.dir || undefined
-    this.cache = repo.cache
+    this.gitBackend = gitBackend
+    this.cache = cache
     // Don't read the index in the constructor - read it lazily when needed
     // This ensures we always get the latest index state, solving cache synchronization issues
     const walker = this
@@ -86,14 +80,28 @@ export class GitWalkerIndex {
 
   /**
    * Lazy getter for the tree structure - reads the index on-demand
-   * Uses the Repository instance passed in the constructor (single source of truth)
+   * Uses gitBackend.readIndex() directly for consistency
    * This ensures we see the same index state as the command that created this walker
    */
   private async getTree(): Promise<Map<string, Inode>> {
     try {
-      // Use the Repository instance passed in the constructor
-      // This ensures we see the same index state as add(), status(), etc.
-      const index = await this.repo.readIndexDirect() // Use default force=false to get owned instance
+      const { GitIndex } = await import('../git/index/GitIndex.ts')
+      const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+      const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+      
+      let indexBuffer: UniversalBuffer
+      try {
+        indexBuffer = await this.gitBackend.readIndex()
+      } catch {
+        return new Map<string, Inode>()
+      }
+      
+      if (indexBuffer.length === 0) {
+        return new Map<string, Inode>()
+      }
+      
+      const objectFormat = await detectObjectFormat(undefined, undefined, this.cache, this.gitBackend)
+      const index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
       
       // Handle null index (empty or uninitialized)
       if (!index || !index.entries) {

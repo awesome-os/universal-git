@@ -21,6 +21,7 @@ import type { TreeEntry } from "../../models/GitTree.ts"
 import type { WalkerEntry } from "../../models/Walker.ts"
 import { WalkerMapWithNulls, WalkerReduceTree } from "../../models/Walker.ts"
 import type { GitIndex } from "../index/GitIndex.ts"
+import type { Repository } from '../../core-utils/Repository.ts'
 
 /**
  * Create a merged tree with index management and worktree operations
@@ -41,13 +42,11 @@ import type { GitIndex } from "../index/GitIndex.ts"
  * - You have tree OIDs and need a pure algorithm (use `mergeTrees()` capability module instead)
  * - You're implementing merge logic in `cherryPick` or `rebase` (use `mergeTrees()` instead)
  * 
- * **Note:** This function now uses `GitBackend` instead of `Repository` to support bare repositories.
- * - Manages the index (stages conflicts, updates index) - index is stored in GitBackend
- * - Optionally writes conflicted files to the worktree (if fs and dir are provided)
- * - Works with bare repositories (no worktree needed)
+ * **Note:** This function requires a `Repository` instance with the correct worktree backend.
+ * The caller is responsible for creating the Repository with the proper worktree backend.
  * 
  * @param {Object} args
- * @param {GitBackend} args.gitBackend - Git backend instance
+ * @param {Repository} args.repo - Repository instance with proper worktree backend
  * @param {GitIndex} args.index - Git index instance
  * @param {string} args.ourOid - The SHA-1 object id of our tree
  * @param {string} args.baseOid - The SHA-1 object id of the base tree
@@ -58,16 +57,12 @@ import type { GitIndex } from "../index/GitIndex.ts"
  * @param {boolean} [args.dryRun=false] - If true, don't write to the index or worktree
  * @param {boolean} [args.abortOnConflict=false] - If true, throw error on conflict; if false, return MergeConflictError
  * @param {MergeDriverCallback} [args.mergeDriver] - Custom merge driver (defaults to `mergeFile`)
- * @param {FileSystemProvider} [args.fs] - Optional filesystem for writing conflict files to worktree
- * @param {string} [args.dir] - Optional worktree directory for writing conflict files
- * @param {Record<string, unknown>} [args.cache] - Optional cache for packfile indices
- * @param {string} [args.gitdir] - Optional gitdir path (for FilesystemBackend)
  *
  * @returns {Promise<string | MergeConflictError>} - The SHA-1 object id of the merged tree, or MergeConflictError if conflicts occur and abortOnConflict is false
  *
  */
 export async function mergeTree({
-  gitBackend,
+  repo,
   index,
   ourOid,
   baseOid,
@@ -78,12 +73,8 @@ export async function mergeTree({
   dryRun = false,
   abortOnConflict = true,
   mergeDriver,
-  fs,
-  dir,
-  cache = {},
-  gitdir,
 }: {
-  gitBackend: GitBackend
+  repo: Repository
   index: GitIndex
   ourOid: string
   baseOid: string
@@ -94,34 +85,8 @@ export async function mergeTree({
   dryRun?: boolean
   abortOnConflict?: boolean
   mergeDriver?: MergeDriverCallback
-  fs?: FileSystemProvider | null
-  dir?: string | null
-  cache?: Record<string, unknown>
-  gitdir?: string
 }): Promise<string | MergeConflictError> {
-  // Get gitdir if not provided (for FilesystemBackend)
-  if (!gitdir && gitBackend.getFileSystem) {
-    const backendFs = gitBackend.getFileSystem()
-    if (backendFs) {
-      // For FilesystemBackend, we can try to extract gitdir
-      // But this is not reliable, so gitdir should be provided
-      gitdir = undefined
-    }
-  }
-  
-  // Get fs from GitBackend if not provided
-  const effectiveFs = fs || (gitBackend.getFileSystem ? gitBackend.getFileSystem() : null)
-  
-  // Create a minimal Repository wrapper for _walk (which still needs Repository)
-  // TODO: Refactor _walk to use GitBackend directly
-  const { Repository } = await import('../../core-utils/Repository.ts')
-  const repo = await Repository.open({
-    gitBackend,
-    fs: effectiveFs || undefined,
-    dir: dir || undefined,
-    cache,
-    autoDetectConfig: true,
-  })
+  const gitBackend = repo.gitBackend
   
   const ourTree = WalkerFactory.tree({ ref: ourOid })
   const baseTree = WalkerFactory.tree({ ref: baseOid })
@@ -309,20 +274,25 @@ export async function mergeTree({
           }
 
           // Modifications - both are blobs
-          if (
-            ours &&
-            theirs &&
-            (await ours.type()) === 'blob' &&
-            (await theirs.type()) === 'blob'
-          ) {
-            // mergeBlobs needs fs and gitdir - use effectiveFs and gitdir from repo
-            const effectiveGitdir = gitdir || (await repo.getGitdir())
-            if (!effectiveFs) {
-              throw new Error('Filesystem is required for merge operations')
+          if (filepath === 'a' || filepath === 'b') {
+            const ourType = ours ? await ours.type() : 'null'
+            const theirType = theirs ? await theirs.type() : 'null'
+            console.log(`[mergeTree] File ${filepath} types: ours=${ourType}, theirs=${theirType}, ours exists=${!!ours}, theirs exists=${!!theirs}`)
+          }
+          const ourType = ours ? await ours.type() : null
+          const theirType = theirs ? await theirs.type() : null
+          const isBlobMerge = ours && theirs && ourType === 'blob' && theirType === 'blob'
+          if (filepath === 'a' || filepath === 'b') {
+            console.log(`[mergeTree] File ${filepath} blob check: isBlobMerge=${isBlobMerge}, ourType=${ourType}, theirType=${theirType}`)
+          }
+          if (isBlobMerge) {
+            // mergeBlobs now uses GitBackend instead of fs/gitdir
+            if (filepath === 'a' || filepath === 'b') {
+              console.log(`[mergeTree] Calling mergeBlobs for ${filepath}`)
             }
             const r = await mergeBlobs({
-              fs: effectiveFs,
-              gitdir: effectiveGitdir,
+              gitBackend,
+              repo,
               path,
               ours,
               base,
@@ -331,6 +301,7 @@ export async function mergeTree({
               baseName,
               theirName,
               mergeDriver,
+              dryRun,
             })
             if (!r.cleanMerge) {
               // Use filepath (full path) for unmergedFiles tracking
@@ -358,7 +329,7 @@ export async function mergeTree({
                 // Store conflicted content to write to worktree
                 // The conflicted content (with markers) is already generated by mergeFile
                 // Only store if we're not aborting on conflict (abortOnConflict = false)
-                if (dir && !dryRun && !abortOnConflict && r.mergedText) {
+                if (repo.worktreeBackend && !dryRun && !abortOnConflict && r.mergedText) {
                   const mode = parseInt(r.mergeResult.mode, 8)
                   conflictedFiles.set(filepath, { content: r.mergedText, mode })
                 }
@@ -486,8 +457,7 @@ export async function mergeTree({
         if (validEntries.length > 0) {
           // Create root tree from entries using writeTree with dryRun support
           const oid = await writeTree({
-            fs,
-            gitdir,
+            repo,
             tree: validEntries,
             dryRun,
           })
@@ -530,8 +500,7 @@ export async function mergeTree({
       if (validEntries.length > 0) {
         // Use writeTree with dryRun support
         const oid = await writeTree({
-          fs,
-          gitdir,
+          repo,
           tree: validEntries,
           dryRun,
         })
@@ -580,50 +549,40 @@ export async function mergeTree({
   // Even if the walk failed due to missing objects (NotFoundError), we should still check for conflicts
   // because conflicts might have been detected before the walk failed
   if (unmergedFiles.length > 0) {
-    if (effectiveFs && dir && !abortOnConflict && !dryRun) {
-      const { createFileSystem } = await import('../../utils/createFileSystem.ts')
-      const normalizedFs = createFileSystem(effectiveFs)
-      // Write workdir files from the merged tree (excluding conflicted files)
-      // Only if we have a valid tree OID and fs/dir are provided (worktree operation)
-      if (effectiveFs && dir && results && typeof results === 'object' && 'oid' in results && results.oid) {
-        const { createFileSystem } = await import('../../utils/createFileSystem.ts')
-        const normalizedFs = createFileSystem(effectiveFs)
-        await _walk({
-          repo, // CRITICAL: Pass repo to _walk, not fs/cache/dir/gitdir
-          trees: [WalkerFactory.tree({ ref: results.oid as string })],
-          map: WalkerMapWithNulls(async function (filepath: string, [entry]: (WalkerEntry | null)[]): Promise<boolean> {
-            if (!entry) return false
-            const path = `${dir}/${filepath}`
-            if ((await entry.type()) === 'blob') {
-              const mode = await entry.mode()
-              const content = await entry.content()
-              if (content) {
-                const contentStr = new TextDecoder().decode(content)
-                await normalizedFs.write(path, contentStr, { mode })
-              }
+    // Write workdir files from the merged tree (excluding conflicted files)
+    // Only if we have a valid tree OID and worktree backend is available
+    if (repo.worktreeBackend && results && typeof results === 'object' && 'oid' in results && results.oid) {
+      await _walk({
+        repo, // CRITICAL: Pass repo to _walk, not fs/cache/dir/gitdir
+        trees: [WalkerFactory.tree({ ref: results.oid as string })],
+        map: WalkerMapWithNulls(async function (filepath: string, [entry]: (WalkerEntry | null)[]): Promise<boolean> {
+          if (!entry) return false
+          if ((await entry.type()) === 'blob') {
+            const mode = await entry.mode()
+            const content = await entry.content()
+            if (content) {
+              const contentStr = new TextDecoder().decode(content)
+              await repo.worktreeBackend!.write(filepath, contentStr, { mode })
             }
-            return true
-          }),
-        })
-      }
+          }
+          return true
+        }),
+      })
 
       // Write conflicted files with conflict markers to worktree (only if fs and dir are provided)
-      if (effectiveFs && dir) {
+      if (repo.worktreeBackend) {
         // Use Promise.allSettled to write all files concurrently and handle partial failures
         // This eliminates race conditions and ensures all conflicts are written even if some fail
         const { dirname } = await import('../../utils/dirname.ts')
-        const { createFileSystem } = await import('../../utils/createFileSystem.ts')
-        const normalizedFs = createFileSystem(effectiveFs)
         const writePromises = Array.from(conflictedFiles.entries()).map(async ([filepath, { content, mode }]) => {
-          const fullPath = `${dir}/${filepath}`
-          const parentDir = dirname(fullPath)
+          const parentDir = dirname(filepath)
           try {
             // FileSystem.mkdir already implements recursive directory creation
-            await normalizedFs.mkdir(parentDir)
+            await repo.worktreeBackend!.mkdir(parentDir)
           } catch {
             // Directory might already exist, ignore
           }
-          await normalizedFs.write(fullPath, content, { mode })
+          await repo.worktreeBackend!.write(filepath, content, { mode })
         })
       
       const writeResults = await Promise.allSettled(writePromises)
@@ -634,6 +593,7 @@ export async function mergeTree({
       if (failures.length > 0) {
         // Log failures but continue - the merge conflict error will still be returned
         console.warn(`Failed to write ${failures.length} conflicted file(s):`, failures)
+      }
       }
     }
     // Always return MergeConflictError when there are conflicts
@@ -714,8 +674,8 @@ export async function mergeTree({
  *   - `mergedText`: Merged text content (only present for conflicts)
  */
 export async function mergeBlobs({
-  fs,
-  gitdir,
+  gitBackend,
+  repo,
   path,
   ours,
   base,
@@ -726,8 +686,8 @@ export async function mergeBlobs({
   dryRun,
   mergeDriver = mergeFile as unknown as MergeDriverCallback,
 }: {
-  fs: FileSystemProvider
-  gitdir: string
+  gitBackend: GitBackend
+  repo?: Repository
   path: string
   ours: WalkerEntry
   base: WalkerEntry | null
@@ -814,13 +774,23 @@ export async function mergeBlobs({
     cleanMerge = !mergeResult.hasConflict
   }
   
-  // Write merged blob using writeBlob with dryRun support
-  const oid = await writeBlob({
-    fs,
-    gitdir,
-    blob: UniversalBuffer.from(mergedText, 'utf8'),
-    dryRun,
-  })
+  // Write merged blob using GitBackend.writeObject() or writeBlob with repo
+  let oid: string
+  if (dryRun) {
+    // For dryRun, compute OID without writing
+    const { computeObjectId } = await import('../../utils/computeObjectId.ts')
+    oid = computeObjectId({
+      type: 'blob',
+      object: UniversalBuffer.from(mergedText, 'utf8'),
+    })
+  } else {
+    // Use GitBackend.writeObject() to write the blob
+    oid = await gitBackend.writeObject(
+      'blob',
+      UniversalBuffer.from(mergedText, 'utf8'),
+      'content'
+    )
+  }
 
   return { 
     cleanMerge, 

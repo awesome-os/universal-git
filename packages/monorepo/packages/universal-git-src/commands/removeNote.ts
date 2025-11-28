@@ -150,9 +150,7 @@ export async function _removeNote({
 
   // I'm using the "empty tree" magic number here for brevity
   const result = await readTree({
-    fs,
-    cache,
-    gitdir,
+    repo,
     oid: parent || '4b825dc642cb6eb9a060e54bf8d69288fbee4904',
   })
   let tree = result.tree

@@ -2,6 +2,7 @@ export type { GitBackend } from './GitBackend.ts'
 export { FilesystemBackend } from './FilesystemBackend.ts'
 export { SQLiteBackend } from './SQLiteBackend.ts'
 export { InMemoryBackend } from './InMemoryBackend.ts'
+export { NativeGitBackend } from './NativeGitBackend.ts'
 export { BackendRegistry } from './BackendRegistry.ts'
 export type {
   BackendType,
@@ -18,6 +19,7 @@ export type {
   BackendCapabilities,
   BackendMetadata,
   GitBackendWithMetadata,
+  NativeGitBackendOptions,
 } from './types.ts'
 
 // Import registry and types
@@ -25,12 +27,14 @@ import type {
   BackendOptions,
   FilesystemBackendOptions,
   SQLiteBackendOptions,
+  NativeGitBackendOptions,
 } from './types.ts'
 import type { GitBackend } from './GitBackend.ts'
 import { BackendRegistry } from './BackendRegistry.ts'
 import { FilesystemBackend } from './FilesystemBackend.ts'
 import { SQLiteBackend } from './SQLiteBackend.ts'
 import { InMemoryBackend } from './InMemoryBackend.ts'
+import { NativeGitBackend } from './NativeGitBackend.ts'
 import { createFileSystem } from '../utils/createFileSystem.ts'
 
 /**
@@ -69,6 +73,18 @@ export function createBackend(options: BackendOptions): GitBackend {
   if (!BackendRegistry.isRegistered('in-memory')) {
     BackendRegistry.register('in-memory', () => {
       return new InMemoryBackend()
+    })
+  }
+
+  if (!BackendRegistry.isRegistered('native-git')) {
+    BackendRegistry.register('native-git', (opts) => {
+      const opt = opts as NativeGitBackendOptions
+      if (!opt.fs || !opt.gitdir) {
+        throw new Error('Native git backend requires fs and gitdir options')
+      }
+      // Normalize fs using factory pattern to ensure consistent caching and normalization
+      const normalizedFs = createFileSystem(opt.fs)
+      return new NativeGitBackend(normalizedFs, opt.gitdir, opt.workdir)
     })
   }
 

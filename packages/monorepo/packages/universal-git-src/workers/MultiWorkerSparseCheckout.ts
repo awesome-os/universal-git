@@ -293,7 +293,28 @@ export class MultiWorkerSparseCheckout {
     
     // Step 8: Write merged index
     if (allIndexEntries.length > 0) {
-      const gitIndex = await repo.readIndexDirect(false)
+      const { GitIndex } = await import('../git/index/GitIndex.ts')
+      const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+      
+      let indexBuffer: UniversalBuffer
+      if (repo.gitBackend) {
+        try {
+          indexBuffer = await repo.gitBackend.readIndex()
+        } catch {
+          indexBuffer = UniversalBuffer.alloc(0)
+        }
+      } else {
+        throw new Error('gitBackend is required')
+      }
+      
+      let gitIndex: GitIndex
+      if (indexBuffer.length === 0) {
+        gitIndex = new GitIndex()
+      } else {
+        const objectFormat = await detectObjectFormat(fs, gitdir, repo.cache, repo.gitBackend)
+        gitIndex = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+      }
+      
       for (const entry of allIndexEntries) {
         gitIndex.insert({
           filepath: entry.filepath,

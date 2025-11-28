@@ -1,12 +1,7 @@
-import { resolveBlob } from "../utils/resolveBlob.ts"
-import { resolveFilepath } from "../utils/resolveFilepath.ts"
 import { MissingParameterError } from "../errors/MissingParameterError.ts"
-import { Repository } from "../core-utils/Repository.ts"
-import { createFileSystem } from '../utils/createFileSystem.ts'
 import { assertParameter } from "../utils/assertParameter.ts"
 import { normalizeCommandArgs } from '../utils/commandHelpers.ts'
 import { join } from "../utils/join.ts"
-import type { FileSystemProvider } from "../models/FileSystem.ts"
 import type { BaseCommandOptions } from "../types/commandOptions.ts"
 
 // ============================================================================
@@ -63,7 +58,7 @@ export async function readBlob({
   cache = {},
 }: ReadBlobOptions): Promise<ReadBlobResult> {
   try {
-    const { repo, fs, gitdir: effectiveGitdir, cache: effectiveCache } = await normalizeCommandArgs({
+    const { repo, cache: effectiveCache } = await normalizeCommandArgs({
       repo: _repo,
       fs: _fs,
       dir,
@@ -75,17 +70,11 @@ export async function readBlob({
 
     assertParameter('oid', oid)
 
-    let resolvedOid = oid
-    if (filepath !== undefined) {
-      resolvedOid = await resolveFilepath({ fs, cache, gitdir: effectiveGitdir, oid, filepath })
+    if (!repo?.gitBackend) {
+      throw new MissingParameterError('gitBackend (required for readBlob operation)')
     }
-    const blob = await resolveBlob({
-      fs,
-      cache,
-      gitdir: effectiveGitdir,
-      oid: resolvedOid,
-    })
-    return blob
+
+    return await repo.gitBackend.readBlob(oid, filepath)
   } catch (err) {
     ;(err as { caller?: string }).caller = 'git.readBlob'
     throw err

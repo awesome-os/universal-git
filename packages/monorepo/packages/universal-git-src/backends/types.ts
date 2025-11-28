@@ -15,6 +15,7 @@ export type BackendType =
   | 'in-memory'
   | 'indexeddb'
   | 'webstorage'
+  | 'native-git'
   | string // Allow custom backend types
 
 /**
@@ -102,6 +103,7 @@ export type BackendOptions =
   | InMemoryBackendOptions
   | IndexedDBBackendOptions
   | WebStorageBackendOptions
+  | NativeGitBackendOptions
   | CustomBackendOptions
 
 /**
@@ -115,6 +117,23 @@ export interface FilesystemBackendOptions {
    */
   fs: any // RawFileSystemProvider | FileSystemProvider (typed as any, factory normalizes it)
   gitdir: string
+}
+
+/**
+ * Options for native git backend
+ */
+export interface NativeGitBackendOptions {
+  type: 'native-git'
+  /**
+   * Filesystem client - can be RawFileSystemProvider (callback or promise-based) or FileSystemProvider.
+   * The factory will normalize this using createFileSystem before creating NativeGitBackend.
+   */
+  fs: any // RawFileSystemProvider | FileSystemProvider (typed as any, factory normalizes it)
+  gitdir: string
+  /**
+   * Working directory for git commands (optional, defaults to parent of gitdir)
+   */
+  workdir?: string | null
 }
 
 /**

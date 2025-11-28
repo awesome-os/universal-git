@@ -1,12 +1,8 @@
 import { MissingParameterError } from "../errors/MissingParameterError.ts"
 import { readTree } from './readTree.ts'
-// GitRefManager import removed - using src/git/refs/ functions instead
-import { createFileSystem } from '../utils/createFileSystem.ts'
-import { assertParameter } from "../utils/assertParameter.ts"
 import { normalizeCommandArgs } from "../utils/commandHelpers.ts"
 import { join } from "../utils/join.ts"
 import { Repository } from "../core-utils/Repository.ts"
-import type { FileSystem } from "../models/FileSystem.ts"
 import type { BaseCommandOptions } from "../types/commandOptions.ts"
 
 /**
@@ -35,6 +31,7 @@ import type { BaseCommandOptions } from "../types/commandOptions.ts"
  */
 export type ListFilesOptions = BaseCommandOptions & {
   ref?: string
+  worktree?: boolean // If true, list files from worktree instead of index
 }
 
 export async function listFiles({
@@ -43,23 +40,30 @@ export async function listFiles({
   dir,
   gitdir = dir ? join(dir, '.git') : undefined,
   ref,
+  worktree = false,
   cache = {},
 }: ListFilesOptions): Promise<string[]> {
   try {
-    const { repo, fs, gitdir: effectiveGitdir } = await normalizeCommandArgs({
+    const { repo } = await normalizeCommandArgs({
       repo: _repo,
       fs: _fs,
       dir,
       gitdir,
       cache,
       ref,
+      worktree,
     })
+
+    // If worktree option is true, list files from worktree
+    if (worktree) {
+      if (!repo?.worktreeBackend) {
+        throw new MissingParameterError('worktreeBackend (required for listing worktree files)')
+      }
+      return await repo.worktreeBackend.listFiles()
+    }
 
     return await _listFiles({
       repo,
-      fs: fs as any,
-      cache,
-      gitdir: effectiveGitdir,
       ref,
     })
   } catch (err) {
@@ -74,43 +78,60 @@ export async function listFiles({
  */
 export async function _listFiles({
   repo: _repo,
-  fs: _fs,
-  gitdir: _gitdir,
   ref,
-  cache: _cache,
 }: {
   repo?: Repository
-  fs?: FileSystem
-  gitdir?: string
   ref?: string
-  cache?: Record<string, unknown>
 }): Promise<string[]> {
-  // Use normalizeCommandArgs for consistency
-  const { repo } = await normalizeCommandArgs({
-    repo: _repo,
-    fs: _fs,
-    gitdir: _gitdir,
-    cache: _cache || {},
-    ref,
-  })
+  if (!_repo) {
+    throw new MissingParameterError('repo (required for listFiles operation)')
+  }
+  const repo = _repo
 
   if (ref) {
-    // Use direct resolveRef() for consistency
-    const { resolveRef } = await import('../git/refs/readRef.ts')
-    const oid = await resolveRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref })
+    // Use repo.resolveRef() which uses backend methods
+    const oid = await repo.resolveRef(ref)
     const filenames: string[] = []
     await accumulateFilesFromOid({
-      fs: repo.fs as FileSystem,
-      cache: repo.cache,
-      gitdir: await repo.getGitdir(),
+      repo,
       oid,
       filenames,
       prefix: '',
     })
     return filenames
   } else {
-    // Use Repository.readIndexDirect() for consistency
-    const index = await repo.readIndexDirect(false) // Force fresh read
+    // Use gitBackend.readIndex() directly instead of repo.readIndexDirect()
+    if (!repo.gitBackend) {
+      throw new MissingParameterError('gitBackend (required for listFiles operation)')
+    }
+    
+    const { GitIndex } = await import('../git/index/GitIndex.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+    
+    // Read index directly from backend
+    let indexBuffer: UniversalBuffer
+    try {
+      indexBuffer = await repo.gitBackend.readIndex()
+    } catch {
+      // Index doesn't exist - return empty array
+      return []
+    }
+
+    // Parse index
+    if (indexBuffer.length === 0) {
+      return []
+    }
+    
+    // Detect object format - use gitBackend
+    const objectFormat = await detectObjectFormat(
+      undefined,
+      undefined,
+      repo.cache,
+      repo.gitBackend
+    )
+    const index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+    
     // Filter out entries without paths and return sorted list
     // This handles edge cases where entries might not have paths set
     return index.entries
@@ -120,29 +141,23 @@ export async function _listFiles({
 }
 
 async function accumulateFilesFromOid({
-  fs,
-  cache,
-  gitdir,
+  repo,
   oid,
   filenames,
   prefix,
 }: {
-  fs: FileSystem
-  cache: Record<string, unknown>
-  gitdir: string
+  repo: Repository
   oid: string
   filenames: string[]
   prefix: string
 }): Promise<void> {
-  const { tree } = await readTree({ fs, cache, gitdir, oid })
+  const { tree } = await readTree({ repo, oid })
   // TODO: Use `walk` to do this. Should be faster.
   for (const entry of tree) {
     if (!entry.path) continue // Skip entries without paths
     if (entry.type === 'tree') {
       await accumulateFilesFromOid({
-        fs,
-        cache,
-        gitdir,
+        repo,
         oid: entry.oid,
         filenames,
         prefix: join(prefix, entry.path),

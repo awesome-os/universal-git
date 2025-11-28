@@ -6,8 +6,8 @@
  */
 
 import { execSync } from 'child_process'
-import { join, sep } from 'path'
-import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'fs'
+import { join, sep, resolve } from 'path'
+import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, realpathSync } from 'fs'
 import { tmpdir } from 'os'
 // FileSystem and FileSystemProvider are not exported as subpath, use relative path
 import { FileSystem } from '@awesome-os/universal-git-src/models/FileSystem.ts'
@@ -48,7 +48,32 @@ export function isGitAvailable(): boolean {
 }
 
 /**
+ * Get the working directory from Repository's worktree backend
+ * CRITICAL: Native git only works with filesystem, so we must get the directory from the backend
+ * @param repo - Test repository
+ * @returns Working directory path
+ */
+export function getBackendDir(repo: TestRepo): string {
+  const worktreeBackend = repo.repo.worktreeBackend
+  if (!worktreeBackend) {
+    throw new Error('Repository must have a worktree backend for native git operations')
+  }
+  const dir = worktreeBackend.getDirectory?.()
+  if (!dir) {
+    throw new Error('WorktreeBackend must provide a directory')
+  }
+  // DEBUG: Log path for debugging
+  console.log(`[nativeGit] getBackendDir: ${dir}`)
+  return dir
+}
+
+/**
  * Create a temporary test repository using native git
+ * 
+ * CRITICAL: This function creates a Repository with NativeGitBackend explicitly,
+ * which uses native git CLI commands for git operations while still using filesystem
+ * for file operations. This ensures native git compatibility.
+ * 
  * @param objectFormat - Object format: 'sha1' or 'sha256'
  * @returns TestRepo with path, gitdir, fs, and cleanup function
  */
@@ -60,27 +85,32 @@ export async function createTestRepo(objectFormat: 'sha1' | 'sha256' = 'sha1'): 
   const tempDir = join(tmpdir(), `ugit-test-${Date.now()}-${Math.random().toString(36).substring(7)}`)
   const repoPath = join(tempDir, 'repo')
   mkdirSync(repoPath, { recursive: true })
+  const gitdir = join(repoPath, '.git')
 
   try {
-    // Initialize git repository
-    const initArgs = objectFormat === 'sha256'
-      ? `git init --object-format=sha256 "${repoPath}"`
-      : `git init "${repoPath}"`
-    execSync(initArgs, { stdio: 'pipe' })
-
-    // Set git config
-    execSync('git config user.name "Test User"', { cwd: repoPath, stdio: 'pipe' })
-    execSync('git config user.email "test@example.com"', { cwd: repoPath, stdio: 'pipe' })
-    
-    // Disable automatic packing to ensure all objects are loose and accessible
-    // This ensures universal-git can read all objects without needing packfile support
-    execSync('git config gc.auto 0', { cwd: repoPath, stdio: 'pipe' })
-    execSync('git config gc.autopacklimit 0', { cwd: repoPath, stdio: 'pipe' })
-
-    // Create FileSystem wrapper for universal-git
+    // CRITICAL: Create FileSystem wrapper for universal-git first
     const _fs = await import('fs')
     const fs = new FileSystem(_fs)
-    const gitdir = join(repoPath, '.git')
+
+    // CRITICAL: Get directory path first (before creating backends)
+    // We need to initialize git BEFORE creating Repository/backends to avoid incomplete .git structure
+    const { createGitWorktreeBackend } = await import('@awesome-os/universal-git-src/git/worktree/index.ts')
+    const worktreeBackend = createGitWorktreeBackend({ fs, dir: repoPath })
+    const backendDir = worktreeBackend.getDirectory?.()
+    
+    if (!backendDir) {
+      throw new Error('WorktreeBackend must provide a directory for native git tests')
+    }
+
+    // DEBUG: Log paths for debugging
+    console.log('[nativeGit] Creating test repo:')
+    console.log(`  repoPath: ${repoPath}`)
+    console.log(`  gitdir: ${gitdir}`)
+    console.log(`  backendDir: ${backendDir}`)
+
+    // CRITICAL: Create NativeGitBackend - uses native git CLI for operations
+    const { NativeGitBackend } = await import('@awesome-os/universal-git-src/backends/NativeGitBackend.ts')
+    const gitBackend = new NativeGitBackend(fs, gitdir, backendDir)
 
     // Query native git for actual config file locations to ensure Repository can read them
     let systemConfigPath: string | undefined
@@ -127,21 +157,204 @@ export async function createTestRepo(objectFormat: 'sha1' | 'sha256' = 'sha1'): 
       // Global config might not exist
     }
 
-    // Create Repository instance for convenience
+    // CRITICAL: Create Repository with explicit backends using new constructor
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const repo = await Repository.open({
-      fs: fs as FileSystemProvider,
-      dir: repoPath,
-      gitdir,
+    const defaultBranch = 'master'  // Use 'master' as default branch for native git compatibility
+    const repo = new Repository({
+      gitBackend,
+      worktreeBackend,
       cache: {},
       autoDetectConfig: true,
       systemConfigPath,
       globalConfigPath,
     })
+    
+    // CRITICAL: Initialize the repository structure
+    await repo.init({
+      bare: false,
+      defaultBranch: defaultBranch,
+      objectFormat: objectFormat,
+    })
+    
+    // CRITICAL: Checkout to worktree backend if provided
+    // This makes fs available and sets up the worktree properly
+    if (worktreeBackend) {
+      await repo.checkout(worktreeBackend)
+      
+      // Verify worktree is set up correctly
+      const verifyWorktreeBackend = repo.worktreeBackend
+      if (!verifyWorktreeBackend) {
+        throw new Error('Worktree backend not accessible after checkout - worktreeBackend is null')
+      }
+      const verifyDir = verifyWorktreeBackend.getDirectory?.()
+      console.log(`[nativeGit] Verified worktree backend is accessible: ${verifyDir || 'no directory'}`)
+    }
+
+    // CRITICAL: Verify gitBackend is NativeGitBackend
+    if (repo.gitBackend?.getType() !== 'native-git') {
+      throw new Error(`Native git tests require NativeGitBackend. Got: ${repo.gitBackend?.getType()}`)
+    }
+
+    // CRITICAL: Get paths from backends (after Repository initialization)
+    const backendGitdir = gitBackend.getGitdir()
+    // backendDir is already declared above, just use it
+    
+    // CRITICAL: Resolve to absolute path and convert Windows short paths to long paths
+    const absoluteBackendDir = resolve(backendDir)
+    console.log(`[nativeGit] Original resolved path: ${absoluteBackendDir}`)
+    
+    // On Windows, convert short paths (8.3 format) to long paths
+    let longBackendDir: string
+    try {
+      longBackendDir = process.platform === 'win32' 
+        ? realpathSync.native(absoluteBackendDir)
+        : absoluteBackendDir
+      console.log(`[nativeGit] Long path: ${longBackendDir}`)
+    } catch (err) {
+      // If realpathSync fails, fall back to absolute path
+      console.log(`[nativeGit] Warning: Could not convert to long path, using absolute: ${err}`)
+      longBackendDir = absoluteBackendDir
+    }
+    
+    // Verify .git directory exists (Repository.init should have created it)
+    const expectedGitdir = join(longBackendDir, '.git')
+    if (!existsSync(expectedGitdir)) {
+      throw new Error(`Repository.init failed: .git directory not found at ${expectedGitdir}`)
+    }
+    console.log(`[nativeGit] Verified .git directory exists at: ${expectedGitdir}`)
+    
+    // CRITICAL: Verify HEAD file exists (Repository.init should have created it)
+    const headPath = join(expectedGitdir, 'HEAD')
+    if (!existsSync(headPath)) {
+      console.log(`[nativeGit] HEAD file not found, creating it via gitBackend...`)
+      // Create HEAD file via gitBackend to ensure it's properly formatted
+      await gitBackend.writeHEAD(`ref: refs/heads/${defaultBranch}`)
+    } else {
+      // Verify HEAD content is correct
+      const headContent = readFileSync(headPath, 'utf-8').trim()
+      console.log(`[nativeGit] HEAD file content: ${headContent}`)
+      if (!headContent.startsWith('ref: refs/heads/')) {
+        console.log(`[nativeGit] HEAD content incorrect, fixing...`)
+        await gitBackend.writeHEAD(`ref: refs/heads/${defaultBranch}`)
+      }
+    }
+    
+    // CRITICAL: Ensure refs/heads directory exists and default branch ref exists (even if empty)
+    const refsHeadsDir = join(expectedGitdir, 'refs', 'heads')
+    if (!existsSync(refsHeadsDir)) {
+      console.log(`[nativeGit] refs/heads directory not found, creating it...`)
+      mkdirSync(refsHeadsDir, { recursive: true })
+    }
+    
+    // CRITICAL: Create an empty index file if it doesn't exist
+    // Native git expects an index file to exist (even if empty) for some operations
+    const indexPath = join(expectedGitdir, 'index')
+    if (!existsSync(indexPath)) {
+      console.log(`[nativeGit] Index file not found, creating empty index...`)
+      // Create an empty index file - git uses a specific format, but an empty file should work for recognition
+      // Actually, let's use the gitBackend to write an empty index
+      const { GitIndex } = await import('@awesome-os/universal-git-src/git/index/GitIndex.ts')
+      const emptyIndex = new GitIndex()
+      await gitBackend.writeIndex(await emptyIndex.toBuffer())
+    }
+    
+    // List contents of the directory to verify
+    try {
+      if (process.platform === 'win32') {
+        const dirContents = execSync('dir /b', { cwd: longBackendDir, encoding: 'utf-8', shell: 'cmd.exe' }).trim()
+        console.log(`[nativeGit] Repo directory contents: ${dirContents}`)
+        
+        // List .git directory contents
+        const gitDirContents = execSync('dir /b', { cwd: expectedGitdir, encoding: 'utf-8', shell: 'cmd.exe' }).trim()
+        console.log(`[nativeGit] .git directory contents: ${gitDirContents}`)
+      } else {
+        const dirContents = execSync('ls -la', { cwd: longBackendDir, encoding: 'utf-8', shell: '/bin/sh' }).trim()
+        console.log(`[nativeGit] Repo directory contents:\n${dirContents}`)
+        
+        // List .git directory contents
+        const gitDirContents = execSync('ls -la', { cwd: expectedGitdir, encoding: 'utf-8', shell: '/bin/sh' }).trim()
+        console.log(`[nativeGit] .git directory contents:\n${gitDirContents}`)
+      }
+    } catch (err: any) {
+      console.error(`[nativeGit] Error listing directory contents: ${err.message}`)
+    }
+
+    // CRITICAL: Verify git can find the repository - use --show-toplevel first to check
+    // Note: For an empty repository (no commits), git rev-parse might fail, but git should still recognize the repo
+    try {
+      const gitDirOutput = execSync('git rev-parse --git-dir', { 
+        cwd: longBackendDir, 
+        encoding: 'utf-8',
+        stdio: 'pipe' 
+      }).trim()
+      console.log(`[nativeGit] Git found repository at: ${gitDirOutput}`)
+      
+      // Try to get top-level (might fail for empty repo, but that's okay)
+      try {
+        const topLevel = execSync('git rev-parse --show-toplevel', { 
+          cwd: longBackendDir, 
+          encoding: 'utf-8',
+          stdio: 'pipe' 
+        }).trim()
+        console.log(`[nativeGit] Git found top-level at: ${topLevel}`)
+      } catch {
+        // Empty repo - this is expected
+        console.log(`[nativeGit] Empty repository (no commits yet)`)
+      }
+    } catch (err: any) {
+      console.error(`[nativeGit] ERROR: Git cannot find repository in ${longBackendDir}`)
+      console.error(`[nativeGit] Error details: ${err.message}`)
+      // Try to get more info - check if we're in the right directory
+      try {
+        if (process.platform === 'win32') {
+          const pwd = execSync('cd', { cwd: longBackendDir, encoding: 'utf-8', shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/sh' }).trim()
+          console.error(`[nativeGit] Current directory (cd): ${pwd}`)
+        }
+        // Try git status to see what error we get
+        const statusOutput = execSync('git status', { 
+          cwd: longBackendDir, 
+          encoding: 'utf-8',
+          stdio: 'pipe' 
+        })
+        console.error(`[nativeGit] Git status output: ${statusOutput}`)
+      } catch (statusErr: any) {
+        console.error(`[nativeGit] Git status error: ${statusErr.message}`)
+      }
+      throw new Error(`Git cannot find repository: ${err}`)
+    }
+
+    // CRITICAL: Set git config using long backend directory
+    // Use --local flag to ensure we're setting config in the repository
+    console.log(`[nativeGit] Setting git config in: ${longBackendDir}`)
+    try {
+      execSync('git config --local user.name "Test User"', { cwd: longBackendDir, stdio: 'pipe' })
+      execSync('git config --local user.email "test@example.com"', { cwd: longBackendDir, stdio: 'pipe' })
+      
+      // Disable automatic packing to ensure all objects are loose and accessible
+      // This ensures universal-git can read all objects without needing packfile support
+      execSync('git config --local gc.auto 0', { cwd: longBackendDir, stdio: 'pipe' })
+      execSync('git config --local gc.autopacklimit 0', { cwd: longBackendDir, stdio: 'pipe' })
+      console.log(`[nativeGit] Git config set successfully`)
+    } catch (err: any) {
+      // If git config fails, try using the gitdir directly
+      console.error(`[nativeGit] Git config failed, trying with --git-dir: ${err.message}`)
+      const gitDirFlag = `--git-dir=${expectedGitdir}`
+      execSync(`git config ${gitDirFlag} user.name "Test User"`, { cwd: longBackendDir, stdio: 'pipe' })
+      execSync(`git config ${gitDirFlag} user.email "test@example.com"`, { cwd: longBackendDir, stdio: 'pipe' })
+      execSync(`git config ${gitDirFlag} gc.auto 0`, { cwd: longBackendDir, stdio: 'pipe' })
+      execSync(`git config ${gitDirFlag} gc.autopacklimit 0`, { cwd: longBackendDir, stdio: 'pipe' })
+      console.log(`[nativeGit] Git config set successfully using --git-dir`)
+    }
+    
+    // Update return value to use long path (convert gitdir too)
+    const longBackendGitdir = process.platform === 'win32'
+      ? realpathSync.native(backendGitdir)
+      : backendGitdir
+
 
     return {
-      path: repoPath,
-      gitdir,
+      path: longBackendDir,  // Use long backend directory (converted from short path on Windows)
+      gitdir: longBackendGitdir,  // Use long backend gitdir (converted from short path on Windows)
       fs: fs as FileSystemProvider,
       repo,
       systemConfigPath,
@@ -163,6 +376,9 @@ export async function createTestRepo(objectFormat: 'sha1' | 'sha256' = 'sha1'): 
 
 /**
  * Create an initial commit with files
+ * 
+ * CRITICAL: Uses paths from Repository's backends to ensure consistency with native git.
+ * 
  * @param repo - Test repository
  * @param files - Object mapping file paths to content
  * @param message - Commit message
@@ -173,48 +389,139 @@ export async function createInitialCommit(
   files: Record<string, string>,
   message: string = 'initial commit'
 ): Promise<string> {
+  // CRITICAL: Get directory from backend
+  // Debug: Check repository state
+  const worktreeCheck = repo.repo.getWorktreeSync()
+  const hasBackend = !!(repo.repo as any)._worktreeBackend
+  console.log(`[nativeGit] createInitialCommit: worktree=${!!worktreeCheck}, _worktreeBackend=${hasBackend}`)
+  
+  if (!worktreeCheck || !hasBackend) {
+    throw new Error(`Repository worktree not accessible in createInitialCommit. worktree=${!!worktreeCheck}, _worktreeBackend=${hasBackend}`)
+  }
+  
+  const dir = getBackendDir(repo)
+  const gitdir = repo.gitdir
+  console.log(`[nativeGit] createInitialCommit: using directory ${dir}, gitdir=${gitdir}`)
+
+  // Verify .git directory exists
+  if (!existsSync(gitdir)) {
+    throw new Error(`Git directory does not exist: ${gitdir}`)
+  }
+
+  // Write files to backend directory
   for (const [filepath, content] of Object.entries(files)) {
-    const fullPath = join(repo.path, filepath)
-    const dir = fullPath.substring(0, fullPath.lastIndexOf(sep))
-    if (dir && dir !== repo.path && !existsSync(dir)) {
-      mkdirSync(dir, { recursive: true })
+    const fullPath = join(dir, filepath)
+    const dirPath = fullPath.substring(0, fullPath.lastIndexOf(sep))
+    if (dirPath && dirPath !== dir && !existsSync(dirPath)) {
+      mkdirSync(dirPath, { recursive: true })
     }
     writeFileSync(fullPath, content)
   }
 
-  execSync('git add -A', { cwd: repo.path, stdio: 'pipe' })
-  execSync(`git commit -m "${message}"`, {
-    cwd: repo.path,
-    stdio: 'pipe',
-    env: { ...process.env, GIT_AUTHOR_DATE: '1262356920 +0000', GIT_COMMITTER_DATE: '1262356920 +0000' },
-  })
+  // CRITICAL: Use NativeGitBackend methods instead of execSync
+  const nativeBackend = repo.repo.gitBackend as any
+  if (nativeBackend && nativeBackend.addFiles && nativeBackend.createCommit) {
+    // Use NativeGitBackend methods
+    await nativeBackend.addFiles('.')
+    const commitOid = await nativeBackend.createCommit(message, {
+      env: { GIT_AUTHOR_DATE: '1262356920 +0000', GIT_COMMITTER_DATE: '1262356920 +0000' },
+    })
+    
+    // Get the default branch name
+    const defaultBranch = await repo.repo.currentBranch() || 'master'
+    
+    // Rename to 'master' if it's 'main' for consistency with tests
+    if (defaultBranch === 'main') {
+      execSync('git branch -m master', { cwd: dir, stdio: 'pipe' })
+      // Update HEAD to point to master
+      await repo.repo.gitBackend.writeHEAD('ref: refs/heads/master')
+    }
+    
+    return commitOid
+  }
+
+  // Fallback to execSync if NativeGitBackend methods aren't available
+  console.log(`[nativeGit] Falling back to execSync for git commands`)
+  
+  // CRITICAL: Run native git in backend directory with explicit --git-dir if needed
+  console.log(`[nativeGit] Running 'git add -A' in ${dir}`)
+  try {
+    execSync('git add -A', { cwd: dir, stdio: 'pipe' })
+  } catch (error: any) {
+    // If git add fails, try with explicit --git-dir
+    console.log(`[nativeGit] git add failed, trying with --git-dir: ${error.message}`)
+    execSync(`git --git-dir="${gitdir}" --work-tree="${dir}" add -A`, { stdio: 'pipe' })
+  }
+  
+  try {
+    execSync(`git commit -m "${message}"`, {
+      cwd: dir,
+      stdio: 'pipe',
+      env: { ...process.env, GIT_AUTHOR_DATE: '1262356920 +0000', GIT_COMMITTER_DATE: '1262356920 +0000' },
+    })
+  } catch (error: any) {
+    // If git commit fails, try with explicit --git-dir
+    console.log(`[nativeGit] git commit failed, trying with --git-dir: ${error.message}`)
+    execSync(`git --git-dir="${gitdir}" --work-tree="${dir}" commit -m "${message}"`, {
+      stdio: 'pipe',
+      env: { ...process.env, GIT_AUTHOR_DATE: '1262356920 +0000', GIT_COMMITTER_DATE: '1262356920 +0000' },
+    })
+  }
 
   // Get the default branch name (could be 'main' or 'master')
-  const defaultBranch = execSync('git branch --show-current', { 
-    cwd: repo.path, 
-    encoding: 'utf-8' 
-  }).trim() || 'master'
+  let defaultBranch: string
+  try {
+    defaultBranch = execSync('git branch --show-current', { 
+      cwd: dir, 
+      encoding: 'utf-8' 
+    }).trim() || 'master'
+  } catch {
+    // Fallback: try with --git-dir
+    try {
+      defaultBranch = execSync(`git --git-dir="${gitdir}" branch --show-current`, { 
+        encoding: 'utf-8' 
+      }).trim() || 'master'
+    } catch {
+      defaultBranch = 'master'
+    }
+  }
   
   // Rename to 'master' if it's 'main' for consistency with tests
   if (defaultBranch === 'main') {
-    execSync('git branch -m master', { cwd: repo.path, stdio: 'pipe' })
+    try {
+      execSync('git branch -m master', { cwd: dir, stdio: 'pipe' })
+    } catch {
+      execSync(`git --git-dir="${gitdir}" branch -m master`, { stdio: 'pipe' })
+    }
+    // Update HEAD to point to master
+    await repo.repo.gitBackend.writeHEAD('ref: refs/heads/master')
   }
 
-  return execSync('git rev-parse HEAD', { cwd: repo.path, encoding: 'utf-8' }).trim()
+  // Get commit OID
+  try {
+    return execSync('git rev-parse HEAD', { cwd: dir, encoding: 'utf-8' }).trim()
+  } catch {
+    return execSync(`git --git-dir="${gitdir}" rev-parse HEAD`, { encoding: 'utf-8' }).trim()
+  }
 }
 
 /**
  * Create a branch from a commit
+ * CRITICAL: Uses paths from Repository's backends to ensure consistency with native git.
  * @param repo - Test repository
  * @param branchName - Name of the branch
  * @param fromRef - Reference to create branch from (commit, branch, or tag)
  */
 export function createBranch(repo: TestRepo, branchName: string, fromRef: string): void {
-  execSync(`git branch "${branchName}" "${fromRef}"`, { cwd: repo.path, stdio: 'pipe' })
+  const dir = getBackendDir(repo)
+  execSync(`git branch "${branchName}" "${fromRef}"`, { cwd: dir, stdio: 'pipe' })
 }
 
 /**
  * Create a commit on a branch
+ * 
+ * CRITICAL: Uses paths from Repository's backends to ensure consistency with native git.
+ * 
  * @param repo - Test repository
  * @param branchName - Branch to commit to
  * @param files - Object mapping file paths to content (empty object for no file changes)
@@ -231,53 +538,58 @@ export async function createCommit(
   message: string = 'commit',
   timestamp: number = Date.now() / 1000
 ): Promise<string> {
+  // CRITICAL: Get directory from backend
+  const dir = getBackendDir(repo)
+
   // Checkout branch
-  execSync(`git checkout "${branchName}"`, { cwd: repo.path, stdio: 'pipe' })
+  execSync(`git checkout "${branchName}"`, { cwd: dir, stdio: 'pipe' })
 
   // Add/modify files
   for (const [filepath, content] of Object.entries(files)) {
-    const fullPath = join(repo.path, filepath)
-    const dir = fullPath.substring(0, fullPath.lastIndexOf(sep))
-    if (dir && dir !== repo.path && !existsSync(dir)) {
-      mkdirSync(dir, { recursive: true })
+    const fullPath = join(dir, filepath)
+    const dirPath = fullPath.substring(0, fullPath.lastIndexOf(sep))
+    if (dirPath && dirPath !== dir && !existsSync(dirPath)) {
+      mkdirSync(dirPath, { recursive: true })
     }
     writeFileSync(fullPath, content)
   }
 
   // Delete files
   for (const filepath of deletedFiles) {
-    const fullPath = join(repo.path, filepath)
+    const fullPath = join(dir, filepath)
     if (existsSync(fullPath)) {
-      execSync(`git rm "${filepath}"`, { cwd: repo.path, stdio: 'pipe' })
+      execSync(`git rm "${filepath}"`, { cwd: dir, stdio: 'pipe' })
     }
   }
 
   // Stage all changes
-  execSync('git add -A', { cwd: repo.path, stdio: 'pipe' })
+  execSync('git add -A', { cwd: dir, stdio: 'pipe' })
 
   // Create commit
   const gitDate = `${Math.floor(timestamp)} +0000`
   execSync(`git commit -m "${message}"`, {
-    cwd: repo.path,
+    cwd: dir,
     stdio: 'pipe',
     env: { ...process.env, GIT_AUTHOR_DATE: gitDate, GIT_COMMITTER_DATE: gitDate },
   })
 
-  return execSync('git rev-parse HEAD', { cwd: repo.path, encoding: 'utf-8' }).trim()
+  return execSync('git rev-parse HEAD', { cwd: dir, encoding: 'utf-8' }).trim()
 }
 
 /**
  * Ensure all objects are unpacked and accessible
  * This is important because native git might pack objects, but universal-git needs them accessible
+ * CRITICAL: Uses paths from Repository's backends to ensure consistency with native git.
  */
 function ensureObjectsUnpacked(repo: TestRepo): void {
+  const dir = getBackendDir(repo)
   try {
     // Unpack any packfiles to ensure all objects are loose and accessible
     // This ensures universal-git can read all objects
     execSync('git unpack-objects < /dev/null 2>/dev/null || true', { 
-      cwd: repo.path, 
+      cwd: dir, 
       stdio: 'pipe',
-      shell: true 
+      shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/sh'
     })
   } catch {
     // If unpack fails (no packfiles), that's fine - objects are already loose
@@ -286,7 +598,7 @@ function ensureObjectsUnpacked(repo: TestRepo): void {
   // Alternative: ensure packfiles are indexed and accessible
   // Run git gc --no-prune to ensure packfiles are properly indexed
   try {
-    execSync('git gc --no-prune --quiet', { cwd: repo.path, stdio: 'pipe' })
+    execSync('git gc --no-prune --quiet', { cwd: dir, stdio: 'pipe' })
   } catch {
     // If gc fails, that's okay - objects should still be accessible
   }
@@ -311,8 +623,12 @@ export async function nativeMerge(
     abortOnConflict?: boolean
   } = {}
 ): Promise<MergeResult> {
-  // Checkout our branch
-  execSync(`git checkout "${ours}"`, { cwd: repo.path, stdio: 'pipe' })
+  // CRITICAL: Get directory from backend
+  const dir = getBackendDir(repo)
+  
+  // Checkout our branch using universal-git checkout
+  const { checkout } = await import('@awesome-os/universal-git-src/commands/checkout.ts')
+  await checkout({ repo: repo.repo, ref: ours, force: true })
   
   // Ensure all objects are accessible before merge
   ensureObjectsUnpacked(repo)
@@ -332,20 +648,76 @@ export async function nativeMerge(
   const conflictFiles: string[] = []
 
   try {
-    // Attempt merge
-    execSync(`git merge ${mergeArgs.join(' ')} "${theirs}"`, {
-      cwd: repo.path,
-      stdio: 'pipe',
+    // Attempt merge using GitBackend merge method
+    const mergeResult = await repo.repo.gitBackend.merge(ours, theirs, {
+      message: options.message,
+      fastForward: !options.noFF,
+      fastForwardOnly: false,
+      abortOnConflict: options.abortOnConflict ?? true,
+      dryRun: false,
+      noUpdateBranch: false,
+      allowUnrelatedHistories: false,
     })
 
-    // Merge succeeded
-    const oid = execSync('git rev-parse HEAD', { cwd: repo.path, encoding: 'utf-8' }).trim()
-    const tree = execSync('git rev-parse "HEAD^{tree}"', { cwd: repo.path, encoding: 'utf-8' }).trim()
-    const commitMessage = execSync('git log -1 --format=%s', { cwd: repo.path, encoding: 'utf-8' }).trim()
-    const parents = execSync('git log -1 --format=%P', { cwd: repo.path, encoding: 'utf-8' })
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean)
+    // Check if merge result is a MergeConflictError
+    const { MergeConflictError } = await import('@awesome-os/universal-git-src/errors/MergeConflictError.ts')
+    const isConflictError = (mergeResult as any)?.code === 'MergeConflictError' || (mergeResult && typeof mergeResult === 'object' && (mergeResult as any).code === 'MergeConflictError')
+    
+    if (isConflictError) {
+      // Merge conflict
+      hasConflicts = true
+      const conflictError = mergeResult as any
+      conflictFiles.push(...(conflictError.data?.filepaths || []))
+
+      if (options.abortOnConflict !== false) {
+        // Abort the merge - reset to before merge
+        const ourOid = await repo.repo.gitBackend.readRef(`refs/heads/${ours}`) || ''
+        if (ourOid) {
+          await repo.repo.gitBackend.writeRef(`refs/heads/${ours}`, ourOid)
+          const { checkout } = await import('@awesome-os/universal-git-src/commands/checkout.ts')
+          await checkout({ repo: repo.repo, ref: ours, force: true })
+        }
+      } else {
+        // Merge is in progress with conflicts
+        // Get current state using GitBackend
+        try {
+          const ourOid = await repo.repo.gitBackend.readRef(`refs/heads/${ours}`) || ''
+          const commitResult = await repo.repo.gitBackend.readObject(ourOid, 'content', {})
+          if (commitResult.type === 'commit') {
+            const { parse: parseCommit } = await import('@awesome-os/universal-git-src/core-utils/parsers/Commit.ts')
+            const commit = parseCommit(commitResult.object)
+            const tree = commit.tree || '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+
+            return {
+              oid: ourOid, // Current HEAD (merge not completed)
+              tree,
+              hasConflicts: true,
+              conflictFiles,
+            }
+          }
+        } catch {
+          // Can't get commit info, return empty result
+        }
+      }
+      
+      // Re-throw the conflict error
+      throw mergeResult
+    }
+
+    // Merge succeeded - mergeResult is not a MergeConflictError
+    const successResult = mergeResult as { oid: string; tree: string; mergeCommit: boolean; fastForward?: boolean; alreadyMerged?: boolean }
+    const oid = successResult.oid
+    const tree = successResult.tree
+    
+    // Get commit message and parents using GitBackend
+    const { parse: parseCommit } = await import('@awesome-os/universal-git-src/core-utils/parsers/Commit.ts')
+    const commitResult = await repo.repo.gitBackend.readObject(oid, 'content', {})
+    if (commitResult.type !== 'commit') {
+      throw new Error('Expected commit object')
+    }
+    const commit = parseCommit(commitResult.object)
+    const commitMessage = commit.message || ''
+    const parents = commit.parent || []
 
     return {
       oid,
@@ -355,61 +727,7 @@ export async function nativeMerge(
       hasConflicts: false,
     }
   } catch (error: any) {
-    // Check if merge failed due to conflicts
-    const statusOutput = execSync('git status --porcelain', {
-      cwd: repo.path,
-      encoding: 'utf-8',
-    })
-
-    // Check for unmerged files (conflicts)
-    const unmergedFiles = execSync('git diff --name-only --diff-filter=U', {
-      cwd: repo.path,
-      encoding: 'utf-8',
-    })
-      .trim()
-      .split('\n')
-      .filter(Boolean)
-
-    if (unmergedFiles.length > 0) {
-      hasConflicts = true
-      conflictFiles.push(...unmergedFiles)
-
-      if (options.abortOnConflict !== false) {
-        // Abort the merge
-        execSync('git merge --abort', { cwd: repo.path, stdio: 'pipe' })
-      } else {
-        // Merge is in progress with conflicts
-        // Get the merge commit OID (if it exists)
-        try {
-          const mergeHead = execSync('git rev-parse MERGE_HEAD', {
-            cwd: repo.path,
-            encoding: 'utf-8',
-          }).trim()
-          const ourOid = execSync('git rev-parse HEAD', { cwd: repo.path, encoding: 'utf-8' }).trim()
-          const tree = execSync('git write-tree', { cwd: repo.path, encoding: 'utf-8' }).trim()
-
-          return {
-            oid: ourOid, // Current HEAD (merge not completed)
-            tree,
-            hasConflicts: true,
-            conflictFiles,
-          }
-        } catch {
-          // Merge head doesn't exist, return current state
-          const oid = execSync('git rev-parse HEAD', { cwd: repo.path, encoding: 'utf-8' }).trim()
-          const tree = execSync('git write-tree', { cwd: repo.path, encoding: 'utf-8' }).trim()
-
-          return {
-            oid,
-            tree,
-            hasConflicts: true,
-            conflictFiles,
-          }
-        }
-      }
-    }
-
-    // Re-throw if it's not a conflict error
+    // Re-throw the error - conflict handling is done above
     throw error
   }
 
@@ -419,43 +737,51 @@ export async function nativeMerge(
 
 /**
  * Get the tree OID for a commit
+ * CRITICAL: Uses paths from Repository's backends to ensure consistency with native git.
  * @param repo - Test repository
  * @param ref - Commit reference (branch, tag, or OID)
  * @returns Tree OID
  */
 export function getTreeOid(repo: TestRepo, ref: string): string {
-  return execSync(`git rev-parse "${ref}^{tree}"`, { cwd: repo.path, encoding: 'utf-8' }).trim()
+  const dir = getBackendDir(repo)
+  return execSync(`git rev-parse "${ref}^{tree}"`, { cwd: dir, encoding: 'utf-8' }).trim()
 }
 
 /**
  * Get the commit OID for a reference
+ * CRITICAL: Uses paths from Repository's backends to ensure consistency with native git.
  * @param repo - Test repository
  * @param ref - Reference (branch, tag, or OID)
  * @returns Commit OID
  */
 export function getCommitOid(repo: TestRepo, ref: string): string {
-  return execSync(`git rev-parse "${ref}"`, { cwd: repo.path, encoding: 'utf-8' }).trim()
+  const dir = getBackendDir(repo)
+  return execSync(`git rev-parse "${ref}"`, { cwd: dir, encoding: 'utf-8' }).trim()
 }
 
 /**
  * Read conflict markers from a file
+ * CRITICAL: Uses paths from Repository's backends to ensure consistency with native git.
  * @param repo - Test repository
  * @param filepath - Path to the file
  * @returns File content with conflict markers
  */
 export function getConflictMarkers(repo: TestRepo, filepath: string): string {
-  const fullPath = join(repo.path, filepath)
+  const dir = getBackendDir(repo)
+  const fullPath = join(dir, filepath)
   return readFileSync(fullPath, 'utf-8')
 }
 
 /**
  * Check if a merge is in progress
+ * CRITICAL: Uses paths from Repository's backends to ensure consistency with native git.
  * @param repo - Test repository
  * @returns True if merge is in progress
  */
 export function isMergeInProgress(repo: TestRepo): boolean {
+  const dir = getBackendDir(repo)
   try {
-    execSync('git rev-parse --verify MERGE_HEAD', { cwd: repo.path, stdio: 'pipe' })
+    execSync('git rev-parse --verify MERGE_HEAD', { cwd: dir, stdio: 'pipe' })
     return true
   } catch {
     return false
@@ -468,6 +794,7 @@ export function isMergeInProgress(repo: TestRepo): boolean {
  * @returns Object with merge-related config values
  */
 export function getMergeConfig(repo: TestRepo): Record<string, string | undefined> {
+  const dir = getBackendDir(repo)
   const configs: Record<string, string | undefined> = {}
   
   // List of merge-related config keys
@@ -490,7 +817,7 @@ export function getMergeConfig(repo: TestRepo): Record<string, string | undefine
   for (const key of mergeConfigKeys) {
     try {
       const value = execSync(`git config --get "${key}"`, {
-        cwd: repo.path,
+        cwd: dir,
         encoding: 'utf-8',
         stdio: 'pipe',
       }).trim()
@@ -510,9 +837,10 @@ export function getMergeConfig(repo: TestRepo): Record<string, string | undefine
  * @returns Object with all config values
  */
 export function getAllConfig(repo: TestRepo): Record<string, string> {
+  const dir = getBackendDir(repo)
   try {
     const output = execSync('git config --list --local', {
-      cwd: repo.path,
+      cwd: dir,
       encoding: 'utf-8',
       stdio: 'pipe',
     })

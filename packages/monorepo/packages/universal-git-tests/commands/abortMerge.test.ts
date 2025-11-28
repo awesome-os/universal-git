@@ -173,7 +173,9 @@ describe('abortMerge', () => {
     // Checkout branch 'a' first to ensure HEAD is on the correct branch
     await checkout({ repo, ref: 'a' })
     
-    const dir = await repo.getDir()!
+    if (!repo.worktreeBackend) {
+      throw new Error('Repository worktreeBackend is not available')
+    }
 
     // Test
     let error: unknown = null
@@ -196,9 +198,9 @@ describe('abortMerge', () => {
     assert.notStrictEqual(error, null)
     assert.ok(error instanceof Errors.MergeConflictError || (error as any).code === Errors.MergeConflictError.code)
 
-    await repo.fs.rm(`${dir}/a`)
-    await repo.fs.write(`${dir}/b`, 'new text for file b')
-    await repo.fs.write(`${dir}/c`, 'new text for file c')
+    await repo.worktreeBackend.rm('a')
+    await repo.worktreeBackend.write('b', 'new text for file b')
+    await repo.worktreeBackend.write('c', 'new text for file c')
 
     await abortMerge({ repo })
 
@@ -222,8 +224,8 @@ describe('abortMerge', () => {
         assert.strictEqual(await modified(index, head), false)
       },
     })
-    const fileCData = await repo.fs.read(`${dir}/c`)
-    const fileBData = await repo.fs.read(`${dir}/b`)
+    const fileCData = await repo.worktreeBackend.read('c')
+    const fileBData = await repo.worktreeBackend.read('b')
     const fileCContent = fileCData ? new TextDecoder().decode(typeof fileCData === 'string' ? new TextEncoder().encode(fileCData) : fileCData) : ''
     const fileBContent = fileBData ? new TextDecoder().decode(typeof fileBData === 'string' ? new TextEncoder().encode(fileBData) : fileBData) : ''
     assert.strictEqual(fileCContent, 'new text for file c')
@@ -237,7 +239,9 @@ describe('abortMerge', () => {
     // Checkout branch 'a' first to ensure HEAD is on the correct branch
     await checkout({ repo, ref: 'a' })
     
-    const dir = await repo.getDir()!
+    if (!repo.worktreeBackend) {
+      throw new Error('Repository worktreeBackend is not available')
+    }
 
     const head = await resolveRef({ repo, ref: 'HEAD' })
 
@@ -277,23 +281,23 @@ describe('abortMerge', () => {
     assert.notStrictEqual(error, null)
     assert.ok(error instanceof Errors.MergeConflictError || (error as any).code === Errors.MergeConflictError.code)
 
-    await repo.fs.write(`${dir}/c`, 'new text for file c')
+    await repo.worktreeBackend.write('c', 'new text for file c')
     await abortMerge({ repo })
 
-    const fileAContent = await repo.fs.read(`${dir}/a`).then(buffer => {
+    const fileAContent = await repo.worktreeBackend.read('a').then(buffer => {
       assert.ok(buffer !== null, 'File a content should not be null')
       return buffer.toString()
     })
-    const fileBContent = await repo.fs.read(`${dir}/b`).then(buffer => {
+    const fileBContent = await repo.worktreeBackend.read('b').then(buffer => {
       assert.ok(buffer !== null, 'File b content should not be null')
       return buffer.toString()
     })
-    const fileCContent = await repo.fs.read(`${dir}/c`).then(buffer => {
+    const fileCContent = await repo.worktreeBackend.read('c').then(buffer => {
       assert.ok(buffer !== null, 'File c content should not be null')
       return buffer.toString()
     })
 
-    const dirContents = await repo.fs.readdir(dir)
+    const dirContents = await repo.worktreeBackend.readdir('.')
     assert.ok(dirContents !== null && dirContents !== undefined, 'readdir should return an array')
 
     assert.strictEqual(dirContents.length, 3)

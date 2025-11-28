@@ -1,14 +1,12 @@
 import { NotFoundError } from '../errors/NotFoundError.ts'
 import { ObjectTypeError } from '../errors/ObjectTypeError.ts'
-// GitRefManager import removed - using src/git/refs/ functions instead
 import { GitTree } from './GitTree.ts'
-import { readObject } from "../git/objects/readObject.ts"
 import { join } from "../utils/join.ts"
 import { normalizeMode } from "../utils/normalizeMode.ts"
-import { resolveTree } from "../utils/resolveTree.ts"
 import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
-import type { FileSystemProvider, Stat } from './FileSystem.ts'
+import type { Stat } from './FileSystem.ts'
 import type { TreeEntry } from './GitTree.ts'
+import type { GitBackend } from '../backends/GitBackend.ts'
 
 type TreeEntryEntry = {
   _fullpath: string
@@ -27,37 +25,32 @@ type MapEntry = {
 }
 
 export class GitWalkerRepo {
-  fs: FileSystemProvider
+  gitBackend: GitBackend
   cache: Record<string, unknown>
-  gitdir: string
+  ref: string
   ConstructEntry: new (fullpath: string) => TreeEntryEntry
   // Store root entry separately to avoid Map size issues
   private rootEntryPromise: Promise<MapEntry | null>
 
   constructor({
-    fs,
-    gitdir,
+    gitBackend,
     ref,
     cache,
   }: {
-    fs: FileSystemProvider
-    gitdir: string
+    gitBackend: GitBackend
     ref: string
     cache: Record<string, unknown>
   }) {
-    this.fs = fs
+    this.gitBackend = gitBackend
     this.cache = cache
-    this.gitdir = gitdir
+    this.ref = ref
     
     // Initialize root entry separately (never stored in map to prevent size overflow)
     this.rootEntryPromise = (async () => {
       let oid: string
       try {
-        // Use direct resolveRef() for consistency
-        const { resolveRef } = await import('../git/refs/readRef.ts')
-        const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
-        const objectFormat = await detectObjectFormat(fs, gitdir)
-        oid = await resolveRef({ fs, gitdir, ref, objectFormat })
+        // Use gitBackend.expandRef() to resolve the ref
+        oid = await this.gitBackend.expandRef(ref)
       } catch (e) {
         if (e instanceof NotFoundError) {
           // Handle fresh branches with no commits
@@ -66,12 +59,23 @@ export class GitWalkerRepo {
           throw e
         }
       }
-      const tree = await resolveTree({ fs, cache: this.cache, gitdir, oid })
+      // Read the commit object to get the tree OID
+      const commitObj = await this.gitBackend.readObject({ oid })
+      if (commitObj.type !== 'commit') {
+        throw new Error(`Expected commit object, got ${commitObj.type}`)
+      }
+      const commitBuffer = UniversalBuffer.from(commitObj.object)
+      const commitText = commitBuffer.toString('utf8')
+      const treeMatch = commitText.match(/^tree ([a-f0-9]{40})/m)
+      if (!treeMatch) {
+        throw new Error('Commit object missing tree reference')
+      }
+      const treeOid = treeMatch[1]
       return {
         type: 'tree' as const,
         mode: '40000',
         path: '.',
-        oid: tree.oid,
+        oid: treeOid,
       }
     })()
     
@@ -144,8 +148,7 @@ export class GitWalkerRepo {
         return null
       }
       
-      const { fs, cache, gitdir } = this
-      const result = await readObject({ fs, cache, gitdir, oid: currentOid })
+      const result = await this.gitBackend.readObject({ oid: currentOid })
       if (result.type !== 'tree') {
         return null
       }
@@ -175,7 +178,6 @@ export class GitWalkerRepo {
 
   async readdir(entry: TreeEntryEntry): Promise<string[] | null> {
     const filepath = entry._fullpath
-    const { fs, cache, gitdir } = this
     // Always resolve entry on-demand (never use map to prevent size overflow)
     const obj = await this.resolveEntry(filepath)
     if (!obj) {
@@ -197,7 +199,7 @@ export class GitWalkerRepo {
     
     let result: any
     try {
-      result = await readObject({ fs, cache, gitdir, oid })
+      result = await this.gitBackend.readObject({ oid })
     } catch (error) {
       if (error instanceof NotFoundError) {
         // If tree object doesn't exist, this might be a repository integrity issue
@@ -217,7 +219,7 @@ export class GitWalkerRepo {
     if (type !== obj.type) {
       throw new ObjectTypeError(oid, type, obj.type)
     }
-    const tree = GitTree.from(object)
+    const tree = GitTree.from(UniversalBuffer.from(object))
     // Don't cache all entries upfront - only cache them when accessed via resolveEntry
     // This prevents Map size overflow for very large repositories
     return tree.entries().map(entry => join(filepath, entry.path))
@@ -270,7 +272,6 @@ export class GitWalkerRepo {
 
   async content(entry: TreeEntryEntry): Promise<Uint8Array | undefined> {
     if (entry._content === false) {
-      const { fs, cache, gitdir } = this
       // Always resolve entry on-demand (never use map to prevent size overflow)
       const obj = await this.resolveEntry(entry._fullpath)
       if (!obj) {
@@ -283,19 +284,15 @@ export class GitWalkerRepo {
       if (!oid) {
         throw new Error(`No oid for obj ${JSON.stringify(obj)}`)
       }
-      const result: any = await readObject({ fs, cache, gitdir, oid })
+      const result = await this.gitBackend.readObject({ oid })
       const type = result.type
       const object = result.object
       if (type !== 'blob') {
         entry._content = undefined
       } else {
         // Convert to plain Uint8Array for compatibility
-        if (object instanceof Uint8Array) {
-          entry._content = object
-        } else {
-          const buf = UniversalBuffer.from(object as Uint8Array)
-          entry._content = buf instanceof Uint8Array ? buf : new Uint8Array(buf)
-        }
+        const buf = UniversalBuffer.from(object)
+        entry._content = buf instanceof Uint8Array ? buf : new Uint8Array(buf)
       }
     }
     return entry._content

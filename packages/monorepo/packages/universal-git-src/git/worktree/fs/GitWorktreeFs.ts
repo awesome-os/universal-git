@@ -2,10 +2,16 @@ import type { FileSystem, FileSystemProvider } from '../../../models/FileSystem.
 import type { ExtendedStat } from '../../../utils/statHelpers.ts'
 import type { GitWorktreeBackend } from '../GitWorktreeBackend.ts'
 import type { Repository } from '../../../core-utils/Repository.ts'
+import type { GitBackend } from '../../../backends/GitBackend.ts'
+import type { Walker } from '../../../models/Walker.ts'
 import { join, normalize } from '../../../core-utils/GitPath.ts'
 import { UniversalBuffer } from '../../../utils/UniversalBuffer.ts'
 import { createFileSystem } from '../../../utils/createFileSystem.ts'
 import { SubmoduleCache, addSubmoduleToBackend, getSubmoduleFromBackend } from '../SubmoduleManager.ts'
+import AsyncLock from 'async-lock'
+
+// Index lock for commit operations
+let indexLock: AsyncLock | undefined
 
 /**
  * GitWorktreeFs - Filesystem implementation of GitWorktreeBackend
@@ -26,7 +32,7 @@ export class GitWorktreeFs implements GitWorktreeBackend {
   readonly name: string
   private readonly fs: FileSystem
   private readonly dir: string
-  private _repo: Repository | null = null
+  private _submoduleInfo: Map<string, { name: string; path: string; url: string; branch?: string }> = new Map()
   private _submoduleCache: SubmoduleCache = new SubmoduleCache()
 
   constructor(
@@ -40,16 +46,6 @@ export class GitWorktreeFs implements GitWorktreeBackend {
     this.dir = dir
     // Use provided name, or generate a UUID as default
     this.name = name ?? crypto.randomUUID()
-  }
-
-  /**
-   * Sets the Repository instance for submodule detection and delegation
-   * Called by Repository when creating/opening the backend
-   */
-  setRepository(repo: Repository | null): void {
-    this._repo = repo
-    // Invalidate submodule cache when repository changes
-    this._submoduleCache.clear()
   }
 
   /**
@@ -77,24 +73,61 @@ export class GitWorktreeFs implements GitWorktreeBackend {
    * Gets the filesystem instance (universal interface method)
    * @returns FileSystemProvider instance
    */
-  getFileSystem(): FileSystemProvider {
-    return this.fs
+
+  // getDirectory() removed - worktreeBackend is a black box
+  // Only the creator knows the directory it operates on
+
+  // ============================================================================
+  // Git Directory Discovery Operations
+  // ============================================================================
+
+  /**
+   * Find the .git directory for this worktree
+   * @returns Path to .git directory, or null if not found
+   */
+  async findGitBackend(): Promise<string | null> {
+    try {
+      const { findRoot } = await import('../../../commands/findRoot.ts')
+      const root = await findRoot({ fs: this.fs, filepath: this.dir })
+      const gitdir = join(root, '.git')
+      // Verify it exists
+      const configPath = join(gitdir, 'config')
+      if (await this.fs.exists(configPath)) {
+        return normalize(gitdir)
+      }
+      return null
+    } catch {
+      return null
+    }
   }
 
   /**
-   * Gets the working directory path (universal interface method)
-   * @returns Directory path
+   * List all .git folders in the worktree (including submodules)
+   * @returns Array of paths to .git directories
    */
-  getDirectory(): string {
-    return this.dir
-  }
+  async listGitFolders(): Promise<string[]> {
+    const gitdirs: string[] = []
+    
+    // Find main .git directory
+    const mainGitdir = await this.findGitBackend()
+    if (mainGitdir) {
+      gitdirs.push(mainGitdir)
+    }
 
-  /**
-   * Gets the Repository instance (universal interface method)
-   * @returns Repository instance if available, null otherwise
-   */
-  getRepository(): Repository | null {
-    return this._repo
+    // Find submodule .git directories using stored submodule info
+    try {
+      for (const [path, info] of this._submoduleInfo.entries()) {
+        const submodulePath = join(this.dir, info.path)
+        const submoduleGitdir = join(submodulePath, '.git')
+        if (await this.fs.exists(join(submoduleGitdir, 'config'))) {
+          gitdirs.push(normalize(submoduleGitdir))
+        }
+      }
+    } catch {
+      // Ignore errors when checking submodules
+    }
+
+    return gitdirs
   }
 
   // ============================================================================
@@ -102,20 +135,28 @@ export class GitWorktreeFs implements GitWorktreeBackend {
   // ============================================================================
 
   /**
-   * Add a submodule to this worktree backend
+   * Get submodule information by path
+   * Called by GitBackend to query submodule info
    */
-  async addSubmodule(normalizedPath: string, submoduleRepo: Repository): Promise<void> {
-    await addSubmoduleToBackend(this, normalizedPath, submoduleRepo, this._submoduleCache)
+  async getSubmodule(path: string): Promise<{ name: string; path: string; url: string; branch?: string } | null> {
+    return this._submoduleInfo.get(path) || null
+  }
+
+  /**
+   * Set submodule information
+   * Called by GitBackend to store submodule info
+   */
+  async setSubmodule(path: string, info: { name: string; path: string; url: string; branch?: string }): Promise<void> {
+    this._submoduleInfo.set(path, info)
   }
 
   /**
    * Get submodule worktree backend by path
    */
-  async getSubmodule(submodulePath: string): Promise<GitWorktreeBackend | null> {
+  async getSubmoduleBackend(submodulePath: string): Promise<GitWorktreeBackend | null> {
     return await getSubmoduleFromBackend(
       this,
       submodulePath,
-      this._repo,
       this._submoduleCache,
       (path) => this.loadSubmoduleBackend(path)
     )
@@ -125,16 +166,11 @@ export class GitWorktreeFs implements GitWorktreeBackend {
    * List all submodule worktrees
    */
   async listSubmodules(): Promise<Array<{ path: string; backend: GitWorktreeBackend }>> {
-    if (!this._repo) {
-      return []
-    }
-
-    const { parseGitmodules } = await import('../../../core-utils/filesystem/SubmoduleManager.ts')
-    const submodules = await parseGitmodules({ repo: this._repo })
     const results: Array<{ path: string; backend: GitWorktreeBackend }> = []
 
-    for (const [name, info] of submodules.entries()) {
-      const backend = await this.getSubmodule(info.path)
+    // Use stored submodule info
+    for (const [path, info] of this._submoduleInfo.entries()) {
+      const backend = await this.getSubmoduleBackend(info.path)
       if (backend) {
         results.push({
           path: info.path,
@@ -164,15 +200,10 @@ export class GitWorktreeFs implements GitWorktreeBackend {
    * Check if a path is within a submodule
    */
   async getSubmoduleForPath(path: string): Promise<string | null> {
-    if (!this._repo) {
-      return null
-    }
-
     const normalizedPath = normalize(path)
-    const { parseGitmodules } = await import('../../../core-utils/filesystem/SubmoduleManager.ts')
-    const submodules = await parseGitmodules({ repo: this._repo })
 
-    for (const [name, info] of submodules.entries()) {
+    // Use stored submodule info
+    for (const [storedPath, info] of this._submoduleInfo.entries()) {
       const submodulePath = normalize(info.path)
       if (normalizedPath === submodulePath || normalizedPath.startsWith(submodulePath + '/')) {
         return submodulePath
@@ -194,7 +225,7 @@ export class GitWorktreeFs implements GitWorktreeBackend {
     const submodulePath = await this.getSubmoduleForPath(normalizedPath)
 
     if (submodulePath) {
-      const submoduleBackend = await this.getSubmodule(submodulePath)
+      const submoduleBackend = await this.getSubmoduleBackend(submodulePath)
       if (submoduleBackend) {
         const relativePath = normalizedPath === submodulePath
           ? '.'
@@ -222,32 +253,15 @@ export class GitWorktreeFs implements GitWorktreeBackend {
 
   /**
    * Loads a submodule backend by path
+   * This method is called by getSubmoduleFromBackend when a submodule backend needs to be loaded.
+   * Since we don't have access to Repository, we can only return null here.
+   * The actual submodule backend loading should be handled by Repository via GitBackend.
    */
   private async loadSubmoduleBackend(submodulePath: string): Promise<GitWorktreeBackend | null> {
-    if (!this._repo) {
-      return null
-    }
-
-    try {
-      // Get submodule Repository
-      const submoduleRepo = await this._repo.getSubmodule(submodulePath)
-      
-      // Get the submodule's WorktreeBackend
-      const submoduleWorktree = await submoduleRepo.getWorktree()
-      if (!submoduleWorktree) {
-        return null
-      }
-      
-      const submoduleBackend = submoduleWorktree.backend
-      if (!submoduleBackend) {
-        return null
-      }
-
-      return submoduleBackend
-    } catch {
-      // Submodule not initialized or error accessing it
-      return null
-    }
+    // Without Repository access, we cannot load submodule backends
+    // This should be handled by Repository.getSubmodule() which creates the submodule Repository
+    // and then gets its worktree backend
+    return null
   }
 
   /**
@@ -259,10 +273,6 @@ export class GitWorktreeFs implements GitWorktreeBackend {
    * @returns Object with submodule WorktreeBackend and relative path, or null if not a submodule
    */
   private async resolveSubmodulePath(path: string): Promise<{ backend: GitWorktreeBackend; submodulePath: string } | null> {
-    if (!this._repo) {
-      return null
-    }
-
     // Use the new resolvePath method for consistency
     const resolved = await this.resolvePath(path)
     
@@ -358,6 +368,11 @@ export class GitWorktreeFs implements GitWorktreeBackend {
     return this.fs.readdirDeep(fullPath)
   }
 
+  async listFiles(): Promise<string[]> {
+    // List all files in the working directory recursively
+    return this.readdirDeep('.')
+  }
+
   async rmdir(path: string, options?: { recursive?: boolean }): Promise<void> {
     // Check if path is in a submodule and delegate if so
     const submodule = await this.resolveSubmodulePath(path)
@@ -441,305 +456,130 @@ export class GitWorktreeFs implements GitWorktreeBackend {
   }
 
   // ============================================================================
-  // Sparse Checkout Operations
+  // Sparse Checkout Operations - MOVED TO GitBackend
+  // These operations require gitdir access and have been moved to GitBackend
+  // Use gitBackend.sparseCheckoutInit(worktreeBackend, ...) instead
   // ============================================================================
 
-  async sparseCheckoutInit(gitdir: string, cone?: boolean): Promise<void> {
-    const { sparseCheckout } = await import('../../../commands/sparseCheckout.ts')
-    await sparseCheckout({
-      fs: this.fs,
-      gitdir,
-      dir: this.dir,
-      init: true,
-      cone: cone ?? false,
-    })
-  }
-
-  async sparseCheckoutSet(
-    gitdir: string,
-    patterns: string[],
-    treeOid: string,
-    cone?: boolean
-  ): Promise<void> {
-    const { sparseCheckout } = await import('../../../commands/sparseCheckout.ts')
-    await sparseCheckout({
-      fs: this.fs,
-      gitdir,
-      dir: this.dir,
-      set: patterns,
-      treeOid,
-      cone,
-    })
-  }
-
-  async sparseCheckoutList(gitdir: string): Promise<string[]> {
-    const { sparseCheckout } = await import('../../../commands/sparseCheckout.ts')
-    return await sparseCheckout({
-      fs: this.fs,
-      gitdir,
-      dir: this.dir,
-      list: true,
-    })
-  }
-
   // ============================================================================
-  // File Operations (Staging Area)
+  // File Operations (Staging Area) - MOVED TO GitBackend
+  // These methods have been moved to GitBackend.add() and GitBackend.remove()
+  // Use gitBackend.add(worktreeBackend, ...) and gitBackend.remove(worktreeBackend, ...) instead
   // ============================================================================
 
-  async add(
-    gitdir: string,
-    filepaths: string | string[],
-    options?: { force?: boolean; update?: boolean }
-  ): Promise<void> {
-    const { add } = await import('../../../commands/add.ts')
-    await add({
-      fs: this.fs,
-      gitdir,
-      dir: this.dir,
-      filepath: filepaths,
-      force: options?.force,
-      update: options?.update,
-    })
-  }
-
-  async remove(
-    gitdir: string,
-    filepaths: string | string[],
-    options?: { cached?: boolean; force?: boolean }
-  ): Promise<void> {
-    const { remove } = await import('../../../commands/remove.ts')
-    await remove({
-      fs: this.fs,
-      gitdir,
-      dir: this.dir,
-      filepath: filepaths,
-      cached: options?.cached,
-      force: options?.force,
-    })
-  }
-
   // ============================================================================
-  // Commit Operations
+  // Commit Operations - MOVED TO GitBackend
+  // This method has been moved to GitBackend.commit()
+  // Use gitBackend.commit(worktreeBackend, ...) instead
   // ============================================================================
 
-  async commit(
-    gitdir: string,
-    message: string,
-    options?: {
-      author?: Partial<import('../../../models/GitCommit.ts').Author>
-      committer?: Partial<import('../../../models/GitCommit.ts').Author>
-      noVerify?: boolean
-      amend?: boolean
-      ref?: string
-      parent?: string[]
-      tree?: string
-    }
-  ): Promise<string> {
-    const { commit } = await import('../../../commands/commit.ts')
-    return await commit({
-      fs: this.fs,
-      gitdir,
-      dir: this.dir,
-      message,
-      author: options?.author,
-      committer: options?.committer,
-      noVerify: options?.noVerify,
-      amend: options?.amend,
-      ref: options?.ref,
-      parent: options?.parent,
-      tree: options?.tree,
-    })
+  // REMOVED: commit() method - now in GitBackend
+
+  // ============================================================================
+  // Branch/Checkout Operations - MOVED TO GitBackend
+  // These operations require gitdir access and have been moved to GitBackend
+  // Use gitBackend.checkout(worktreeBackend, ...) instead
+  // ============================================================================
+
+  // REMOVED: checkout() method - now in GitBackend
+  // REMOVED: switch() method - now in GitBackend
+
+  // ============================================================================
+  // Status Operations - MOVED TO GitBackend
+  // These operations require gitdir access and have been moved to GitBackend
+  // Use gitBackend.status(worktreeBackend, ...) instead
+  // ============================================================================
+
+  // REMOVED: status() method - now in GitBackend
+  // REMOVED: statusMatrix() method - now in GitBackend
+
+  // ============================================================================
+  // Reset Operations - MOVED TO GitBackend
+  // These operations require gitdir access and have been moved to GitBackend
+  // Use gitBackend.reset(worktreeBackend, ...) instead
+  // ============================================================================
+
+  // REMOVED: reset() method - now in GitBackend
+
+  // ============================================================================
+  // Diff Operations - MOVED TO GitBackend
+  // These operations require gitdir access and have been moved to GitBackend
+  // Use gitBackend.diff(worktreeBackend, ...) instead
+  // ============================================================================
+
+  // REMOVED: diff() method - now in GitBackend
+
+  // ============================================================================
+  // Merge Operations - MOVED TO GitBackend
+  // These operations require gitdir access and have been moved to GitBackend
+  // Use gitBackend.mergeTree(worktreeBackend, ...) instead
+  // ============================================================================
+
+  // REMOVED: mergeTree() method - now in GitBackend
+
+  // ============================================================================
+  // Worktree Config Operations - MOVED TO GitBackend
+  // These operations require gitdir access and have been moved to GitBackend
+  // Use gitBackend.readWorktreeConfig(worktreeBackend), gitBackend.getWorktreeConfig(worktreeBackend, path), etc.
+  // ============================================================================
+
+  // ============================================================================
+  // Sparse Checkout Operations (Config-based) - REMOVED (duplicate)
+  // These are already implemented above in the "Sparse Checkout Operations" section
+  // ============================================================================
+
+  // ============================================================================
+  // Submodule Operations
+  // ============================================================================
+  // Note: listSubmodules() is already implemented above (line 219)
+
+  // ============================================================================
+  // Helper Methods
+  // ============================================================================
+
+  private renderCommitHeaders(commit: any): Uint8Array {
+    // This is a placeholder implementation - the actual method should be elsewhere
+    throw new Error('renderCommitHeaders should not be called on GitWorktreeFs')
+  }
+
+  private async constructTree(options: any): Promise<string> {
+    // This is a placeholder implementation - the actual method should be elsewhere
+    throw new Error('constructTree should not be called on GitWorktreeFs')
   }
 
   // ============================================================================
-  // Branch/Checkout Operations
+  // Walker Creation
   // ============================================================================
 
-  async checkout(
-    gitdir: string,
-    ref: string,
-    options?: {
-      filepaths?: string[]
-      force?: boolean
-      noCheckout?: boolean
-      noUpdateHead?: boolean
-      dryRun?: boolean
-      sparsePatterns?: string[]
-      onProgress?: import('../../remote/types.ts').ProgressCallback
-      remote?: string
-      track?: boolean
-    }
-  ): Promise<void> {
-    const { checkout } = await import('../../../commands/checkout.ts')
-    await checkout({
-      fs: this.fs,
-      gitdir,
-      dir: this.dir,
-      ref,
-      filepaths: options?.filepaths,
-      force: options?.force,
-      noCheckout: options?.noCheckout,
-      noUpdateHead: options?.noUpdateHead,
-      dryRun: options?.dryRun,
-      sparsePatterns: options?.sparsePatterns,
-      onProgress: options?.onProgress,
-      remote: options?.remote,
-      track: options?.track,
-    })
-  }
-
-  async switch(
-    gitdir: string,
-    branch: string,
-    options?: {
-      create?: boolean
-      force?: boolean
-      track?: boolean
-      remote?: string
-    }
-  ): Promise<void> {
-    // Switch is essentially checkout with branch switching
-    // For now, delegate to checkout - a proper switch command can be added later
-    await this.checkout(gitdir, branch, {
-      force: options?.force,
-      track: options?.track,
-      remote: options?.remote,
-    })
-  }
-
-  // ============================================================================
-  // Status Operations
-  // ============================================================================
-
-  async status(
-    gitdir: string,
-    filepath: string
-  ): Promise<import('../../../commands/status.ts').FileStatus> {
-    const { status } = await import('../../../commands/status.ts')
-    return await status({
-      fs: this.fs,
-      gitdir,
-      dir: this.dir,
-      filepath,
-    })
-  }
-
-  async statusMatrix(
-    gitdir: string,
-    options?: { filepaths?: string[] }
-  ): Promise<import('../../../commands/statusMatrix.ts').StatusRow[]> {
-    const { statusMatrix } = await import('../../../commands/statusMatrix.ts')
-    return await statusMatrix({
-      fs: this.fs,
-      gitdir,
-      dir: this.dir,
-      filepaths: options?.filepaths,
-    })
-  }
-
-  // ============================================================================
-  // Reset Operations
-  // ============================================================================
-
-  async reset(
-    gitdir: string,
-    ref?: string,
-    mode?: 'soft' | 'mixed' | 'hard'
-  ): Promise<void> {
-    const { reset } = await import('../../../commands/reset.ts')
-    await reset({
-      fs: this.fs,
-      gitdir,
-      dir: this.dir,
-      ref: ref || 'HEAD',
-      mode: mode || 'mixed',
-    })
-  }
-
-  // ============================================================================
-  // Diff Operations
-  // ============================================================================
-
-  async diff(
-    gitdir: string,
-    options?: {
-      ref?: string
-      filepaths?: string[]
-      cached?: boolean
-    }
-  ): Promise<import('../../../commands/diff.ts').DiffResult> {
-    const { diff } = await import('../../../commands/diff.ts')
-    return await diff({
-      fs: this.fs,
-      gitdir,
-      dir: this.dir,
-      ref: options?.ref,
-      filepaths: options?.filepaths,
-      cached: options?.cached,
-    })
-  }
-
-  // ============================================================================
-  // Merge Operations
-  // ============================================================================
-
-  async mergeTree(
-    gitdir: string,
-    ourOid: string,
-    baseOid: string,
-    theirOid: string,
-    options?: {
-      ourName?: string
-      baseName?: string
-      theirName?: string
-      dryRun?: boolean
-      abortOnConflict?: boolean
-      mergeDriver?: import('../../merge/types.ts').MergeDriverCallback
-    }
-  ): Promise<string | import('../../../errors/MergeConflictError.ts').MergeConflictError> {
-    const { mergeTree } = await import('../../../git/merge/mergeTree.ts')
-    // Read index for mergeTree
-    const { Repository } = await import('../../../core-utils/Repository.ts')
-    const repo = await Repository.open({
-      fs: this.fs,
-      dir: this.dir,
-      gitdir,
-      cache: {},
-      autoDetectConfig: true,
-    })
-    const index = await repo.readIndexDirect(false, true, gitdir)
-    
-    return await mergeTree({
-      repo,
-      index,
-      ourOid,
-      baseOid,
-      theirOid,
-      ourName: options?.ourName,
-      baseName: options?.baseName,
-      theirName: options?.theirName,
-      dryRun: options?.dryRun,
-      abortOnConflict: options?.abortOnConflict,
-      mergeDriver: options?.mergeDriver,
-    })
-  }
-
-  // ============================================================================
-  // Worktree Config Operations
-  // ============================================================================
-
-  async readWorktreeConfig(gitdir: string): Promise<import('../../../core-utils/ConfigParser.ts').ConfigObject | null> {
-    const { readWorktreeConfig } = await import('../../config/worktreeConfig.ts')
-    return readWorktreeConfig({ fs: this.fs, gitdir })
-  }
-
-  async writeWorktreeConfig(
-    gitdir: string,
-    config: import('../../../core-utils/ConfigParser.ts').ConfigObject
-  ): Promise<void> {
-    const { writeWorktreeConfig } = await import('../../config/worktreeConfig.ts')
-    return writeWorktreeConfig({ fs: this.fs, gitdir, config })
+  async createWorkdirWalker(gitBackend: GitBackend): Promise<import('../../../models/GitWalkerFs.ts').GitWalkerFs> {
+    const { GitWalkerFs } = await import('../../../models/GitWalkerFs.ts')
+    return new GitWalkerFs({ worktreeBackend: this, gitBackend })
   }
 }
 
+// ============================================================================
+// Helper Functions (moved from class methods)
+// ============================================================================
 
+type AddEntriesParams = {
+  dir: string
+  gitdir: string
+  fs: FileSystem
+  repo: Repository
+  filepath: string | string[]
+  index: import('../../../git/index/GitIndex.ts').GitIndex
+  force: boolean
+  parallel: boolean
+  autocrlf: string
+}
+
+// ============================================================================
+// REMOVED: All methods below have been moved to GitBackend
+// - checkout() -> GitBackend.checkout()
+// - switch() -> GitBackend.switch()
+// - status() -> GitBackend.status()
+// - statusMatrix() -> GitBackend.statusMatrix()
+// - reset() -> GitBackend.reset()
+// - diff() -> GitBackend.diff()
+// - mergeTree() -> GitBackend.mergeTree()
+// ============================================================================

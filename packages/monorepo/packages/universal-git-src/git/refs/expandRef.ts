@@ -3,6 +3,7 @@ import { readPackedRefs } from './packedRefs.ts'
 import { join } from '../../core-utils/GitPath.ts'
 import AsyncLock from 'async-lock'
 import type { FileSystemProvider } from '../../models/FileSystem.ts'
+import type { GitBackend } from '../../backends/GitBackend.ts'
 
 let lock: AsyncLock | undefined
 
@@ -24,31 +25,64 @@ const refpaths = (ref: string): string[] => [
 /**
  * Expands a ref to its full name
  * 
- * @param fs - File system client
- * @param gitdir - Path to .git directory
+ * Supports both GitBackend (preferred) and legacy fs/gitdir parameters.
+ * 
+ * @param gitBackend - GitBackend instance (preferred)
+ * @param fs - File system client (legacy, used if gitBackend not provided)
+ * @param gitdir - Path to .git directory (legacy, used if gitBackend not provided)
  * @param ref - Reference name to expand (e.g., 'main', 'HEAD', 'refs/heads/main')
+ * @param cache - Optional cache for packfile indices
  * @returns Full reference path (e.g., 'refs/heads/main')
  * 
  * @throws NotFoundError if the ref cannot be found
  * 
  * @example
  * ```typescript
+ * // Using GitBackend (preferred)
+ * const fullRef = await expandRef({ gitBackend, ref: 'main' })
+ * 
+ * // Using legacy fs/gitdir
  * const fullRef = await expandRef({ fs, gitdir, ref: 'main' })
- * // Returns: 'refs/heads/main'
  * ```
  */
 export async function expandRef({
+  gitBackend,
   fs,
   gitdir,
   ref,
+  cache = {},
 }: {
-  fs: FileSystemProvider
-  gitdir: string
+  gitBackend?: GitBackend
+  fs?: FileSystemProvider
+  gitdir?: string
   ref: string
+  cache?: Record<string, unknown>
 }): Promise<string> {
   // Is it a complete and valid SHA?
   if (ref.length === 40 && /[0-9a-f]{40}/.test(ref)) {
     return ref
+  }
+
+  // Use GitBackend if provided (preferred)
+  if (gitBackend) {
+    // Look in all the proper paths, in this order
+    const allpaths = refpaths(ref)
+    
+    for (const refPath of allpaths) {
+      // Use GitBackend.readRef to check if ref exists
+      const oid = await gitBackend.readRef(refPath, 5, cache)
+      if (oid !== null) {
+        return refPath
+      }
+    }
+    
+    // Do we give up?
+    throw new NotFoundError(ref)
+  }
+
+  // Legacy: use fs/gitdir
+  if (!fs || !gitdir) {
+    throw new Error('Either gitBackend or both fs and gitdir must be provided')
   }
 
   // We need to alternate between the file system and the packed-refs

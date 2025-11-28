@@ -1211,6 +1211,65 @@ export class SQLiteBackend implements GitBackend {
     return parseListRefsResponse(res.body)
   }
 
+  async readPackedRefs(): Promise<string | null> {
+    const db = this.getDb()
+    const packedRow = db.prepare('SELECT data FROM packed_refs WHERE id = 1').get()
+    if (packedRow && packedRow.data) {
+      return packedRow.data as string
+    }
+    return null
+  }
+
+  async writePackedRefs(data: string): Promise<void> {
+    const db = this.getDb()
+    db.prepare('INSERT OR REPLACE INTO packed_refs (id, data) VALUES (1, ?)').run(data)
+  }
+
+  async expandRef(ref: string, cache: Record<string, unknown> = {}): Promise<string> {
+    const { NotFoundError } = await import('../errors/NotFoundError.ts')
+    const { parsePackedRefs } = await import('../git/refs/packedRefs.ts')
+    
+    // Is it a complete and valid SHA?
+    if (ref.length === 40 && /[0-9a-f]{40}/.test(ref)) {
+      return ref
+    }
+    
+    // Read packed refs
+    let packedMap = new Map<string, string>()
+    try {
+      const content = await this.readPackedRefs()
+      if (content) {
+        packedMap = parsePackedRefs(content)
+      }
+    } catch {
+      // packed-refs doesn't exist, that's okay
+    }
+    
+    // Define refpaths in the same order as the command
+    const refpaths = [
+      `${ref}`,
+      `refs/${ref}`,
+      `refs/tags/${ref}`,
+      `refs/heads/${ref}`,
+      `refs/remotes/${ref}`,
+      `refs/remotes/${ref}/HEAD`,
+    ]
+    
+    // Look in all the proper paths, in this order
+    for (const refPath of refpaths) {
+      // Check if ref exists using backend method
+      const refValue = await this.readRef(refPath, 5, cache)
+      if (refValue) {
+        return refPath
+      }
+      // Also check packed refs
+      if (packedMap.has(refPath)) return refPath
+    }
+    
+    // Do we give up?
+    throw new NotFoundError(ref)
+  }
+
   async close(): Promise<void> {
     if (this.db) {
       this.db.close()

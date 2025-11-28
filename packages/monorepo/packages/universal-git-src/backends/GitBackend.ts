@@ -5,11 +5,18 @@
  * (objects, refs, config, hooks, etc.), allowing implementations using filesystem,
  * SQLite, or other storage mechanisms.
  * 
+ * ARCHITECTURAL PRINCIPLE: GitBackend does NOT access GitWorktreeBackend directly.
+ * Both backends are black boxes that only communicate through Repository.
+ * Repository coordinates between GitBackend and GitWorktreeBackend for operations
+ * that require both (e.g., merged config access).
+ * 
  * NOTE: This backend is for Git repository data only. For worktree-specific data
  * (working directory files, worktree config, etc.), use GitWorktreeBackend instead.
  */
 
 import type { UniversalBuffer } from '../utils/UniversalBuffer.ts'
+import type { FileSystemProvider } from '../models/FileSystem.ts'
+import type { Walker } from '../models/Walker.ts'
 
 /**
  * Worktree gitdir interface - opaque handle to worktree gitdir structure
@@ -39,12 +46,12 @@ export type GitBackend = {
   writeHEAD(value: string): Promise<void>
 
   /**
-   * Reads the repository config file
+   * Reads the repository config file (raw buffer)
    */
   readConfig(): Promise<UniversalBuffer>
 
   /**
-   * Writes the repository config file
+   * Writes the repository config file (raw buffer)
    */
   writeConfig(data: UniversalBuffer): Promise<void>
 
@@ -54,6 +61,180 @@ export type GitBackend = {
    * @returns true if config exists, false otherwise
    */
   hasConfig(): Promise<boolean>
+
+  // ============================================================================
+  // High-Level Config Operations (local config only, with defaults)
+  // ============================================================================
+
+  /**
+   * Get a config value (from local config, with defaults)
+   * GitBackend only handles local config - worktree config is handled by WorktreeBackend
+   * @param path - Config path (e.g., 'core.filemode', 'user.name')
+   * @returns Config value or default value if not found
+   */
+  getConfig(path: string): Promise<unknown>
+
+  /**
+   * Set a config value (only local config is supported)
+   * @param path - Config path (e.g., 'core.filemode')
+   * @param value - Config value
+   * @param scope - Must be 'local' or undefined (other scopes are ignored for backward compatibility)
+   * @param append - Whether to append to existing values (default: false)
+   */
+  setConfig(
+    path: string,
+    value: unknown,
+    scope?: 'local' | 'global' | 'system',
+    append?: boolean
+  ): Promise<void>
+
+  /**
+   * Get all values for a config path (only from local config)
+   * @param path - Config path (e.g., 'user.name')
+   * @returns Array of values with scope 'local'
+   */
+  getAllConfig(path: string): Promise<Array<{ value: unknown; scope: 'local' }>>
+
+  /**
+   * Get all subsections for a section
+   * @param section - Section name (e.g., 'remote')
+   * @returns Array of subsection names
+   */
+  getConfigSubsections(section: string): Promise<(string | null)[]>
+
+  /**
+   * Get all section names
+   * @returns Array of section names
+   */
+  getConfigSections(): Promise<string[]>
+
+  /**
+   * Reload config (re-reads from filesystem/storage)
+   */
+  reloadConfig(): Promise<void>
+
+  // ============================================================================
+  // Worktree Config Operations (require worktreeBackend to determine worktree gitdir)
+  // ============================================================================
+
+  /**
+   * Read worktree config (worktree-specific config that overrides repository config)
+   * @param worktreeBackend - Worktree backend to determine worktree gitdir
+   * @returns ConfigObject if worktree config exists, null otherwise
+   */
+  readWorktreeConfigObject(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend
+  ): Promise<import('../core-utils/ConfigParser.ts').ConfigObject | null>
+
+  /**
+   * Write worktree config (worktree-specific config that overrides repository config)
+   * @param worktreeBackend - Worktree backend to determine worktree gitdir
+   * @param config - Config object to write
+   */
+  writeWorktreeConfigObject(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    config: import('../core-utils/ConfigParser.ts').ConfigObject
+  ): Promise<void>
+
+  /**
+   * Get a worktree config value
+   * @param worktreeBackend - Worktree backend to determine worktree gitdir
+   * @param path - Config path (e.g., 'core.filemode', 'user.name')
+   * @returns Config value or undefined if not found
+   */
+  getWorktreeConfig(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    path: string
+  ): Promise<unknown>
+
+  /**
+   * Set a worktree config value
+   * @param worktreeBackend - Worktree backend to determine worktree gitdir
+   * @param path - Config path (e.g., 'core.filemode')
+   * @param value - Config value
+   * @param append - Whether to append to existing values (default: false)
+   */
+  setWorktreeConfig(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    path: string,
+    value: unknown,
+    append?: boolean
+  ): Promise<void>
+
+  /**
+   * Get all values for a config path from worktree config
+   * @param worktreeBackend - Worktree backend to determine worktree gitdir
+   * @param path - Config path (e.g., 'user.name')
+   * @returns Array of values (worktree config only, so typically one value)
+   */
+  getAllWorktreeConfig(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    path: string
+  ): Promise<Array<{ value: unknown; scope: 'worktree' }>>
+
+  /**
+   * Get all subsections for a section in worktree config
+   * @param worktreeBackend - Worktree backend to determine worktree gitdir
+   * @param section - Section name (e.g., 'remote')
+   * @returns Array of subsection names
+   */
+  getWorktreeConfigSubsections(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    section: string
+  ): Promise<(string | null)[]>
+
+  /**
+   * Get all section names in worktree config
+   * @param worktreeBackend - Worktree backend to determine worktree gitdir
+   * @returns Array of section names
+   */
+  getWorktreeConfigSections(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend
+  ): Promise<string[]>
+
+  /**
+   * Reload worktree config (re-reads from filesystem/storage)
+   * @param worktreeBackend - Worktree backend to determine worktree gitdir
+   */
+  reloadWorktreeConfig(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend
+  ): Promise<void>
+
+  // ============================================================================
+  // Sparse Checkout Operations (require worktreeBackend for directory access)
+  // ============================================================================
+
+  /**
+   * Initialize sparse checkout
+   * @param worktreeBackend - Worktree backend for directory access
+   * @param cone - Use cone mode (default: false)
+   */
+  sparseCheckoutInit(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    cone?: boolean
+  ): Promise<void>
+
+  /**
+   * Set sparse checkout patterns
+   * @param worktreeBackend - Worktree backend for directory access
+   * @param patterns - Array of patterns to include/exclude
+   * @param treeOid - Tree OID to checkout (from HEAD or specified ref)
+   * @param cone - Use cone mode (optional, uses config if not provided)
+   */
+  sparseCheckoutSet(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    patterns: string[],
+    treeOid: string,
+    cone?: boolean
+  ): Promise<void>
+
+  /**
+   * List current sparse checkout patterns
+   * @param worktreeBackend - Worktree backend for directory access
+   */
+  sparseCheckoutList(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend
+  ): Promise<string[]>
 
   /**
    * Reads the index (staging area)
@@ -400,9 +581,65 @@ export type GitBackend = {
    */
   hasHook(name: string): Promise<boolean>
 
+  /**
+   * Runs a Git hook
+   * 
+   * @param hookName - Name of the hook (e.g., 'pre-commit', 'post-commit')
+   * @param context - Hook execution context (environment variables, etc.)
+   * @param executor - Optional custom hook executor (defaults to environment-appropriate executor)
+   * @param stdin - Optional standard input for the hook
+   * @param args - Optional command-line arguments for the hook
+   * @returns Promise resolving to hook execution result
+   * @throws Error if hook exists and returns non-zero exit code
+   */
+  runHook(
+    hookName: string,
+    context?: import('../git/hooks/runHook.ts').HookContext,
+    executor?: import('../git/hooks/runHook.ts').HookExecutor,
+    stdin?: string | UniversalBuffer,
+    args?: string[]
+  ): Promise<import('../git/hooks/runHook.ts').HookResult>
+
   // ============================================================================
   // Advanced Features
   // ============================================================================
+
+  /**
+   * Reads the .gitmodules file (submodule configuration)
+   * @param worktreeBackend - Worktree backend to read .gitmodules from working directory
+   * @returns .gitmodules file content as string, or null if file doesn't exist
+   */
+  readGitmodules(worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend): Promise<string | null>
+
+  /**
+   * Writes the .gitmodules file (submodule configuration)
+   * @param worktreeBackend - Worktree backend to write .gitmodules to working directory
+   * @param data - .gitmodules file content
+   */
+  writeGitmodules(worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend, data: string): Promise<void>
+
+  /**
+   * Parses .gitmodules file and returns submodule definitions
+   * @param worktreeBackend - Worktree backend to read .gitmodules from
+   * @returns Map of submodule name to submodule info (path, url, branch)
+   */
+  parseGitmodules(worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend): Promise<Map<string, { path: string; url: string; branch?: string }>>
+
+  /**
+   * Gets submodule information by name
+   * @param worktreeBackend - Worktree backend to read .gitmodules from
+   * @param name - Submodule name
+   * @returns Submodule info with name, or null if not found
+   */
+  getSubmoduleByName(worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend, name: string): Promise<{ name: string; path: string; url: string; branch?: string } | null>
+
+  /**
+   * Gets submodule information by path
+   * @param worktreeBackend - Worktree backend to read .gitmodules from
+   * @param path - Submodule path
+   * @returns Submodule info with name, or null if not found
+   */
+  getSubmoduleByPath(worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend, path: string): Promise<{ name: string; path: string; url: string; branch?: string } | null>
 
   /**
    * Reads a submodule config file
@@ -491,6 +728,220 @@ export type GitBackend = {
   deleteGitDaemonExportOk(): Promise<void>
 
   // ============================================================================
+  // File Operations (Staging Area) - Require worktreeBackend for file access
+  // ============================================================================
+
+  /**
+   * Add files to the staging area
+   * @param worktreeBackend - Worktree backend for file access
+   * @param filepaths - Files or directories to add
+   * @param options - Add options (force, update, etc.)
+   */
+  add(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    filepaths: string | string[],
+    options?: { force?: boolean; update?: boolean; parallel?: boolean }
+  ): Promise<void>
+
+  /**
+   * Remove files from the staging area and working directory
+   * @param worktreeBackend - Worktree backend for file access
+   * @param filepaths - Files to remove
+   * @param options - Remove options (cached, force, etc.)
+   */
+  remove(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    filepaths: string | string[],
+    options?: { cached?: boolean; force?: boolean }
+  ): Promise<void>
+
+  /**
+   * Update the Git index with a file entry
+   * @param worktreeBackend - Worktree backend for reading files
+   * @param filepath - Path to the file to update in the index
+   * @param options - Update options
+   * @returns OID of the blob written, or void if file was removed
+   */
+  updateIndex(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    filepath: string,
+    options?: {
+      oid?: string
+      mode?: number
+      add?: boolean
+      remove?: boolean
+      force?: boolean
+    }
+  ): Promise<string | void>
+
+  // ============================================================================
+  // Commit Operations - Require worktreeBackend for file access
+  // ============================================================================
+
+  /**
+   * Create a commit from the current staging area
+   * @param worktreeBackend - Worktree backend for file access
+   * @param message - Commit message
+   * @param options - Commit options (author, committer, noVerify, etc.)
+   * @returns Commit OID
+   */
+  commit(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    message: string,
+    options?: {
+      author?: Partial<import('../models/GitCommit.ts').Author>
+      committer?: Partial<import('../models/GitCommit.ts').Author>
+      noVerify?: boolean
+      amend?: boolean
+      dryRun?: boolean
+      noUpdateBranch?: boolean
+      ref?: string
+      parent?: string[]
+      tree?: string
+      signingKey?: string
+      onSign?: import('../core-utils/Signing.ts').SignCallback
+    }
+  ): Promise<string>
+
+  // ============================================================================
+  // Branch/Checkout Operations - Require worktreeBackend for file access
+  // ============================================================================
+
+  /**
+   * Checkout a branch, tag, or commit
+   * @param worktreeBackend - Worktree backend for file access
+   * @param ref - Branch name, tag name, or commit SHA
+   * @param options - Checkout options
+   */
+  checkout(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    ref: string,
+    options?: {
+      filepaths?: string[]
+      force?: boolean
+      noCheckout?: boolean
+      noUpdateHead?: boolean
+      dryRun?: boolean
+      sparsePatterns?: string[]
+      onProgress?: import('../git/remote/types.ts').ProgressCallback
+      remote?: string
+      track?: boolean
+      oldOid?: string
+    }
+  ): Promise<void>
+
+  /**
+   * Switch to a different branch (alias for checkout with branch switching)
+   * @param worktreeBackend - Worktree backend for file access
+   * @param branch - Branch name to switch to
+   * @param options - Switch options (create, force, etc.)
+   */
+  switch(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    branch: string,
+    options?: {
+      create?: boolean
+      force?: boolean
+      track?: boolean
+      remote?: string
+    }
+  ): Promise<void>
+
+  // ============================================================================
+  // Status Operations - Require worktreeBackend for file access
+  // ============================================================================
+
+  /**
+   * Get the status of a single file in the working directory
+   * @param worktreeBackend - Worktree backend for file access
+   * @param filepath - File path relative to working directory root
+   * @returns File status
+   */
+  status(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    filepath: string
+  ): Promise<import('../commands/status.ts').FileStatus>
+
+  /**
+   * Get status matrix (more detailed than status) for multiple files
+   * @param worktreeBackend - Worktree backend for file access
+   * @param options - Status matrix options (filepaths, etc.)
+   * @returns Status matrix array
+   */
+  statusMatrix(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    options?: { filepaths?: string[] }
+  ): Promise<import('../commands/statusMatrix.ts').StatusRow[]>
+
+  // ============================================================================
+  // Reset Operations - Require worktreeBackend for file access
+  // ============================================================================
+
+  /**
+   * Reset the working directory and/or index to a specific commit
+   * @param worktreeBackend - Worktree backend for file access
+   * @param ref - Commit to reset to (default: HEAD)
+   * @param mode - Reset mode: 'soft', 'mixed', 'hard' (default: 'mixed')
+   */
+  reset(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    ref?: string,
+    mode?: 'soft' | 'mixed' | 'hard'
+  ): Promise<void>
+
+  // ============================================================================
+  // Diff Operations - Require worktreeBackend for file access
+  // ============================================================================
+
+  /**
+   * Show changes between commits, commit and working tree, etc.
+   * @param worktreeBackend - Worktree backend for file access
+   * @param options - Diff options
+   * @returns Diff result
+   */
+  diff(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    options?: {
+      ref?: string
+      filepaths?: string[]
+      cached?: boolean
+    }
+  ): Promise<import('../commands/diff.ts').DiffResult>
+
+  // ============================================================================
+  // Merge Operations - Require worktreeBackend for file access
+  // ============================================================================
+
+  /**
+   * Merge trees with index management and worktree file writing
+   * This is a gitdir-level operation because it:
+   * - Manages the gitdir index (stages conflicts, updates index)
+   * - Writes conflicted files to the worktree
+   * - Uses the worktree's directory for file operations
+   * 
+   * @param worktreeBackend - Worktree backend for file access
+   * @param ourOid - Our tree OID
+   * @param baseOid - Base tree OID
+   * @param theirOid - Their tree OID
+   * @param options - Merge options (ourName, baseName, theirName, dryRun, abortOnConflict, mergeDriver)
+   * @returns Merged tree OID or MergeConflictError
+   */
+  mergeTree(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    ourOid: string,
+    baseOid: string,
+    theirOid: string,
+    options?: {
+      ourName?: string
+      baseName?: string
+      theirName?: string
+      dryRun?: boolean
+      abortOnConflict?: boolean
+      mergeDriver?: import('../git/merge/types.ts').MergeDriverCallback
+    }
+  ): Promise<string | import('../errors/MergeConflictError.ts').MergeConflictError>
+
+  // ============================================================================
   // Remote Info Operations
   // ============================================================================
 
@@ -568,6 +1019,24 @@ export type GitBackend = {
   isInitialized(): Promise<boolean>
 
   /**
+   * Initializes a new Git repository (always creates a bare repository)
+   * This is the main entry point for repository initialization.
+   * Backend-specific implementations will:
+   * - Create necessary directory structure (FilesystemBackend)
+   * - Create database tables (SQL backend)
+   * - Set initial config values (core.bare = true)
+   * - Set HEAD to default branch
+   * 
+   * Note: init() always creates a bare repository. To make it non-bare,
+   * use Repository constructor with both gitBackend and worktreeBackend.
+   * @param options - Initialization options
+   */
+  init(options?: {
+    defaultBranch?: string
+    objectFormat?: 'sha1' | 'sha256'
+  }): Promise<void>
+
+  /**
    * Closes the backend (for cleanup, e.g., closing database connections)
    */
   close(): Promise<void>
@@ -576,16 +1045,6 @@ export type GitBackend = {
    * Gets the backend type identifier
    */
   getType(): string
-
-  /**
-   * Gets the filesystem instance if this backend uses a filesystem
-   * @returns FileSystemProvider if available, null otherwise
-   * 
-   * This method allows consumers to access the filesystem without knowing
-   * the backend implementation. Non-filesystem backends (e.g., SQLite, in-memory)
-   * should return null.
-   */
-  getFileSystem?(): FileSystemProvider | null
 
   /**
    * Checks if a Git repository file exists
@@ -597,6 +1056,27 @@ export type GitBackend = {
    * For other backends, it checks if the data exists in the storage.
    */
   existsFile(path: string): Promise<boolean>
+
+  /**
+   * Reads the packed-refs file
+   * @returns The content of packed-refs file as a string, or null if it doesn't exist
+   */
+  readPackedRefs(): Promise<string | null>
+
+  /**
+   * Writes the packed-refs file
+   * @param data - The content to write to packed-refs file
+   */
+  writePackedRefs(data: string): Promise<void>
+
+  /**
+   * Expand an abbreviated ref to its full name
+   * @param ref - The ref to expand (like "v1.0.0" or "main")
+   * @param cache - Optional cache for packfile indices
+   * @returns The full ref name (e.g., "refs/tags/v1.0.0" or "refs/heads/main")
+   * @throws NotFoundError if the ref cannot be found
+   */
+  expandRef(ref: string, cache?: Record<string, unknown>): Promise<string>
 
   // ============================================================================
   // Merge Operations
@@ -650,5 +1130,36 @@ export type GitBackend = {
     | { oid: string; tree: string; mergeCommit: boolean; fastForward?: boolean; alreadyMerged?: boolean }
     | import('../errors/MergeConflictError.ts').MergeConflictError
   >
+
+  // ============================================================================
+  // Walker Creation
+  // ============================================================================
+
+  /**
+   * Creates a TREE walker for walking Git tree objects
+   * @param ref - Git reference (default: 'HEAD')
+   * @param cache - Optional cache for packfile indices
+   * @returns Walker instance (GitWalkerRepo)
+   */
+  createTreeWalker(ref?: string, cache?: Record<string, unknown>): Promise<unknown>
+
+  /**
+   * Creates a STAGE walker for walking the Git index (staging area)
+   * @param cache - Optional cache for packfile indices
+   * @returns Walker instance (GitWalkerIndex)
+   */
+  createIndexWalker(cache?: Record<string, unknown>): Promise<unknown>
+
+  // ============================================================================
+  // Blob Operations
+  // ============================================================================
+
+  /**
+   * Reads a blob object by OID
+   * @param oid - Object ID (can be blob, commit, tree, or tag - will be peeled)
+   * @param filepath - Optional filepath to resolve within a tree/commit
+   * @returns Blob result with oid and blob content
+   */
+  readBlob(oid: string, filepath?: string): Promise<{ oid: string; blob: Uint8Array }>
 }
 

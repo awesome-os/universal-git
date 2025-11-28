@@ -1,23 +1,64 @@
 import { getConfig } from '../config.ts'
 import { join } from '../../utils/join.ts'
 import type { FileSystemProvider } from '../../models/FileSystem.ts'
+import type { GitBackend } from '../../backends/GitBackend.ts'
 
 /**
  * Determines the hooks directory path for a repository
  * 
  * Respects the `core.hooksPath` config setting. If not set, defaults to `.git/hooks`.
  * 
- * @param fs - File system client
- * @param gitdir - Path to .git directory
+ * Supports both GitBackend (preferred) and legacy fs/gitdir parameters.
+ * 
+ * @param gitBackend - GitBackend instance (preferred)
+ * @param fs - File system client (legacy, used if gitBackend not provided)
+ * @param gitdir - Path to .git directory (legacy, used if gitBackend not provided)
  * @returns Promise resolving to the hooks directory path
  */
 export async function getHooksPath({
+  gitBackend,
   fs,
   gitdir,
 }: {
-  fs: FileSystemProvider
-  gitdir: string
+  gitBackend?: GitBackend
+  fs?: FileSystemProvider
+  gitdir?: string
 }): Promise<string> {
+  // Use GitBackend if provided (preferred)
+  if (gitBackend) {
+    // Get config from GitBackend
+    const configBuffer = await gitBackend.readConfig()
+    const { parse } = await import('../../core-utils/ConfigParser.ts')
+    const config = parse(configBuffer)
+    const hooksPath = config.get('core.hooksPath') as string | undefined
+
+    if (hooksPath && typeof hooksPath === 'string') {
+      // If it's an absolute path, use it directly
+      // If it's a relative path, we need gitdir to resolve it
+      if (hooksPath.startsWith('/') || hooksPath.match(/^[A-Za-z]:/)) {
+        return hooksPath
+      }
+      // For relative paths, we need gitdir - try to get it from GitBackend
+      if (gitBackend.getGitdir) {
+        const backendGitdir = await gitBackend.getGitdir()
+        if (backendGitdir) {
+          return join(backendGitdir, hooksPath)
+        }
+      }
+      // Can't resolve relative path without gitdir - default to hooks
+      return 'hooks'
+    }
+
+    // Default to hooks (relative to gitdir, but we can't resolve it here)
+    // The actual path resolution will happen in FilesystemBackend.runHook
+    return 'hooks'
+  }
+
+  // Legacy: use fs/gitdir
+  if (!fs || !gitdir) {
+    throw new Error('Either gitBackend or both fs and gitdir must be provided')
+  }
+
   // Check for custom hooks path in config
   const hooksPath = await getConfig({
     fs,
@@ -41,20 +82,35 @@ export async function getHooksPath({
 /**
  * Checks if a hook should run (exists and is executable)
  * 
- * @param fs - File system client
- * @param gitdir - Path to .git directory
+ * Supports both GitBackend (preferred) and legacy fs/gitdir parameters.
+ * 
+ * @param gitBackend - GitBackend instance (preferred)
+ * @param fs - File system client (legacy, used if gitBackend not provided)
+ * @param gitdir - Path to .git directory (legacy, used if gitBackend not provided)
  * @param hookName - Name of the hook (e.g., 'pre-commit', 'post-commit')
  * @returns Promise resolving to true if hook should run, false otherwise
  */
 export async function shouldRunHook({
+  gitBackend,
   fs,
   gitdir,
   hookName,
 }: {
-  fs: FileSystemProvider
-  gitdir: string
+  gitBackend?: GitBackend
+  fs?: FileSystemProvider
+  gitdir?: string
   hookName: string
 }): Promise<boolean> {
+  // Use GitBackend if provided (preferred)
+  if (gitBackend) {
+    return await gitBackend.hasHook(hookName)
+  }
+
+  // Legacy: use fs/gitdir
+  if (!fs || !gitdir) {
+    throw new Error('Either gitBackend or both fs and gitdir must be provided')
+  }
+
   try {
     const hooksPath = await getHooksPath({ fs, gitdir })
     const hookPath = join(hooksPath, hookName)

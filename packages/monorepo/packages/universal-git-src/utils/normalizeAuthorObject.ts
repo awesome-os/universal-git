@@ -19,17 +19,19 @@ export async function normalizeAuthorObject({
   repo,
   author,
   commit,
+  configService,
 }: {
   repo: Repository
   author?: Partial<Author>
   commit?: CommitObject
+  configService?: Awaited<ReturnType<Repository['getConfig']>>
 }): Promise<Author | undefined> {
   // CRITICAL: Use the Repository's config service to ensure state consistency
   // This ensures that setConfig() and getAuthor() use the same UnifiedConfigService instance
   let nameConfig: string | undefined
   let emailConfig: string | undefined
   try {
-    const config = await repo.getConfig()
+    const config = configService ?? await repo.getConfig()
     nameConfig = (await config.get('user.name')) as string | undefined
     emailConfig = ((await config.get('user.email')) as string | undefined) || ''
     // Ensure nameConfig is truly undefined (not empty string) if config is missing

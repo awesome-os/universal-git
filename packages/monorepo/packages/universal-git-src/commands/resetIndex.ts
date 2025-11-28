@@ -124,8 +124,28 @@ export async function resetIndex({
         }
       }
     }
-    // Use Repository.readIndexDirect() and writeIndexDirect() for consistency
-    const index = await repo.readIndexDirect(false) // Force fresh read
+    // Use gitBackend.readIndex() directly
+    const { GitIndex } = await import('../git/index/GitIndex.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    
+    let indexBuffer: UniversalBuffer
+    if (repo.gitBackend) {
+      try {
+        indexBuffer = await repo.gitBackend.readIndex()
+      } catch {
+        indexBuffer = UniversalBuffer.alloc(0)
+      }
+    } else {
+      throw new Error('gitBackend is required')
+    }
+    
+    let index: GitIndex
+    if (indexBuffer.length === 0) {
+      index = new GitIndex()
+    } else {
+      const objectFormat = await detectObjectFormat(fs, effectiveGitdir, repo.cache, repo.gitBackend)
+      index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+    }
     
     index.delete({ filepath })
     if (oid) {

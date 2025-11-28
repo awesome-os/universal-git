@@ -109,10 +109,32 @@ export async function abortMerge({
         // Use Repository.resolveRef() instead of low-level resolveRef
         const HEAD_oid = await repo.resolveRef(commit)
         log('HEAD resolved:', HEAD_oid)
-        const { tree } = await readTree({ fs, cache: effectiveCache, gitdir: effectiveGitdir, oid: HEAD_oid })
+        const { tree } = await readTree({ repo, oid: HEAD_oid })
         return tree
       })(),
-      repo.readIndexDirect()
+      (async () => {
+        if (!repo.gitBackend) {
+          throw new Error('gitBackend is required for abortMerge')
+        }
+        const { GitIndex } = await import('../git/index/GitIndex.ts')
+        const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+        const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+        
+        let indexBuffer: UniversalBuffer
+        try {
+          indexBuffer = await repo.gitBackend.readIndex()
+        } catch {
+          indexBuffer = UniversalBuffer.alloc(0)
+        }
+        
+        if (indexBuffer.length === 0) {
+          const objectFormat = await detectObjectFormat(repo.fs || undefined, await repo.getGitdir(), repo.cache, repo.gitBackend)
+          return new GitIndex(null, undefined, 2)
+        } else {
+          const objectFormat = await detectObjectFormat(repo.fs || undefined, await repo.getGitdir(), repo.cache, repo.gitBackend)
+          return await GitIndex.fromBuffer(indexBuffer, objectFormat)
+        }
+      })()
     ])
     
     log('HEAD tree read, entries:', headTree.length)
@@ -393,7 +415,28 @@ export async function abortMerge({
 
     // 7. Update the index
     log('Updating index...')
-    const finalIndex = await repo.readIndexDirect()
+    if (!repo.gitBackend) {
+      throw new Error('gitBackend is required for abortMerge')
+    }
+    const { GitIndex } = await import('../git/index/GitIndex.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+    
+    let indexBuffer: UniversalBuffer
+    try {
+      indexBuffer = await repo.gitBackend.readIndex()
+    } catch {
+      indexBuffer = UniversalBuffer.alloc(0)
+    }
+    
+    let finalIndex: GitIndex
+    if (indexBuffer.length === 0) {
+      const objectFormat = await detectObjectFormat(repo.fs || undefined, await repo.getGitdir(), repo.cache, repo.gitBackend)
+      finalIndex = new GitIndex(null, undefined, 2)
+    } else {
+      const objectFormat = await detectObjectFormat(repo.fs || undefined, await repo.getGitdir(), repo.cache, repo.gitBackend)
+      finalIndex = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+    }
     
     // Delete all existing entries
     const allIndexPaths = Array.from(finalIndex.entriesMap.keys())

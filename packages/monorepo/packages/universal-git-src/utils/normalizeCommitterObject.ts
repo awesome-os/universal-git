@@ -24,16 +24,18 @@ export async function normalizeCommitterObject({
   committer,
   commit,
   amend = false,
+  configService,
 }: {
   repo: Repository
   author?: Partial<Author>
   committer?: Partial<Author>
   commit?: CommitObject
   amend?: boolean
+  configService?: Awaited<ReturnType<Repository['getConfig']>>
 }): Promise<Author | undefined> {
   // CRITICAL: Use the Repository's config service to ensure state consistency
   // This ensures that setConfig() and getCommitter() use the same UnifiedConfigService instance
-  const config = await repo.getConfig()
+  const config = configService ?? await repo.getConfig()
   const nameConfig = (await config.get('user.name')) as string | undefined
   const emailConfig = ((await config.get('user.email')) as string | undefined) || '' // committer.email is allowed to be empty string
   

@@ -46,7 +46,32 @@ export async function remove({
 
     assertParameter('filepath', filepath)
 
-    const index = await repo.readIndexDirect(false) // Force fresh read
+    // Use gitBackend.readIndex() directly
+    if (!repo.gitBackend) {
+      throw new MissingParameterError('gitBackend (required for remove operation)')
+    }
+    const { GitIndex } = await import('../git/index/GitIndex.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+    
+    let indexBuffer: UniversalBuffer
+    try {
+      indexBuffer = await repo.gitBackend.readIndex()
+    } catch {
+      indexBuffer = UniversalBuffer.alloc(0)
+    }
+    
+    let index: GitIndex
+    if (indexBuffer.length === 0) {
+      const gitdir = await repo.getGitdir()
+      const objectFormat = await detectObjectFormat(repo.fs || undefined, gitdir, repo.cache, repo.gitBackend)
+      index = new GitIndex(null, undefined, 2)
+    } else {
+      const gitdir = await repo.getGitdir()
+      const objectFormat = await detectObjectFormat(repo.fs || undefined, gitdir, repo.cache, repo.gitBackend)
+      index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+    }
+    
     index.delete({ filepath })
     await repo.writeIndexDirect(index)
     // Note: effectiveDir and effectiveCache are available but not needed here

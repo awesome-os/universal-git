@@ -7,19 +7,18 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('updateIndex', async (t) => {
   await t.test('ok:add-file-to-index', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-empty')
-    await fs.write(path.join(dir, 'hello.md'), 'Hello, World!')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    await repo.fs.write(path.join(dir, 'hello.md'), 'Hello, World!')
     // Test
     const oid = await updateIndex({
-      fs,
-      dir,
+      repo,
       add: true,
       filepath: 'hello.md',
     })
     assert.strictEqual(oid, 'b45ef6fec89518d314f546fd6c3025367b721684')
     const fileStatus = await status({
-      fs,
-      dir,
+      repo,
       filepath: 'hello.md',
     })
     assert.strictEqual(fileStatus, 'added')
@@ -27,26 +26,24 @@ test('updateIndex', async (t) => {
 
   await t.test('ok:remove-file-not-in-workdir', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-empty')
-    await fs.write(path.join(dir, 'hello.md'), 'Hello, World!')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    await repo.fs.write(path.join(dir, 'hello.md'), 'Hello, World!')
     await add({
-      fs,
-      dir,
+      repo,
       filepath: 'hello.md',
     })
-    await fs.rm(path.join(dir, 'hello.md'))
+    await repo.fs.rm(path.join(dir, 'hello.md'))
     // Test
     let fileStatus = await status({
-      fs,
-      dir,
+      repo,
       filepath: 'hello.md',
     })
     // Status may be '*added' or '*absent' depending on implementation
     // The key is that it has '*' prefix indicating file is in index but not in workdir
     assert.ok(fileStatus.startsWith('*'))
     const result = await updateIndex({
-      fs,
-      dir,
+      repo,
       remove: true,
       filepath: 'hello.md',
     })
@@ -56,8 +53,7 @@ test('updateIndex', async (t) => {
     // Note: In a fresh repo without HEAD, status calculation may differ
     // The important thing is that updateIndex was called successfully
     fileStatus = await status({
-      fs,
-      dir,
+      repo,
       filepath: 'hello.md',
     })
     // Status might still show '*added' if there's no HEAD to compare against
@@ -67,29 +63,26 @@ test('updateIndex', async (t) => {
 
   await t.test('behavior:no-remove-if-exists-in-workdir', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-empty')
-    await fs.write(path.join(dir, 'hello.md'), 'Hello, World!')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    await repo.fs.write(path.join(dir, 'hello.md'), 'Hello, World!')
     await add({
-      fs,
-      dir,
+      repo,
       filepath: 'hello.md',
     })
     // Test
     let fileStatus = await status({
-      fs,
-      dir,
+      repo,
       filepath: 'hello.md',
     })
     assert.strictEqual(fileStatus, 'added')
     await updateIndex({
-      fs,
-      dir,
+      repo,
       remove: true,
       filepath: 'hello.md',
     })
     fileStatus = await status({
-      fs,
-      dir,
+      repo,
       filepath: 'hello.md',
     })
     assert.strictEqual(fileStatus, 'added')
@@ -97,30 +90,27 @@ test('updateIndex', async (t) => {
 
   await t.test('param:force-remove', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-empty')
-    await fs.write(path.join(dir, 'hello.md'), 'Hello, World!')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    await repo.fs.write(path.join(dir, 'hello.md'), 'Hello, World!')
     await add({
-      fs,
-      dir,
+      repo,
       filepath: 'hello.md',
     })
     // Test
     let fileStatus = await status({
-      fs,
-      dir,
+      repo,
       filepath: 'hello.md',
     })
     assert.strictEqual(fileStatus, 'added')
     await updateIndex({
-      fs,
-      dir,
+      repo,
       remove: true,
       force: true,
       filepath: 'hello.md',
     })
     fileStatus = await status({
-      fs,
-      dir,
+      repo,
       filepath: 'hello.md',
     })
     assert.strictEqual(fileStatus, '*added')
@@ -128,24 +118,21 @@ test('updateIndex', async (t) => {
 
   await t.test('ok:add-from-object-db', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
     const oid = await writeBlob({
-      fs,
-      dir,
+      repo,
       blob: Buffer.from('Hello, World!'),
     })
     // Test
     const updatedOid = await updateIndex({
-      fs,
-      dir,
+      repo,
       add: true,
       filepath: 'hello.md',
       oid,
     })
     assert.strictEqual(updatedOid, oid)
     const fileStatus = await status({
-      fs,
-      dir,
+      repo,
       filepath: 'hello.md',
     })
     // Status may be '*added' or '*absent' depending on implementation
@@ -155,30 +142,27 @@ test('updateIndex', async (t) => {
 
   await t.test('ok:update-file', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-empty')
-    await fs.write(path.join(dir, 'hello.md'), 'Hello, World!')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    await repo.fs.write(path.join(dir, 'hello.md'), 'Hello, World!')
     await add({
-      fs,
-      dir,
+      repo,
       filepath: 'hello.md',
     })
-    await fs.write(path.join(dir, 'hello.md'), 'Hello World')
+    await repo.fs.write(path.join(dir, 'hello.md'), 'Hello World')
     // Test
     let fileStatus = await status({
-      fs,
-      dir,
+      repo,
       filepath: 'hello.md',
     })
     assert.strictEqual(fileStatus, '*added')
     const oid = await updateIndex({
-      fs,
-      dir,
+      repo,
       filepath: 'hello.md',
     })
     assert.strictEqual(oid, '5e1c309dae7f45e0f39b1bf3ac3cd9db12e7d689')
     fileStatus = await status({
-      fs,
-      dir,
+      repo,
       filepath: 'hello.md',
     })
     assert.strictEqual(fileStatus, 'added')
@@ -186,14 +170,14 @@ test('updateIndex', async (t) => {
 
   await t.test('error:update-new-file-without-add', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-empty')
-    await fs.write(path.join(dir, 'hello.md'), 'Hello, World!')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    await repo.fs.write(path.join(dir, 'hello.md'), 'Hello, World!')
     // Test
     let error: unknown = null
     try {
       await updateIndex({
-        fs,
-        dir,
+        repo,
         filepath: 'hello.md',
       })
     } catch (e) {
@@ -211,13 +195,12 @@ test('updateIndex', async (t) => {
 
   await t.test('error:update-file-not-on-disk', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-empty')
+    const { repo } = await makeFixture('test-empty', { init: true })
     // Test
     let error: unknown = null
     try {
       await updateIndex({
-        fs,
-        dir,
+        repo,
         filepath: 'hello.md',
       })
     } catch (e) {
@@ -235,14 +218,14 @@ test('updateIndex', async (t) => {
 
   await t.test('error:add-directory', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-empty')
-    await fs.mkdir(path.join(dir, 'hello-world'))
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    await repo.fs.mkdir(path.join(dir, 'hello-world'))
     // Test
     let error: unknown = null
     try {
       await updateIndex({
-        fs,
-        dir,
+        repo,
         filepath: 'hello-world',
       })
     } catch (e) {
@@ -258,20 +241,19 @@ test('updateIndex', async (t) => {
 
   await t.test('error:remove-directory', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-empty')
-    await fs.mkdir(path.join(dir, 'hello-world'))
-    await fs.write(path.join(dir, 'hello-world/a'), 'a')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    await repo.fs.mkdir(path.join(dir, 'hello-world'))
+    await repo.fs.write(path.join(dir, 'hello-world/a'), 'a')
     await add({
-      fs,
-      dir,
+      repo,
       filepath: 'hello-world/a',
     })
     // Test
     let error: unknown = null
     try {
       await updateIndex({
-        fs,
-        dir,
+        repo,
         remove: true,
         filepath: 'hello-world',
       })
@@ -288,31 +270,28 @@ test('updateIndex', async (t) => {
 
   await t.test('param:force-remove-directory', async () => {
     // Setup
-    const { fs, dir } = await makeFixture('test-empty')
-    await fs.mkdir(path.join(dir, 'hello-world'))
-    await fs.write(path.join(dir, 'hello-world/a'), 'a')
+    const { repo } = await makeFixture('test-empty', { init: true })
+    const dir = await repo.getDir()!
+    await repo.fs.mkdir(path.join(dir, 'hello-world'))
+    await repo.fs.write(path.join(dir, 'hello-world/a'), 'a')
     await add({
-      fs,
-      dir,
+      repo,
       filepath: 'hello-world/a',
     })
     // Test
     let fileStatus = await status({
-      fs,
-      dir,
+      repo,
       filepath: 'hello-world/a',
     })
     assert.strictEqual(fileStatus, 'added')
     await updateIndex({
-      fs,
-      dir,
+      repo,
       remove: true,
       force: true,
       filepath: 'hello-world',
     })
     fileStatus = await status({
-      fs,
-      dir,
+      repo,
       filepath: 'hello-world/a',
     })
     assert.strictEqual(fileStatus, 'added')

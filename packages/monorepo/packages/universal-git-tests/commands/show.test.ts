@@ -189,11 +189,11 @@ test('show', async (t) => {
       cache: repo.cache,
     })
 
-    // Get the blob OID from the tree - use dir to let readCommit/readTree resolve gitdir the same way commit does
+    // Get the blob OID from the tree
     const { readCommit, readTree } = await import('@awesome-os/universal-git-src/index.ts')
-    const commitResult = await readCommit({ fs, dir, oid: commitOid, cache: repo.cache })
+    const commitResult = await readCommit({ repo, oid: commitOid })
     const treeOid = commitResult.commit.tree
-    const treeResult = await readTree({ fs, dir, oid: treeOid, cache: repo.cache })
+    const treeResult = await readTree({ repo, oid: treeOid })
     const blobOid = treeResult.tree.find((entry: any) => entry.path === 'file.txt')?.oid
 
     // Show the blob - use dir to let show resolve gitdir the same way commit does

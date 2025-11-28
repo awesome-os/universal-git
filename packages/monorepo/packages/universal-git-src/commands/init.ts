@@ -6,6 +6,7 @@ import { assertParameter } from "../utils/assertParameter.ts"
 import type { ObjectFormat } from "../utils/detectObjectFormat.ts"
 import type { FileSystemProvider } from "../models/FileSystem.ts"
 import type { GitBackend } from '../backends/index.ts'
+import type { Repository } from '../core-utils/Repository.ts'
 
 /**
  * Initialize a new repository
@@ -13,6 +14,7 @@ import type { GitBackend } from '../backends/index.ts'
  * @param objectFormat - Object format to use ('sha1' or 'sha256'), defaults to 'sha1'
  */
 export async function init({
+  repo: _repo,
   fs: _fs,
   bare = false,
   dir,
@@ -21,7 +23,8 @@ export async function init({
   objectFormat = 'sha1',
   backend,
 }: {
-  fs: FileSystemProvider
+  repo?: Repository
+  fs?: FileSystemProvider
   bare?: boolean
   dir?: string
   gitdir?: string
@@ -30,18 +33,46 @@ export async function init({
   backend?: GitBackend
 }): Promise<void> {
   try {
-    assertParameter('fs', _fs)
-    assertParameter('gitdir', gitdir!)
-    if (!bare) {
-      assertParameter('dir', dir)
+    let fs: FileSystemProvider
+    let effectiveDir: string | undefined
+    let effectiveGitdir: string | undefined
+
+    if (_repo) {
+      // Get fs from gitBackend if it's a FilesystemBackend
+      if (_repo.gitBackend && 'getFs' in _repo.gitBackend) {
+        fs = (_repo.gitBackend as any).getFs()
+      } else {
+        throw new Error('Cannot initialize repository: filesystem backend required')
+      }
+      effectiveGitdir = await _repo.getGitdir()
+      const worktree = _repo.getWorktree()
+      if (worktree) {
+        effectiveDir = worktree.dir || undefined
+      }
+      if (!bare && !effectiveDir && !_repo.worktreeBackend) {
+        throw new Error('Cannot initialize non-bare repository without worktree')
+      }
+    } else {
+      if (!_fs) {
+        throw new Error('Either repo or fs must be provided')
+      }
+      fs = _fs
+      effectiveDir = dir
+      effectiveGitdir = gitdir
     }
 
-    const fs = _fs
+    assertParameter('fs', fs)
+    assertParameter('gitdir', effectiveGitdir!)
+    // For non-bare repos, dir is required unless repo has worktreeBackend (which is a black box)
+    if (!bare && !_repo?.worktreeBackend) {
+      assertParameter('dir', effectiveDir)
+    }
+
     return await _init({
       fs,
       bare,
-      dir,
-      gitdir,
+      dir: effectiveDir,
+      gitdir: effectiveGitdir,
       defaultBranch,
       objectFormat,
       backend,
@@ -77,36 +108,21 @@ export async function _init({
   const resolvedGitdir = gitdir! // Asserted by assertParameter above
   const gitBackend = backend || new FilesystemBackend(fs, resolvedGitdir)
 
-  // Check if already initialized
-  if (await gitBackend.isInitialized()) {
-    return
-  }
-
-  // Initialize backend structure
-  await gitBackend.initialize()
-
-  // Use ConfigAccess to set initial config values
-  const configAccess = new ConfigAccess(fs, resolvedGitdir)
+  // Delegate to backend's init method
+  // init() always creates a bare repository
+  // Backend-specific implementations will handle initialization
+  await gitBackend.init({
+    defaultBranch,
+    objectFormat,
+  })
   
-  // Set repository format version and object format
-  if (objectFormat === 'sha256') {
-    // SHA-256 requires repository format version 1 (for extensions)
-    await configAccess.setConfigValue('core.repositoryformatversion', '1', 'local')
-    await configAccess.setConfigValue('extensions.objectformat', 'sha256', 'local')
-  } else {
-    // SHA-1 uses repository format version 0
-    await configAccess.setConfigValue('core.repositoryformatversion', '0', 'local')
-  }
-  
-  await configAccess.setConfigValue('core.filemode', 'false', 'local')
-  await configAccess.setConfigValue('core.bare', bare.toString(), 'local')
+  // If bare=false, update config to make it non-bare
+  // (This is for backward compatibility with the command interface)
   if (!bare) {
+    const { ConfigAccess } = await import('../utils/configAccess.ts')
+    const configAccess = new ConfigAccess(fs, resolvedGitdir)
+    await configAccess.setConfigValue('core.bare', 'false', 'local')
     await configAccess.setConfigValue('core.logallrefupdates', 'true', 'local')
   }
-  await configAccess.setConfigValue('core.symlinks', 'false', 'local')
-  await configAccess.setConfigValue('core.ignorecase', 'true', 'local')
-
-  // Use writeSymbolicRef to set HEAD (symbolic ref)
-  await gitBackend.writeHEAD(`ref: refs/heads/${defaultBranch}`)
 }
 

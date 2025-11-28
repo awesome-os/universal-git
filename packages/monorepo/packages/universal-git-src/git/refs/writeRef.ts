@@ -199,9 +199,11 @@ export async function writeSymbolicRef({
     // (will default to zero OID in logRefUpdate)
     
     // Resolve new HEAD OID (the target branch)
+    // Strip 'ref: ' prefix if present (it's only used in HEAD file format, not in ref resolution)
+    const targetRef = value.startsWith('ref: ') ? value.substring(5).trim() : value.trim()
     try {
       const { resolveRef } = await import('./readRef.ts')
-      const newHeadOid = await resolveRef({ fs, gitdir, ref: value, objectFormat })
+      const newHeadOid = await resolveRef({ fs, gitdir, ref: targetRef, objectFormat })
       if (newHeadOid && validateOid(newHeadOid, objectFormat)) {
         newOid = newHeadOid
       }
@@ -219,8 +221,12 @@ export async function writeSymbolicRef({
     await normalizedFs.mkdir(parentDir)
     
     // Write the symbolic ref with 'ref: ' prefix
-    const trimmedValue = value.trim()
-    await normalizedFs.write(path, 'ref: ' + `${trimmedValue}\n`, 'utf8')
+    // Strip 'ref: ' prefix if already present to avoid double prefix
+    let trimmedValue = value.trim()
+    if (trimmedValue.startsWith('ref: ')) {
+      trimmedValue = trimmedValue.substring(5).trim()
+    }
+    await normalizedFs.write(path, `ref: ${trimmedValue}\n`, 'utf8')
     
     // Record the mutation in StateMutationStream
     const { getStateMutationStream } = await import('../../core-utils/StateMutationStream.ts')

@@ -66,9 +66,6 @@ export async function listNotes({
     // Create the current note tree
     const result = await readTree({
       repo,
-      fs,
-      cache: effectiveCache,
-      gitdir: effectiveGitdir,
       oid: parent,
     })
 

@@ -8,6 +8,8 @@ import type { ProgressCallback } from '../remote/types.ts'
 import type { MergeDriverCallback } from '../merge/types.ts'
 import type { MergeConflictError } from '../../errors/MergeConflictError.ts'
 import type { FileSystemProvider } from '../../models/FileSystem.ts'
+import type { GitBackend } from '../../backends/GitBackend.ts'
+import type { Walker } from '../../models/Walker.ts'
 
 /**
  * GitWorktreeBackend - Abstract interface for Git working directory storage backends
@@ -88,6 +90,12 @@ export interface GitWorktreeBackend {
   readdirDeep(path: string): Promise<string[]>
 
   /**
+   * List all files in the working directory (recursive)
+   * @returns Array of all file paths (relative to working directory root)
+   */
+  listFiles(): Promise<string[]>
+
+  /**
    * Delete a directory
    * @param path - Directory path relative to working directory root
    * @param options - Optional configuration. `recursive` for recursive deletion
@@ -146,16 +154,6 @@ export interface GitWorktreeBackend {
   writelink(path: string, target: string): Promise<void>
 
   /**
-   * Gets the filesystem instance if this backend uses a filesystem
-   * @returns FileSystemProvider if available, null otherwise
-   * 
-   * This method allows consumers to access the filesystem without knowing
-   * the backend implementation. Non-filesystem backends (e.g., blob storage, SQL)
-   * should return null.
-   */
-  getFileSystem?(): FileSystemProvider | null
-
-  /**
    * Gets the working directory path if this backend has a directory
    * @returns Directory path if available, null otherwise
    * 
@@ -165,39 +163,33 @@ export interface GitWorktreeBackend {
    */
   getDirectory?(): string | null
 
-  /**
-   * Gets the Repository instance associated with this worktree backend
-   * @returns Repository instance if available, null otherwise
-   * 
-   * This method allows the backend to access the Repository for submodule detection
-   * and delegation. When a path is a submodule, the backend can delegate to the
-   * submodule's WorktreeBackend.
-   * 
-   * The Repository reference is set by Repository when creating/opening the backend.
-   */
-  getRepository?(): import('../../core-utils/Repository.ts').Repository | null
-
   // ============================================================================
   // Submodule Operations
   // ============================================================================
 
   /**
-   * Add a submodule to this worktree backend
-   * @param normalizedPath - Normalized path to submodule (e.g., 'libs/submodule-name')
-   * @param submoduleRepo - Repository instance for the submodule
-   * @returns Promise resolving when submodule is added
+   * Get submodule information by path
+   * @param path - Submodule path (e.g., 'libs/submodule-name')
+   * @returns Submodule info (name, path, url, branch) or null if not found
    * 
-   * This method registers a submodule Repository with this WorktreeBackend,
-   * allowing it to delegate operations to the submodule's WorktreeBackend.
-   * The submodule is cached for efficient future access.
+   * This method allows GitBackend to query submodule information from the worktree backend.
+   * The worktree backend stores submodule info that was set via setSubmodule().
    * 
-   * @example
-   * ```typescript
-   * const submoduleRepo = await Repository.open({ fs, dir: '/path/to/submodule' })
-   * await worktreeBackend.addSubmodule('libs/my-module', submoduleRepo)
-   * ```
+   * GitBackend calls this method when it needs submodule information for operations.
    */
-  addSubmodule?(normalizedPath: string, submoduleRepo: import('../../core-utils/Repository.ts').Repository): Promise<void>
+  getSubmodule?(path: string): Promise<{ name: string; path: string; url: string; branch?: string } | null>
+
+  /**
+   * Set submodule information
+   * @param path - Submodule path (e.g., 'libs/submodule-name')
+   * @param info - Submodule info (name, path, url, branch)
+   * 
+   * This method allows GitBackend to store submodule information in the worktree backend.
+   * The worktree backend caches this info for efficient access via getSubmodule().
+   * 
+   * GitBackend calls this method when it discovers submodule information (e.g., from .gitmodules).
+   */
+  setSubmodule?(path: string, info: { name: string; path: string; url: string; branch?: string }): Promise<void>
 
   /**
    * Get submodule worktree backend by path
@@ -205,10 +197,10 @@ export interface GitWorktreeBackend {
    * @returns WorktreeBackend for the submodule, or null if not found
    * 
    * This method enables multi-worktree awareness by allowing access to nested
-   * submodule worktrees. The submodule's WorktreeBackend can then use its Repository
-   * to access remote config and perform submodule-specific operations.
+   * submodule worktrees. The submodule's WorktreeBackend can then be used for
+   * submodule-specific operations.
    */
-  getSubmodule?(submodulePath: string): Promise<GitWorktreeBackend | null>
+  getSubmoduleBackend?(submodulePath: string): Promise<GitWorktreeBackend | null>
 
   /**
    * List all submodule worktrees
@@ -248,240 +240,70 @@ export interface GitWorktreeBackend {
   // Worktree Config Operations
   // ============================================================================
 
-  /**
-   * Read worktree config (worktree-specific config that overrides repository config)
-   * @param gitdir - Git directory path (can be worktree gitdir or main gitdir)
-   * @returns ConfigObject if worktree config exists, null otherwise
-   */
-  readWorktreeConfig(gitdir: string): Promise<import('../../core-utils/ConfigParser.ts').ConfigObject | null>
-
-  /**
-   * Write worktree config (worktree-specific config that overrides repository config)
-   * @param gitdir - Git directory path (can be worktree gitdir or main gitdir)
-   * @param config - Config object to write
-   */
-  writeWorktreeConfig(
-    gitdir: string,
-    config: import('../../core-utils/ConfigParser.ts').ConfigObject
-  ): Promise<void>
-
   // ============================================================================
-  // Sparse Checkout Operations
+  // Worktree Config Operations - MOVED TO GitBackend
+  // These operations require gitdir access and have been moved to GitBackend
+  // Use gitBackend.readWorktreeConfig(worktreeBackend), gitBackend.getWorktreeConfig(worktreeBackend, path), etc.
   // ============================================================================
 
-  /**
-   * Initialize sparse checkout
-   * @param gitdir - Git directory path
-   * @param cone - Use cone mode (default: false)
-   */
-  sparseCheckoutInit(gitdir: string, cone?: boolean): Promise<void>
-
-  /**
-   * Set sparse checkout patterns
-   * @param gitdir - Git directory path
-   * @param patterns - Array of patterns to include/exclude
-   * @param treeOid - Tree OID to checkout (from HEAD or specified ref)
-   * @param cone - Use cone mode (optional, uses config if not provided)
-   */
-  sparseCheckoutSet(
-    gitdir: string,
-    patterns: string[],
-    treeOid: string,
-    cone?: boolean
-  ): Promise<void>
-
-  /**
-   * List current sparse checkout patterns
-   * @param gitdir - Git directory path
-   */
-  sparseCheckoutList(gitdir: string): Promise<string[]>
-
   // ============================================================================
-  // File Operations (Staging Area)
+  // Sparse Checkout Operations - MOVED TO GitBackend
+  // These operations require gitdir access and have been moved to GitBackend
+  // Use gitBackend.sparseCheckoutInit(worktreeBackend, ...) instead
   // ============================================================================
 
-  /**
-   * Add files to the staging area
-   * @param gitdir - Git directory path
-   * @param filepaths - Files or directories to add
-   * @param options - Add options (force, update, etc.)
-   */
-  add(
-    gitdir: string,
-    filepaths: string | string[],
-    options?: { force?: boolean; update?: boolean }
-  ): Promise<void>
-
-  /**
-   * Remove files from the staging area and working directory
-   * @param gitdir - Git directory path
-   * @param filepaths - Files to remove
-   * @param options - Remove options (cached, force, etc.)
-   */
-  remove(
-    gitdir: string,
-    filepaths: string | string[],
-    options?: { cached?: boolean; force?: boolean }
-  ): Promise<void>
+  // ============================================================================
+  // File Operations (Staging Area) - MOVED TO GitBackend
+  // These operations require gitdir access and have been moved to GitBackend
+  // Use gitBackend.add(worktreeBackend, ...) instead
+  // ============================================================================
 
   // ============================================================================
-  // Commit Operations
+  // Commit Operations - MOVED TO GitBackend
+  // These operations require gitdir access and have been moved to GitBackend
+  // Use gitBackend.commit(worktreeBackend, ...) instead
+  // ============================================================================
+
+  // ============================================================================
+  // Branch/Checkout Operations - MOVED TO GitBackend
+  // These operations require gitdir access and have been moved to GitBackend
+  // Use gitBackend.checkout(worktreeBackend, ...) instead
+  // ============================================================================
+
+  // ============================================================================
+  // Status Operations - MOVED TO GitBackend
+  // These operations require gitdir access and have been moved to GitBackend
+  // Use gitBackend.status(worktreeBackend, ...) instead
+  // ============================================================================
+
+  // ============================================================================
+  // Reset Operations - MOVED TO GitBackend
+  // These operations require gitdir access and have been moved to GitBackend
+  // Use gitBackend.reset(worktreeBackend, ...) instead
+  // ============================================================================
+
+  // ============================================================================
+  // Diff Operations - MOVED TO GitBackend
+  // These operations require gitdir access and have been moved to GitBackend
+  // Use gitBackend.diff(worktreeBackend, ...) instead
+  // ============================================================================
+
+  // ============================================================================
+  // Merge Operations - MOVED TO GitBackend
+  // These operations require gitdir access and have been moved to GitBackend
+  // Use gitBackend.mergeTree(worktreeBackend, ...) instead
+  // ============================================================================
+
+  // ============================================================================
+  // Walker Creation
   // ============================================================================
 
   /**
-   * Create a commit from the current staging area
-   * @param gitdir - Git directory path
-   * @param message - Commit message
-   * @param options - Commit options (author, committer, noVerify, etc.)
-   * @returns Commit OID
+   * Creates a WORKDIR walker for walking the working directory
+   * @param gitBackend - GitBackend instance (needed for index/config access)
+   * @returns Walker instance (GitWalkerFs)
    */
-  commit(
-    gitdir: string,
-    message: string,
-    options?: {
-      author?: Partial<Author>
-      committer?: Partial<Author>
-      noVerify?: boolean
-      amend?: boolean
-      ref?: string
-      parent?: string[]
-      tree?: string
-    }
-  ): Promise<string>
-
-  // ============================================================================
-  // Branch/Checkout Operations
-  // ============================================================================
-
-  /**
-   * Checkout a branch, tag, or commit
-   * @param gitdir - Git directory path
-   * @param ref - Branch name, tag name, or commit SHA
-   * @param options - Checkout options
-   */
-  checkout(
-    gitdir: string,
-    ref: string,
-    options?: {
-      filepaths?: string[]
-      force?: boolean
-      noCheckout?: boolean
-      noUpdateHead?: boolean
-      dryRun?: boolean
-      sparsePatterns?: string[]
-      onProgress?: ProgressCallback
-      remote?: string
-      track?: boolean
-    }
-  ): Promise<void>
-
-  /**
-   * Switch to a different branch (alias for checkout with branch switching)
-   * @param gitdir - Git directory path
-   * @param branch - Branch name to switch to
-   * @param options - Switch options (create, force, etc.)
-   */
-  switch(
-    gitdir: string,
-    branch: string,
-    options?: {
-      create?: boolean
-      force?: boolean
-      track?: boolean
-      remote?: string
-    }
-  ): Promise<void>
-
-  // ============================================================================
-  // Status Operations
-  // ============================================================================
-
-  /**
-   * Get the status of a single file in the working directory
-   * @param gitdir - Git directory path
-   * @param filepath - File path relative to working directory root
-   * @returns File status
-   */
-  status(gitdir: string, filepath: string): Promise<FileStatus>
-
-  /**
-   * Get status matrix (more detailed than status) for multiple files
-   * @param gitdir - Git directory path
-   * @param options - Status matrix options (filepaths, etc.)
-   * @returns Status matrix array
-   */
-  statusMatrix(
-    gitdir: string,
-    options?: { filepaths?: string[] }
-  ): Promise<StatusRow[]>
-
-  // ============================================================================
-  // Reset Operations
-  // ============================================================================
-
-  /**
-   * Reset the working directory and/or index to a specific commit
-   * @param gitdir - Git directory path
-   * @param ref - Commit to reset to (default: HEAD)
-   * @param mode - Reset mode: 'soft', 'mixed', 'hard' (default: 'mixed')
-   */
-  reset(
-    gitdir: string,
-    ref?: string,
-    mode?: 'soft' | 'mixed' | 'hard'
-  ): Promise<void>
-
-  // ============================================================================
-  // Diff Operations
-  // ============================================================================
-
-  /**
-   * Show changes between commits, commit and working tree, etc.
-   * @param gitdir - Git directory path
-   * @param options - Diff options
-   * @returns Diff result
-   */
-  diff(
-    gitdir: string,
-    options?: {
-      ref?: string
-      filepaths?: string[]
-      cached?: boolean
-    }
-  ): Promise<DiffResult>
-
-  // ============================================================================
-  // Merge Operations
-  // ============================================================================
-
-  /**
-   * Merge trees with index management and worktree file writing
-   * This is a worktree-level operation because it:
-   * - Manages the worktree index (stages conflicts, updates index)
-   * - Writes conflicted files to the worktree
-   * - Uses the worktree's directory for file operations
-   * 
-   * @param gitdir - Git directory path
-   * @param ourOid - Our tree OID
-   * @param baseOid - Base tree OID
-   * @param theirOid - Their tree OID
-   * @param options - Merge options (ourName, baseName, theirName, dryRun, abortOnConflict, mergeDriver)
-   * @returns Merged tree OID or MergeConflictError
-   */
-  mergeTree(
-    gitdir: string,
-    ourOid: string,
-    baseOid: string,
-    theirOid: string,
-    options?: {
-      ourName?: string
-      baseName?: string
-      theirName?: string
-      dryRun?: boolean
-      abortOnConflict?: boolean
-      mergeDriver?: MergeDriverCallback
-    }
-  ): Promise<string | MergeConflictError>
+  createWorkdirWalker(gitBackend: GitBackend): Promise<unknown>
 }
 
 

@@ -119,21 +119,15 @@ export async function addSubmoduleToBackend(
  * 
  * @param backend - The WorktreeBackend to get the submodule from
  * @param submodulePath - Path to the submodule
- * @param repo - Repository instance (for loading submodules from .gitmodules)
  * @param cache - Submodule cache instance
  * @param loadSubmoduleBackend - Function to load a submodule backend if not cached
  */
 export async function getSubmoduleFromBackend(
   backend: GitWorktreeBackend,
   submodulePath: string,
-  repo: Repository | null,
   cache: SubmoduleCache,
   loadSubmoduleBackend: (path: string) => Promise<GitWorktreeBackend | null>
 ): Promise<GitWorktreeBackend | null> {
-  if (!repo) {
-    return null
-  }
-
   // Check cache first
   const normalizedPath = normalize(submodulePath)
   const cached = cache.get(normalizedPath)

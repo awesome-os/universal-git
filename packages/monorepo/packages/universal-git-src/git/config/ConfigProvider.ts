@@ -134,11 +134,11 @@ export class StaticConfigProvider implements ConfigProvider {
     // Load local config from backend (preferred) or fs (backward compatibility)
     const local = await loadLocalConfig(this.gitBackend, this.fs, this.gitdir)
 
-    // Load worktree config from worktree backend (preferred) or fs (backward compatibility)
+    // Load worktree config from git backend (preferred) or fs (backward compatibility)
     let worktree: ConfigObject
-    if (this.worktreeBackend && this.gitdir) {
-      // Use worktree backend (preferred)
-      const worktreeConfig = await this.worktreeBackend.readWorktreeConfig(this.gitdir)
+    if (this.worktreeBackend && this.gitBackend) {
+      // Use git backend with worktree backend (preferred)
+      const worktreeConfig = await this.gitBackend.readWorktreeConfigObject(this.worktreeBackend)
       worktree = worktreeConfig || parseConfig(UniversalBuffer.alloc(0))
     } else if (this.fs && this.gitdir) {
       // Fallback to direct filesystem access (backward compatibility)
@@ -207,17 +207,14 @@ export class StaticConfigProvider implements ConfigProvider {
     } else if (scope === 'system') {
       this.systemConfig.set(path, value, append)
     } else if (scope === 'worktree') {
-      if (!this.gitdir) {
-        throw new Error('Cannot set worktree config: gitdir is required')
+      if (!this.gitBackend) {
+        throw new Error('Cannot set worktree config: gitBackend is required')
       }
       if (!this.worktreeBackend) {
         throw new Error('Cannot set worktree config: worktreeBackend is required')
       }
-      // Use worktree backend (required for worktree config)
-      const existingConfig = await this.worktreeBackend.readWorktreeConfig(this.gitdir)
-      const worktreeConfig = existingConfig || parseConfig(UniversalBuffer.alloc(0))
-      worktreeConfig.set(path, value, append)
-      await this.worktreeBackend.writeWorktreeConfig(this.gitdir, worktreeConfig)
+      // Use git backend with worktree backend (required for worktree config)
+      await this.gitBackend.setWorktreeConfig(this.worktreeBackend, path, value, append)
     } else {
       throw new Error(`Invalid config scope: ${scope}`)
     }

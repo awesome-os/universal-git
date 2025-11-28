@@ -6,7 +6,6 @@ import { normalizeCommandArgs } from '../utils/commandHelpers.ts'
 import { assertParameter } from '../utils/assertParameter.ts'
 import { MissingParameterError } from '../errors/MissingParameterError.ts'
 import { join } from '../utils/join.ts'
-import { rmRecursive } from '../utils/rmRecursive.ts'
 import { Repository } from '../core-utils/Repository.ts'
 import type { FileSystem } from '../models/FileSystem.ts'
 import { listFiles } from './listFiles.ts'
@@ -228,8 +227,8 @@ export async function resetToCommit({
       // Hard reset: Update index and working directory to match the commit
       // Step 8a: Clean the working directory (removes all untracked files)
       // This is critical because git checkout does NOT remove untracked files
-      if (effectiveDir) {
-        await cleanWorkdir(fs, effectiveDir)
+      if (repo.worktreeBackend) {
+        await cleanWorkdir(repo.worktreeBackend)
       }
 
       // Step 8b: Checkout HEAD to restore the workdir and index to the correct state
@@ -295,7 +294,7 @@ async function resetIndexToTree({
   // Get all file paths from the tree
   // Use listFiles with the commit OID (it will resolve to the tree internally)
   // This ensures we use the same logic as other commands
-  const filePaths = await listFiles({ fs, dir, gitdir, ref: commitOid, cache })
+  const filePaths = await listFiles({ repo, ref: commitOid })
 
   // Read current index and create a new one (this effectively clears the index)
   const index = new GitIndex()
@@ -365,30 +364,28 @@ async function resetIndexToTree({
 /**
  * Clean the working directory by removing all files and directories except .git
  */
-async function cleanWorkdir(fs: FileSystem, dir: string): Promise<void> {
+async function cleanWorkdir(worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend): Promise<void> {
   try {
-    const entries = await fs.readdir(dir)
+    const entries = await worktreeBackend.readdir('.')
     if (!entries || entries.length === 0) return
     
     for (const entry of entries) {
       // Don't delete the .git directory!
       if (entry === '.git') continue
       
-      const fullpath = join(dir, entry)
-      
       try {
-        const stat = await fs.lstat(fullpath)
+        const stat = await worktreeBackend.lstat(entry)
         if (!stat) {
           // If stat returns null, file doesn't exist, skip it
           continue
         }
         
-        if (statIsDirectory(stat)) {
-          // Use rmRecursive for directories to handle nested files
-          await rmRecursive(fs, fullpath)
+        if (stat.isDirectory()) {
+          // Use recursive rm for directories
+          await worktreeBackend.rm(entry, { recursive: true })
         } else {
           // Remove files directly
-          await fs.rm(fullpath)
+          await worktreeBackend.rm(entry)
         }
       } catch (err: any) {
         // If we can't stat or remove a file, check if it's a "not found" error
@@ -400,7 +397,7 @@ async function cleanWorkdir(fs: FileSystem, dir: string): Promise<void> {
           err?.code === 'ENOTFOUND' ||
           (typeof err === 'object' && err !== null && 'code' in err && String(err.code).includes('ENOENT'))
         if (!isNotFound) {
-          console.warn(`[resetToCommit] Warning: Could not remove ${fullpath}:`, err)
+          console.warn(`[resetToCommit] Warning: Could not remove ${entry}:`, err)
         }
         // If it's a not found error, that's fine - continue
       }
@@ -408,7 +405,7 @@ async function cleanWorkdir(fs: FileSystem, dir: string): Promise<void> {
   } catch (err) {
     // If readdir fails, the directory might not exist or be inaccessible
     // This is okay - we'll let checkout handle it
-    console.warn(`[resetToCommit] Warning: Could not read directory ${dir}:`, err)
+    console.warn(`[resetToCommit] Warning: Could not read directory:`, err)
   }
 }
 

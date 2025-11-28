@@ -8,6 +8,7 @@ import { add, commit, status, listFiles } from '@awesome-os/universal-git-src/in
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { readTree } from '@awesome-os/universal-git-src/index.ts'
 import { resetIndexToTree } from '../helpers/resetIndexToTree.ts'
+import { dir } from 'node:console'
 
 // Helper function to set up user config (used by many tests)
 async function setupUserConfig(repo: any): Promise<void> {
@@ -17,61 +18,22 @@ async function setupUserConfig(repo: any): Promise<void> {
 }
 
 describe('writeTreeChanges', () => {
-  it('param:fs-missing', async () => {
-    const { repo } = await makeFixture('test-empty')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
+  it('param:repo-missing', async () => {
     try {
       await writeTreeChanges({
-        dir,
-        gitdir,
         treePair: [TREE({ ref: 'HEAD' }), 'stage'],
       } as any)
       assert.fail('Should have thrown an error')
     } catch (error) {
-      assert.ok(error instanceof Error, 'Should throw an error when fs is missing')
-    }
-  })
-
-  it('param:dir-missing', async () => {
-    const { repo } = await makeFixture('test-empty')
-    const gitdir = await repo.getGitdir()
-    try {
-      await writeTreeChanges({
-        fs: repo.fs,
-        gitdir,
-        treePair: [TREE({ ref: 'HEAD' }), 'stage'],
-      } as any)
-      assert.fail('Should have thrown an error')
-    } catch (error) {
-      assert.ok(error instanceof Error, 'Should throw an error when dir is missing')
-    }
-  })
-
-  it('param:gitdir-missing', async () => {
-    const { repo } = await makeFixture('test-empty')
-    const dir = await repo.getDir()!
-    try {
-      await writeTreeChanges({
-        fs: repo.fs,
-        dir,
-        treePair: [TREE({ ref: 'HEAD' }), 'stage'],
-      } as any)
-      assert.fail('Should have thrown an error')
-    } catch (error) {
-      assert.ok(error instanceof Error, 'Should throw an error when gitdir is missing')
+      assert.ok(error instanceof Error, 'Should throw an error when repo is missing')
     }
   })
 
   it('param:treePair-missing', async () => {
     const { repo } = await makeFixture('test-empty')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
     try {
       await writeTreeChanges({
-        fs: repo.fs,
-        dir,
-        gitdir,
+        repo,
       } as any)
       assert.fail('Should have thrown an error')
     } catch (error) {
@@ -81,8 +43,6 @@ describe('writeTreeChanges', () => {
 
   it('edge:empty-repo-no-HEAD', async () => {
     const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
     
     // Set up user config
     await setupUserConfig(repo)
@@ -90,16 +50,14 @@ describe('writeTreeChanges', () => {
     const cache = {}
     
     // Create a file and stage it
-    await repo.fs.write(`${dir}/newfile.txt`, 'content')
+    await repo.worktreeBackend!.write('newfile.txt', 'content')
     await add({ repo, filepath: ['newfile.txt'] })
     
     // writeTreeChanges should handle the case where HEAD doesn't exist
     // It should still create a tree from STAGE
     try {
       const treeOid = await writeTreeChanges({
-        fs: repo.fs,
-        dir,
-        gitdir,
+        repo,
         cache,
         treePair: [TREE({ ref: 'HEAD' }), 'stage'],
       })
@@ -116,8 +74,6 @@ describe('writeTreeChanges', () => {
 
   it('ok:WORKDIR-tree-pair', async () => {
     const { repo } = await makeFixture('test-stash')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
     
     // Set up user config
     await setupUserConfig(repo)
@@ -125,13 +81,11 @@ describe('writeTreeChanges', () => {
     const cache = {}
     
     // Make unstaged changes to working directory
-    await repo.fs.write(`${dir}/a.txt`, 'unstaged content')
+    await repo.worktreeBackend!.write('a.txt', 'unstaged content')
     
     // Test writeTreeChanges with STAGE vs WORKDIR
     const treeOid = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir,
+      repo,
       cache,
       treePair: [STAGE(), 'workdir'],
     })
@@ -146,8 +100,6 @@ describe('writeTreeChanges', () => {
 
   it('ok:TREE-specific-ref', async () => {
     const { repo } = await makeFixture('test-stash')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
     
     // Set up user config
     await setupUserConfig(repo)
@@ -155,19 +107,17 @@ describe('writeTreeChanges', () => {
     const cache = {}
     
     // Make and commit changes
-    await repo.fs.write(`${dir}/a.txt`, 'committed content')
+    await repo.worktreeBackend!.write(`a.txt`, 'committed content')
     await add({ repo, filepath: ['a.txt'] })
     const commitOid = await commit({ repo, message: 'test commit' })
     
     // Make new changes
-    await repo.fs.write(`${dir}/a.txt`, 'new staged content')
+    await repo.worktreeBackend!.write('a.txt', 'new staged content')
     await add({ repo, filepath: ['a.txt'] })
     
     // Test writeTreeChanges with specific commit ref
     const treeOid = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir,
+      repo,
       cache,
       treePair: [TREE({ ref: commitOid }), 'stage'],
     })
@@ -178,8 +128,6 @@ describe('writeTreeChanges', () => {
 
   it('behavior:ignored-files', async () => {
     const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
     
     // Set up user config
     await setupUserConfig(repo)
@@ -187,21 +135,19 @@ describe('writeTreeChanges', () => {
     const cache = {}
     
     // Create .gitignore
-    await repo.fs.write(`${dir}/.gitignore`, 'ignored.txt\n*.log\n')
+    await repo.worktreeBackend!.write(`.gitignore`, 'ignored.txt\n*.log\n')
     
     // Create ignored and non-ignored files
-    await repo.fs.write(`${dir}/ignored.txt`, 'ignored content')
-    await repo.fs.write(`${dir}/test.log`, 'log content')
-    await repo.fs.write(`${dir}/valid.txt`, 'valid content')
+    await repo.worktreeBackend!.write(`ignored.txt`, 'ignored content')
+    await repo.worktreeBackend!.write(`test.log`, 'log content')
+    await repo.worktreeBackend!.write(`valid.txt`, 'valid content')
     
     // Stage all files (ignored files won't be staged)
     await add({ repo, filepath: ['valid.txt'] })
     
     // writeTreeChanges should not include ignored files
     const treeOid = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir,
+      repo,
       cache,
       treePair: [TREE({ ref: 'HEAD' }), 'stage'],
     })
@@ -216,8 +162,6 @@ describe('writeTreeChanges', () => {
   })
   it('ok:detect-staged-changes', async () => {
     const { repo } = await makeFixture('test-stash')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
     
     // Set up user config
     await setupUserConfig(repo)
@@ -226,9 +170,9 @@ describe('writeTreeChanges', () => {
     const cache = {}
     
     // Make changes to files
-    const originalContent = await repo.fs.read(`${dir}/a.txt`)
-    await repo.fs.write(`${dir}/a.txt`, 'modified content')
-    await repo.fs.write(`${dir}/b.js`, 'modified b content')
+    const originalContent = await repo.worktreeBackend!.read('a.txt')
+    await repo.worktreeBackend!.write('a.txt', 'modified content')
+    await repo.worktreeBackend!.write('b.js', 'modified b content')
     
     // Stage the changes
     await add({ repo, filepath: ['a.txt', 'b.js'] })
@@ -242,9 +186,7 @@ describe('writeTreeChanges', () => {
     
     // Test writeTreeChanges with HEAD vs STAGE
     const treeOid = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir,
+      repo,
       cache,
       treePair: [TREE({ ref: 'HEAD' }), 'stage'],
     })
@@ -264,8 +206,6 @@ describe('writeTreeChanges', () => {
   
   it('ok:returns-null-no-staged-changes', async () => {
     const { repo } = await makeFixture('test-stash')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
     
     // Use a shared cache
     const cache = {}
@@ -282,7 +222,7 @@ describe('writeTreeChanges', () => {
     // Reset index to match HEAD to ensure clean state
     // This ensures the test starts with a clean index that matches HEAD
     try {
-      await resetIndexToTree({ fs: repo.fs, dir, gitdir, ref: 'HEAD', cache })
+      await resetIndexToTree({ repo, ref: 'HEAD' })
     } catch (error) {
       // If reset fails, log it but continue - we'll verify below
       console.warn(`[test] resetIndexToTree failed:`, error)
@@ -302,9 +242,7 @@ describe('writeTreeChanges', () => {
       // Index doesn't match HEAD - this means there are changes
       // writeTreeChanges should detect this and return a tree (not null)
       const treeOid = await writeTreeChanges({
-        fs: repo.fs,
-        dir,
-        gitdir,
+        repo,
         cache,
         treePair: [TREE({ ref: 'HEAD' }), 'stage'],
       })
@@ -318,9 +256,7 @@ describe('writeTreeChanges', () => {
     
     // Index matches HEAD - now verify writeTreeChanges returns null
     const treeOid = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir,
+      repo,
       cache,
       treePair: [TREE({ ref: 'HEAD' }), 'stage'],
     })
@@ -331,8 +267,6 @@ describe('writeTreeChanges', () => {
   
   it('ok:detect-workdir-changes', async () => {
     const { repo } = await makeFixture('test-stash')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
     
     // Set up user config
     await setupUserConfig(repo)
@@ -341,18 +275,16 @@ describe('writeTreeChanges', () => {
     const cache = {}
     
     // Make and stage changes
-    await repo.fs.write(`${dir}/a.txt`, 'staged content')
+    await repo.worktreeBackend!.write(`a.txt`, 'staged content')
     await add({ repo, filepath: ['a.txt'] })
     
     // Make additional unstaged changes
-    await repo.fs.write(`${dir}/a.txt`, 'unstaged content')
-    await repo.fs.write(`${dir}/m.xml`, 'new unstaged file')
+    await repo.worktreeBackend!.write(`a.txt`, 'unstaged content')
+    await repo.worktreeBackend!.write(`m.xml`, 'new unstaged file')
     
     // Test writeTreeChanges with STAGE vs WORKDIR
     const treeOid = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir,
+      repo,
       cache,
       treePair: [STAGE(), 'workdir'],
     })
@@ -370,8 +302,6 @@ describe('writeTreeChanges', () => {
   
   it('ok:detect-new-files-staged', async () => {
     const { repo } = await makeFixture('test-stash')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
     
     // Set up user config
     await setupUserConfig(repo)
@@ -381,7 +311,7 @@ describe('writeTreeChanges', () => {
     
     // Create a truly new file with unique name to ensure it doesn't exist in HEAD
     const uniqueFilename = `newfile-${Date.now()}.txt`
-    await repo.fs.write(`${dir}/${uniqueFilename}`, 'new file content')
+    await repo.worktreeBackend!.write(`${uniqueFilename}`, 'new file content')
     await add({ repo, filepath: [uniqueFilename] })
     
     // Verify the file is staged
@@ -392,9 +322,7 @@ describe('writeTreeChanges', () => {
     
     // Test writeTreeChanges with HEAD vs STAGE
     const treeOid = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir,
+      repo,
       cache,
       treePair: [TREE({ ref: 'HEAD' }), 'stage'],
     })
@@ -409,8 +337,6 @@ describe('writeTreeChanges', () => {
   
   it('ok:multiple-file-changes', async () => {
     const { repo } = await makeFixture('test-stash')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
     
     // Set up user config
     await setupUserConfig(repo)
@@ -420,14 +346,14 @@ describe('writeTreeChanges', () => {
     
     // Modify multiple files with content that's different from HEAD
     // Read original content first to ensure we're making actual changes
-    const originalA = await repo.fs.read(`${dir}/a.txt`)
-    const originalB = await repo.fs.read(`${dir}/b.js`)
-    const originalM = await repo.fs.read(`${dir}/m.xml`)
+    const originalA = await repo.worktreeBackend!.read('a.txt')
+    const originalB = await repo.worktreeBackend!.read('b.js')
+    const originalM = await repo.worktreeBackend!.read('m.xml')
     
     // Write different content
-    await repo.fs.write(`${dir}/a.txt`, 'modified a - ' + Date.now())
-    await repo.fs.write(`${dir}/b.js`, 'modified b - ' + Date.now())
-    await repo.fs.write(`${dir}/m.xml`, 'modified m - ' + Date.now())
+    await repo.worktreeBackend!.write(`a.txt`, 'modified a - ' + Date.now())
+    await repo.worktreeBackend!.write(`b.js`, 'modified b - ' + Date.now())
+    await repo.worktreeBackend!.write(`m.xml`, 'modified m - ' + Date.now())
     
     // Stage all changes
     await add({ repo, filepath: ['a.txt', 'b.js', 'm.xml'] })
@@ -445,9 +371,7 @@ describe('writeTreeChanges', () => {
     
     // Test writeTreeChanges
     const treeOid = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir,
+      repo,
       cache,
       treePair: [TREE({ ref: 'HEAD' }), 'stage'],
     })
@@ -463,8 +387,6 @@ describe('writeTreeChanges', () => {
   
   it('behavior:shared-cache', async () => {
     const { repo } = await makeFixture('test-stash')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
     
     // Set up user config
     await setupUserConfig(repo)
@@ -475,7 +397,7 @@ describe('writeTreeChanges', () => {
     // Reset index to match HEAD first to ensure clean state
     // This ensures we only have the files we're testing with
     try {
-      await resetIndexToTree({ fs: repo.fs, dir, gitdir, ref: 'HEAD', cache })
+      await resetIndexToTree({ repo, ref: 'HEAD' })
       // Verify index was reset
       const index = await repo.readIndexDirect()
       const indexFiles = Array.from(index.entriesMap.keys())
@@ -487,17 +409,15 @@ describe('writeTreeChanges', () => {
     
     // Make changes with unique content to ensure they're different from HEAD
     const timestamp = Date.now()
-    await repo.fs.write(`${dir}/a.txt`, `staged changes - a - ${timestamp}`)
-    await repo.fs.write(`${dir}/b.js`, `staged changes - b - ${timestamp}`)
+    await repo.worktreeBackend!.write(`a.txt`, `staged changes - a - ${timestamp}`)
+    await repo.worktreeBackend!.write(`b.js`, `staged changes - b - ${timestamp}`)
     
     // Stage with shared cache
     await add({ repo, filepath: ['a.txt', 'b.js'] })
     
     // Immediately check with writeTreeChanges using same cache
     const treeOid = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir,
+      repo,
       cache, // Same cache object
       treePair: [TREE({ ref: 'HEAD' }), 'stage'],
     })
@@ -553,8 +473,6 @@ describe('writeTreeChanges', () => {
   
   it('ok:returns-null-HEAD-STAGE-identical', async () => {
     const { repo } = await makeFixture('test-stash')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
     
     // Set up user config and make an initial commit
     await setupUserConfig(repo)
@@ -563,14 +481,14 @@ describe('writeTreeChanges', () => {
     const cache = {}
     
     // Make changes and commit them
-    await repo.fs.write(`${dir}/a.txt`, 'committed content')
+    await repo.worktreeBackend!.write(`a.txt`, 'committed content')
     await add({ repo, filepath: ['a.txt'] })
     await commit({ repo, message: 'initial commit' })
     
     // After commit, reset index to match HEAD to ensure they're identical
     // In Git, after a commit, the index should match HEAD
     try {
-      await resetIndexToTree({ fs: repo.fs, dir, gitdir, ref: 'HEAD', cache })
+      await resetIndexToTree({ repo, ref: 'HEAD' })
     } catch {
       // If reset fails, that's okay - index should already match HEAD after commit
     }
@@ -606,9 +524,7 @@ describe('writeTreeChanges', () => {
     
     // Now HEAD and STAGE should be identical
     const treeOid = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir,
+      repo,
       cache,
       treePair: [TREE({ ref: 'HEAD' }), 'stage'],
     })
@@ -619,8 +535,6 @@ describe('writeTreeChanges', () => {
 
   it('behavior:detect-changes-after-add', async () => {
     const { repo } = await makeFixture('test-stash')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
     
     // Set up user config
     await setupUserConfig(repo)
@@ -634,10 +548,10 @@ describe('writeTreeChanges', () => {
     const mutationStream = getStateMutationStream()
     
     // Make changes with content different from HEAD
-    const originalA = await repo.fs.read(`${dir}/a.txt`)
-    const originalB = await repo.fs.read(`${dir}/b.js`)
-    await repo.fs.write(`${dir}/a.txt`, 'staged changes - a - ' + Date.now())
-    await repo.fs.write(`${dir}/b.js`, 'staged changes - b - ' + Date.now())
+    const originalA = await repo.worktreeBackend!.read('a.txt')
+    const originalB = await repo.worktreeBackend!.read('b.js')
+    await repo.worktreeBackend!.write(`a.txt`, 'staged changes - a - ' + Date.now())
+    await repo.worktreeBackend!.write(`b.js`, 'staged changes - b - ' + Date.now())
     
     // Stage the changes - this should record a mutation
     await add({ repo, filepath: ['a.txt', 'b.js'] })
@@ -652,7 +566,7 @@ describe('writeTreeChanges', () => {
     // Verify mutation was recorded (if the implementation records it)
     // Note: Some implementations may not record mutations, so we make this optional
     const { normalize } = await import('@awesome-os/universal-git-src/core-utils/GitPath.ts')
-    const normalizedGitdir = normalize(gitdir)
+    const normalizedGitdir = normalize(await repo.getGitdir())
     const latestWrite = mutationStream.getLatest('index-write', normalizedGitdir)
     // Only assert if mutation stream is being used
     if (latestWrite !== undefined) {
@@ -661,9 +575,7 @@ describe('writeTreeChanges', () => {
     
     // Now test writeTreeChanges - it should detect the staged changes
     const treeOid = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir,
+      repo,
       cache,
       treePair: [TREE({ ref: 'HEAD' }), 'stage'],
     })
@@ -679,8 +591,6 @@ describe('writeTreeChanges', () => {
 
   it('behavior:detect-changes-cache-invalidated', async () => {
     const { repo } = await makeFixture('test-stash')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
     
     // Set up user config
     await setupUserConfig(repo)
@@ -689,8 +599,8 @@ describe('writeTreeChanges', () => {
     const cache = {}
     
     // Make and stage changes with content different from HEAD
-    const originalContent = await repo.fs.read(`${dir}/a.txt`)
-    await repo.fs.write(`${dir}/a.txt`, 'staged content - ' + Date.now())
+    const originalContent = await repo.worktreeBackend!.read('a.txt')
+    await repo.worktreeBackend!.write(`a.txt`, 'staged content - ' + Date.now())
     await add({ repo, filepath: ['a.txt'] })
     
     // Verify file is staged
@@ -722,9 +632,7 @@ describe('writeTreeChanges', () => {
     
     // Now writeTreeChanges should still detect the changes
     const treeOid = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir,
+      repo,
       cache,
       treePair: [TREE({ ref: 'HEAD' }), 'stage'],
     })
@@ -738,8 +646,6 @@ describe('writeTreeChanges', () => {
 
   it('ok:handle-deleted-files', async () => {
     const { repo } = await makeFixture('test-stash')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
     
     // Set up user config
     await setupUserConfig(repo)
@@ -754,8 +660,8 @@ describe('writeTreeChanges', () => {
     
     // Make a change to another file to ensure we have something to compare
     // Use content that's different from HEAD
-    const originalB = await repo.fs.read(`${dir}/b.js`)
-    await repo.fs.write(`${dir}/b.js`, 'modified b - ' + Date.now())
+    const originalB = await repo.worktreeBackend!.read('b.js')
+    await repo.worktreeBackend!.write(`b.js`, 'modified b - ' + Date.now())
     await add({ repo, filepath: ['b.js'] })
     
     // Verify b.js is staged
@@ -765,9 +671,7 @@ describe('writeTreeChanges', () => {
     
     // writeTreeChanges should detect the change to b.js
     const treeOid = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir,
+      repo,
       cache,
       treePair: [TREE({ ref: 'HEAD' }), 'stage'],
     })
@@ -782,8 +686,6 @@ describe('writeTreeChanges', () => {
 
   it('ok:multiple-sequential-add', async () => {
     const { repo } = await makeFixture('test-stash')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
     
     // Set up user config
     await setupUserConfig(repo)
@@ -794,9 +696,9 @@ describe('writeTreeChanges', () => {
     // Add new files (not in HEAD) - these should definitely be detected
     // Using unique names to ensure they don't exist in HEAD
     const timestamp = Date.now()
-    await repo.fs.write(`${dir}/file1_${timestamp}.txt`, 'content 1')
-    await repo.fs.write(`${dir}/file2_${timestamp}.txt`, 'content 2')
-    await repo.fs.write(`${dir}/file3_${timestamp}.txt`, 'content 3')
+    await repo.worktreeBackend!.write(`file1_${timestamp}.txt`, 'content 1')
+    await repo.worktreeBackend!.write(`file2_${timestamp}.txt`, 'content 2')
+    await repo.worktreeBackend!.write(`file3_${timestamp}.txt`, 'content 3')
     
     // Add files sequentially
     await add({ repo, filepath: [`file1_${timestamp}.txt`] })
@@ -816,9 +718,7 @@ describe('writeTreeChanges', () => {
     
     // writeTreeChanges should detect all staged files
     const treeOid = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir,
+      repo,
       cache,
       treePair: [TREE({ ref: 'HEAD' }), 'stage'],
     })
@@ -834,16 +734,14 @@ describe('writeTreeChanges', () => {
 
   it('behavior:different-cache-instances', async () => {
     const { repo } = await makeFixture('test-stash')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
     
     // Set up user config
     await setupUserConfig(repo)
     
     // Simulate add() using one cache
     const addCache = {}
-    const originalContent = await repo.fs.read(`${dir}/a.txt`)
-    await repo.fs.write(`${dir}/a.txt`, 'staged changes - a - ' + Date.now())
+    const originalContent = await repo.worktreeBackend!.read('a.txt')
+    await repo.worktreeBackend!.write(`a.txt`, 'staged changes - a - ' + Date.now())
     await add({ repo, filepath: ['a.txt'] })
     
     // Verify file is staged
@@ -858,8 +756,14 @@ describe('writeTreeChanges', () => {
     
     // Force read from disk by reading the index with empty cache
     // This simulates stash() reading the index that was written by add()
+    // Create a new Repository instance with the same backends but different cache
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const stashRepo = await Repository.open({ fs: repo.fs, dir, cache: stashCache, autoDetectConfig: true })
+    const stashRepo = new Repository({
+      gitBackend: repo.gitBackend,
+      worktreeBackend: repo.worktreeBackend || undefined,
+      cache: stashCache,
+      autoDetectConfig: true,
+    })
     let index
     try {
       index = await stashRepo.readIndexDirect()
@@ -882,9 +786,7 @@ describe('writeTreeChanges', () => {
     
     // writeTreeChanges should detect the staged changes by reading from disk
     const treeOid = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir,
+      repo,
       cache: stashCache,
       treePair: [TREE({ ref: 'HEAD' }), 'stage'],
     })

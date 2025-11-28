@@ -110,15 +110,9 @@ export class MergeStream extends ReadableStream<MergeStreamEvent> {
       let gitdir: string | undefined
       if (this.options.gitdir) {
         gitdir = this.options.gitdir
-      } else if (this.options.gitBackend.getFileSystem) {
-        // Try to get gitdir from FilesystemBackend
-        const fs = this.options.gitBackend.getFileSystem()
-        if (fs) {
-          // For FilesystemBackend, we can extract gitdir from the fs instance
-          // This is a bit of a hack, but necessary for state mutation tracking
-          // In practice, gitdir should be provided in options
-          gitdir = undefined // Can't reliably extract from GitBackend alone
-        }
+      } else {
+        // gitdir must be provided in options - backends are black boxes
+        gitdir = undefined
       }
       
       if (gitdir) {
@@ -181,12 +175,27 @@ export class MergeStream extends ReadableStream<MergeStreamEvent> {
 
     // Use the existing mergeTree function - it's already well-tested
     const { mergeTree } = await import('../git/merge/mergeTree.ts')
+    const { Repository } = await import('./Repository.ts')
+    const { createGitWorktreeBackend } = await import('../git/worktree/index.ts')
+    
+    // Create Repository with proper worktree backend if fs and dir are available
+    let worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend | undefined
+    if (this.options.fs && this.options.dir) {
+      worktreeBackend = createGitWorktreeBackend({ fs: this.options.fs, dir: this.options.dir })
+    }
+    
+    const repo = new Repository({
+      gitBackend,
+      worktreeBackend,
+      cache: this.options.cache || {},
+      autoDetectConfig: true,
+    })
     
     await this.emit({ type: 'merge-start', data: {} })
 
     try {
       const result = await mergeTree({
-        gitBackend,
+        repo,
         index,
         ourOid,
         baseOid,
@@ -197,10 +206,6 @@ export class MergeStream extends ReadableStream<MergeStreamEvent> {
         abortOnConflict: this.options.abortOnConflict,
         dryRun: this.options.dryRun,
         mergeDriver: this.options.mergeDriver,
-        fs: this.options.fs,
-        dir: this.options.dir,
-        cache: this.options.cache,
-        gitdir: this.options.gitdir,
       })
 
       if (typeof result === 'string') {

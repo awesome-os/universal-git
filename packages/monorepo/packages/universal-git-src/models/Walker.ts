@@ -11,7 +11,11 @@ import { flat } from '../utils/flat.ts'
  * Walker - an opaque handle for tree traversal
  */
 export type Walker = {
-  [GitWalkSymbol]: (args: { repo: Repository }) => Promise<unknown>
+  [GitWalkSymbol]: (args: { 
+    gitBackend: import('../backends/GitBackend.ts').GitBackend
+    worktreeBackend?: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend
+    cache?: Record<string, unknown>
+  }) => Promise<unknown>
 }
 
 /**
@@ -108,7 +112,11 @@ export class WalkerFactory {
    * Similar to UniversalBuffer.from() - normalizes input
    */
   static from(
-    factory: (args: { repo: Repository }) => Promise<unknown>
+    factory: (args: { 
+      gitBackend: import('../backends/GitBackend.ts').GitBackend
+      worktreeBackend?: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend
+      cache?: Record<string, unknown>
+    }) => Promise<unknown>
   ): Walker {
     const o = Object.create(null)
     Object.defineProperty(o, GitWalkSymbol, {
@@ -124,10 +132,8 @@ export class WalkerFactory {
    * Creates a TREE walker
    */
   static tree({ ref = 'HEAD' }: { ref?: string } = {}): Walker {
-    return WalkerFactory.from(async ({ repo }) => {
-      const { GitWalkerRepo } = await import('./GitWalkerRepo.ts')
-      const gitdir = await repo.getGitdir()
-      return new GitWalkerRepo({ fs: repo.fs, gitdir, ref, cache: repo.cache })
+    return WalkerFactory.from(async ({ gitBackend, cache = {} }) => {
+      return await gitBackend.createTreeWalker(ref, cache)
     })
   }
 
@@ -135,14 +141,11 @@ export class WalkerFactory {
    * Creates a WORKDIR walker
    */
   static workdir(): Walker {
-    return WalkerFactory.from(async ({ repo }) => {
-      const { GitWalkerFs } = await import('./GitWalkerFs.ts')
-      // Use getDir() to properly check if repository has a working directory
-      const dir = await repo.getDir()
-      if (!dir) {
+    return WalkerFactory.from(async ({ gitBackend, worktreeBackend }) => {
+      if (!worktreeBackend) {
         throw new Error('Cannot create WORKDIR walker for bare repository')
       }
-      return new GitWalkerFs({ repo })
+      return await worktreeBackend.createWorkdirWalker(gitBackend)
     })
   }
 
@@ -150,9 +153,8 @@ export class WalkerFactory {
    * Creates a STAGE walker
    */
   static stage(): Walker {
-    return WalkerFactory.from(async ({ repo }) => {
-      const { GitWalkerIndex } = await import('./GitWalkerIndex.ts')
-      return new GitWalkerIndex({ repo })
+    return WalkerFactory.from(async ({ gitBackend, cache = {} }) => {
+      return await gitBackend.createIndexWalker(cache)
     })
   }
 }

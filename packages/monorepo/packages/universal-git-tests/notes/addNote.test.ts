@@ -90,7 +90,7 @@ test('addNote', async (t) => {
 
   await t.test('behavior:consecutive-notes-accumulate', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-addNote')
+    const { fs, gitdir, repo } = await makeFixture('test-addNote')
     // Test
     {
       const oid = await addNote({
@@ -105,7 +105,7 @@ test('addNote', async (t) => {
         oid: 'f6d51b1f9a449079f6999be1fb249c359511f164',
         note: 'This is a note about a commit.',
       })
-      const { tree } = await readTree({ fs, gitdir, oid })
+      const { tree } = await readTree({ repo, oid })
       assert.strictEqual(tree.length, 1)
     }
     {
@@ -121,7 +121,7 @@ test('addNote', async (t) => {
         oid: '199948939a0b95c6f27668689102496574b2c332',
         note: 'This is a note about a tree.',
       })
-      const { tree } = await readTree({ fs, gitdir, oid })
+      const { tree } = await readTree({ repo, oid })
       assert.strictEqual(tree.length, 2)
     }
     {
@@ -137,7 +137,7 @@ test('addNote', async (t) => {
         oid: '68aba62e560c0ebc3396e8ae9335232cd93a3f60',
         note: 'This is a note about a blob.',
       })
-      const { tree } = await readTree({ fs, gitdir, oid })
+      const { tree } = await readTree({ repo, oid })
       assert.strictEqual(tree.length, 3)
     }
   })

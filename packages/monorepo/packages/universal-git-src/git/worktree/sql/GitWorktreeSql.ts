@@ -20,7 +20,7 @@ export class GitWorktreeSql implements GitWorktreeBackend {
   readonly name: string
   private readonly database: any // SQL database interface (to be defined)
   private readonly tablePrefix: string
-  private _repo: Repository | null = null
+  private _submoduleInfo: Map<string, { name: string; path: string; url: string; branch?: string }> = new Map()
   private _submoduleCache: SubmoduleCache = new SubmoduleCache()
 
   constructor(
@@ -33,64 +33,55 @@ export class GitWorktreeSql implements GitWorktreeBackend {
     this.name = name ?? crypto.randomUUID()
   }
 
-  getFileSystem(): null {
-    return null // SQL backend doesn't use filesystem
-  }
 
   getDirectory(): null {
     return null // SQL backend doesn't have a directory path
-  }
-
-  getRepository(): Repository | null {
-    return this._repo
-  }
-
-  setRepository(repo: Repository | null): void {
-    this._repo = repo
-    this._submoduleCache.clear()
   }
 
   // ============================================================================
   // Submodule Operations
   // ============================================================================
 
+  /**
+   * Get submodule information by path
+   * Called by GitBackend to query submodule info
+   */
+  async getSubmodule(path: string): Promise<{ name: string; path: string; url: string; branch?: string } | null> {
+    return this._submoduleInfo.get(path) || null
+  }
+
+  /**
+   * Set submodule information
+   * Called by GitBackend to store submodule info
+   */
+  async setSubmodule(path: string, info: { name: string; path: string; url: string; branch?: string }): Promise<void> {
+    this._submoduleInfo.set(path, info)
+  }
+
   async addSubmodule(normalizedPath: string, submoduleRepo: Repository): Promise<void> {
     await addSubmoduleToBackend(this, normalizedPath, submoduleRepo, this._submoduleCache)
   }
 
-  async getSubmodule(submodulePath: string): Promise<GitWorktreeBackend | null> {
+  async getSubmoduleBackend(submodulePath: string): Promise<GitWorktreeBackend | null> {
     return await getSubmoduleFromBackend(
       this,
       submodulePath,
-      this._repo,
       this._submoduleCache,
       async (path) => {
-        if (!this._repo) {
-          return null
-        }
-        
-        try {
-          const submoduleRepo = await this._repo.getSubmodule(path)
-          const submoduleWorktree = await submoduleRepo.getWorktree()
-          return submoduleWorktree?.backend || null
-        } catch {
-          return null
-        }
+        // Without Repository access, we cannot load submodule backends
+        // This should be handled by Repository.getSubmodule() which creates the submodule Repository
+        // and then gets its worktree backend
+        return null
       }
     )
   }
 
   async listSubmodules(): Promise<Array<{ path: string; backend: GitWorktreeBackend }>> {
-    if (!this._repo) {
-      return []
-    }
-
-    const { parseGitmodules } = await import('../../../core-utils/filesystem/SubmoduleManager.ts')
-    const submodules = await parseGitmodules({ repo: this._repo })
     const results: Array<{ path: string; backend: GitWorktreeBackend }> = []
 
-    for (const [name, info] of submodules.entries()) {
-      const backend = await this.getSubmodule(info.path)
+    // Use stored submodule info
+    for (const [path, info] of this._submoduleInfo.entries()) {
+      const backend = await this.getSubmoduleBackend(info.path)
       if (backend) {
         results.push({
           path: info.path,
@@ -116,15 +107,10 @@ export class GitWorktreeSql implements GitWorktreeBackend {
   }
 
   async getSubmoduleForPath(path: string): Promise<string | null> {
-    if (!this._repo) {
-      return null
-    }
-
     const normalizedPath = normalize(path)
-    const { parseGitmodules } = await import('../../../core-utils/filesystem/SubmoduleManager.ts')
-    const submodules = await parseGitmodules({ repo: this._repo })
 
-    for (const [name, info] of submodules.entries()) {
+    // Use stored submodule info
+    for (const [storedPath, info] of this._submoduleInfo.entries()) {
       const submodulePath = normalize(info.path)
       if (normalizedPath === submodulePath || normalizedPath.startsWith(submodulePath + '/')) {
         return submodulePath
@@ -150,7 +136,7 @@ export class GitWorktreeSql implements GitWorktreeBackend {
     const submodulePath = await this.getSubmoduleForPath(normalizedPath)
 
     if (submodulePath) {
-      const submoduleBackend = await this.getSubmodule(submodulePath)
+      const submoduleBackend = await this.getSubmoduleBackend(submodulePath)
       if (submoduleBackend) {
         const relativePath = normalizedPath === submodulePath
           ? '.'
@@ -232,6 +218,11 @@ export class GitWorktreeSql implements GitWorktreeBackend {
       return submodule.worktree.readdirDeep(submodule.relativePath)
     }
     throw new Error('SQL backend readdirDeep not yet implemented')
+  }
+
+  async listFiles(): Promise<string[]> {
+    // List all files in the working directory recursively
+    return this.readdirDeep('.')
   }
 
   async rmdir(path: string, options?: { recursive?: boolean }): Promise<void> {

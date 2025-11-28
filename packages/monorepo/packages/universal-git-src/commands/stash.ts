@@ -225,7 +225,14 @@ async function _createStashCommit({ fs, dir, gitdir, message = '', cache = {}, r
   // which might fail with NotFoundError in a fresh repository
   // Ensure index is read from disk before writeTreeChanges
   if (repo) {
-    await repo.readIndexDirect(false) // Force fresh read to bypass cache
+    // Force fresh read to bypass cache
+    if (repo.gitBackend) {
+      try {
+        await repo.gitBackend.readIndex()
+      } catch {
+        // Index doesn't exist, that's okay
+      }
+    }
   } else {
     // Fallback: use direct readIndex for backward compatibility
     const { readIndex } = await import('../git/index/readIndex.ts')
@@ -394,8 +401,33 @@ export async function _stashPush({ fs, dir, gitdir, message = '', cache = {}, re
   
   // Check for unmerged paths before stashing
   if (repo) {
-    const index = await repo.readIndexDirect(false, false) // Force fresh read, allowUnmerged: false
-    // If there are unmerged paths, readIndexDirect will throw UnmergedPathsError
+    const { GitIndex } = await import('../git/index/GitIndex.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+    
+    let indexBuffer: UniversalBuffer
+    if (repo.gitBackend) {
+      try {
+        indexBuffer = await repo.gitBackend.readIndex()
+      } catch {
+        indexBuffer = UniversalBuffer.alloc(0)
+      }
+    } else {
+      throw new Error('gitBackend is required')
+    }
+    
+    let index: GitIndex
+    if (indexBuffer.length === 0) {
+      index = new GitIndex()
+    } else {
+      const objectFormat = await detectObjectFormat(fs, effectiveGitdir, repo.cache, repo.gitBackend)
+      index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+    }
+    
+    // Check for unmerged paths
+    if (index.unmergedPaths.length > 0) {
+      throw new UnmergedPathsError(index.unmergedPaths)
+    }
   } else {
     // Fallback: use direct readIndex and check unmerged paths manually
     const { readIndex } = await import('../git/index/readIndex.ts')
@@ -449,7 +481,29 @@ export async function _stashPush({ fs, dir, gitdir, message = '', cache = {}, re
   
   // CRITICAL: Check index state before checkout to see what's staged
   if (repo) {
-    const index = await repo.readIndexDirect(false) // Force fresh read
+    const { GitIndex } = await import('../git/index/GitIndex.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+    
+    let indexBuffer: UniversalBuffer
+    if (repo.gitBackend) {
+      try {
+        indexBuffer = await repo.gitBackend.readIndex()
+      } catch {
+        indexBuffer = UniversalBuffer.alloc(0)
+      }
+    } else {
+      throw new Error('gitBackend is required')
+    }
+    
+    let index: GitIndex
+    if (indexBuffer.length === 0) {
+      index = new GitIndex()
+    } else {
+      const objectFormat = await detectObjectFormat(fs, effectiveGitdir, repo.cache, repo.gitBackend)
+      index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+    }
+    
     const indexFilepaths = Array.from(index.entriesMap.keys())
   }
   
@@ -482,8 +536,33 @@ export async function _stashCreate({ fs, dir, gitdir, message = '', cache = {}, 
   // Check for unmerged paths before creating stash
   const effectiveGitdir = repo ? await repo.getGitdir() : gitdir
   if (repo) {
-    const index = await repo.readIndexDirect(false, false) // Force fresh read, allowUnmerged: false
-    // If there are unmerged paths, readIndexDirect will throw UnmergedPathsError
+    const { GitIndex } = await import('../git/index/GitIndex.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+    
+    let indexBuffer: UniversalBuffer
+    if (repo.gitBackend) {
+      try {
+        indexBuffer = await repo.gitBackend.readIndex()
+      } catch {
+        indexBuffer = UniversalBuffer.alloc(0)
+      }
+    } else {
+      throw new Error('gitBackend is required')
+    }
+    
+    let index: GitIndex
+    if (indexBuffer.length === 0) {
+      index = new GitIndex()
+    } else {
+      const objectFormat = await detectObjectFormat(fs, effectiveGitdir, repo.cache, repo.gitBackend)
+      index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+    }
+    
+    // Check for unmerged paths
+    if (index.unmergedPaths.length > 0) {
+      throw new UnmergedPathsError(index.unmergedPaths)
+    }
   } else {
     // Fallback: use direct readIndex and check unmerged paths manually
     const { readIndex } = await import('../git/index/readIndex.ts')
@@ -520,8 +599,33 @@ export async function _stashApply({ fs, dir, gitdir, refIdx = 0, cache = {}, rep
   
   // Check for unmerged paths before applying stash
   if (repo) {
-    const index = await repo.readIndexDirect(false, false) // Force fresh read, allowUnmerged: false
-    // If there are unmerged paths, readIndexDirect will throw UnmergedPathsError
+    const { GitIndex } = await import('../git/index/GitIndex.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+    
+    let indexBuffer: UniversalBuffer
+    if (repo.gitBackend) {
+      try {
+        indexBuffer = await repo.gitBackend.readIndex()
+      } catch {
+        indexBuffer = UniversalBuffer.alloc(0)
+      }
+    } else {
+      throw new Error('gitBackend is required')
+    }
+    
+    let index: GitIndex
+    if (indexBuffer.length === 0) {
+      index = new GitIndex()
+    } else {
+      const objectFormat = await detectObjectFormat(fs, effectiveGitdir, repo.cache, repo.gitBackend)
+      index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+    }
+    
+    // Check for unmerged paths
+    if (index.unmergedPaths.length > 0) {
+      throw new UnmergedPathsError(index.unmergedPaths)
+    }
   } else {
     // Fallback: use direct readIndex and check unmerged paths manually
     const { readIndex } = await import('../git/index/readIndex.ts')

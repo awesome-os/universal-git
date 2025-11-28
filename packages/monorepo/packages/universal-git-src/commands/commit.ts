@@ -3,7 +3,6 @@ import { MissingParameterError } from "../errors/MissingParameterError.ts"
 import { NoCommitError } from "../errors/NoCommitError.ts"
 import { UnmergedPathsError } from "../errors/UnmergedPathsError.ts"
 import { GitIndex } from "../git/index/GitIndex.ts"
-// RefManager import removed - using Repository.resolveRef/writeRef methods instead
 import { logRefUpdate } from "../git/logs/logRefUpdate.ts"
 import { REFLOG_MESSAGES } from "../git/logs/messages.ts"
 import { writeCommit } from "./writeCommit.ts"
@@ -70,7 +69,7 @@ export async function commit({
   autoDetectConfig?: boolean
 }): Promise<string> {
   try {
-    const { repo, fs: effectiveFs, gitdir: effectiveGitdir, cache: effectiveCache } = await normalizeCommandArgs({
+    const { repo, gitdir: effectiveGitdir } = await normalizeCommandArgs({
       repo: _repo,
       fs: _fs,
       dir,
@@ -90,31 +89,37 @@ export async function commit({
       tree,
     })
 
-    assertParameter('gitdir', effectiveGitdir)
-    if (!amend) {
-      assertParameter('message', message)
-    }
-    if (signingKey) {
-      assertParameter('onSign', onSign)
+    const worktreeBackend = repo?.worktreeBackend ?? (repo ? repo.getWorktree()?.worktreeBackend : null)
+    if (!worktreeBackend) {
+      throw new Error('Cannot commit in bare repository - worktree backend not available')
     }
 
-    return await _commit({
-      fs: effectiveFs,
-      cache: effectiveCache,
-      onSign,
-      gitdir: effectiveGitdir,
-      originalGitdir: gitdir, // Pass original gitdir for reflog consistency
-      message,
+    if (!amend && !message) {
+      throw new MissingParameterError('message')
+    }
+    if (signingKey && !onSign) {
+      throw new MissingParameterError('onSign')
+    }
+
+    // Use gitBackend.commit() with worktreeBackend for file operations
+    if (!gitBackend) {
+      throw new MissingParameterError('gitBackend (required for commit operation)')
+    }
+    if (!worktreeBackend) {
+      throw new MissingParameterError('worktreeBackend (required for commit operation)')
+    }
+
+    return await gitBackend.commit(worktreeBackend, message || '', {
       author,
       committer,
       signingKey,
+      onSign,
       amend,
       dryRun,
       noUpdateBranch,
       ref,
       parent,
       tree,
-      repo,
     })
   } catch (err) {
     ;(err as { caller?: string }).caller = 'git.commit'
@@ -280,67 +285,65 @@ export async function _commit({
 
   const indexPath = join(gitdir, 'index')
   return indexLock.acquire(indexPath, async () => {
-    // Read index using Repository.readIndexDirect() if repo is available
-    // This ensures proper unmerged paths detection
-    let index
-    if (repo) {
+    // Read index using gitBackend.readIndex() directly
+    let index: GitIndex
+    let indexBuffer: UniversalBuffer = UniversalBuffer.alloc(0)
+    
+    if (repo?.gitBackend) {
       try {
-        index = await repo.readIndexDirect(false, false) // Force fresh read, allowUnmerged: false
-        // If there are unmerged paths, readIndexDirect will throw UnmergedPathsError
-      } catch (error) {
-        // If readIndexDirect throws UnmergedPathsError, re-throw it
-        if (error instanceof UnmergedPathsError) {
-          throw error
-        }
-        // For other errors, fall back to direct file read
-        let indexBuffer: UniversalBuffer = UniversalBuffer.alloc(0)
-        try {
-          const indexData = await fs.read(indexPath)
-          indexBuffer = UniversalBuffer.from(indexData as string | Uint8Array)
-        } catch {
-          // Index doesn't exist yet
-        }
-        if (indexBuffer.length === 0) {
-          index = new GitIndex(null, undefined, 2)
-        } else {
-          index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
-        }
-        if (index.unmergedPaths.length > 0) {
-          throw new UnmergedPathsError(index.unmergedPaths)
-        }
-      }
-    } else {
-      // Fallback: read index directly from file
-      let indexBuffer: UniversalBuffer = UniversalBuffer.alloc(0)
-      try {
-        const indexData = await fs.read(indexPath)
-        indexBuffer = UniversalBuffer.from(indexData as string | Uint8Array)
+        indexBuffer = await repo.gitBackend.readIndex()
       } catch {
         // Index doesn't exist yet
       }
-
-      // Handle empty index - create an empty index object instead of parsing
-      if (indexBuffer.length === 0) {
-        // Empty index - create a minimal index object with default version
-        index = new GitIndex(null, undefined, 2)
-      } else {
-        // Detect object format for index parsing
-        const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
-        const format = await detectObjectFormat(fs, gitdir)
-        index = await GitIndex.fromBuffer(indexBuffer, format)
+    } else if (fs && gitdir) {
+      // Fallback: try to create a repo to get gitBackend
+      try {
+        const { createRepository } = await import('../core-utils/createRepository.ts')
+        const tempRepo = await createRepository({ fs, gitdir, cache, autoDetectConfig: false })
+        if (tempRepo.gitBackend) {
+          indexBuffer = await tempRepo.gitBackend.readIndex()
+        } else {
+          // Fallback to fs
+          const indexData = await fs.read(indexPath)
+          indexBuffer = UniversalBuffer.from(indexData as string | Uint8Array)
+        }
+      } catch {
+        // Index doesn't exist yet
       }
+    } else {
+      throw new Error('Cannot read index: no filesystem or gitdir available')
+    }
 
-      // Check for unmerged paths
-      if (index.unmergedPaths.length > 0) {
-        throw new UnmergedPathsError(index.unmergedPaths)
-      }
+    // Handle empty index - create an empty index object instead of parsing
+    if (indexBuffer.length === 0) {
+      // Empty index - create a minimal index object with default version
+      index = new GitIndex(null, undefined, 2)
+    } else {
+      // Detect object format for index parsing
+      const format = await detectObjectFormat(fs || undefined, gitdir || '', cache, repo?.gitBackend)
+      index = await GitIndex.fromBuffer(indexBuffer, format)
+    }
+
+    // Check for unmerged paths
+    if (index.unmergedPaths.length > 0) {
+      throw new UnmergedPathsError(index.unmergedPaths)
     }
 
     // Build tree from index
+    // Only include stage 0 entries (normal entries, not conflicted)
+    // For normal entries, entry.stages = [entry] where entry.flags.stage === 0
+    // For conflicted entries, entry.stages contains multiple stages, but we only want stage 0
     const entries = index.entries.flatMap(entry => {
-      // Get the main entry (stage 0) or the first stage
-      const mainEntry = entry.stages.length > 0 ? entry.stages[0] : entry
-      return mainEntry ? [mainEntry] : []
+      // For normal entries, entry itself is stage 0 and entry.stages = [entry]
+      // For conflicted entries, we need to find the stage 0 entry in entry.stages
+      if (entry.flags.stage === 0) {
+        // Entry itself is stage 0 - use it directly
+        return [entry]
+      } else {
+        // Entry is not stage 0 (conflicted) - find stage 0 in stages array
+        const stage0Entry = entry.stages.find(s => s && s.flags.stage === 0)
+        return stage0Entry ? [stage0Entry] : []
+      }
     })
 
     const inodes = flatFileListToDirectoryStructure(entries)
@@ -822,12 +825,28 @@ async function constructTree({
       child.metadata.oid = await constructTree({ repo, fs, gitdir, inode: child as Inode, dryRun, cache, objectFormat })
     }
   }
-  const entries = children.map(child => ({
-    mode: child.metadata.mode || '100644',
-    path: child.basename,
-    oid: child.metadata.oid || '',
-    type: child.type as 'tree' | 'blob' | 'commit',
-  }))
+  const entries = children.map(child => {
+    // Convert numeric mode to octal string (e.g., 33188 -> '100644')
+    // Index entries have mode as number, but tree entries need mode as octal string
+    // The metadata contains the full index entry, so mode and oid are direct properties
+    const metadata = child.metadata as { mode?: number | string; oid?: string; [key: string]: unknown }
+    let mode: string
+    if (metadata.mode !== undefined && metadata.mode !== null) {
+      if (typeof metadata.mode === 'number') {
+        mode = metadata.mode.toString(8).padStart(6, '0')
+      } else {
+        mode = String(metadata.mode)
+      }
+    } else {
+      mode = '100644' // Default mode for regular files
+    }
+    return {
+      mode,
+      path: child.basename,
+      oid: metadata.oid || '',
+      type: child.type as 'tree' | 'blob' | 'commit',
+    }
+  })
   // Write tree using writeTree with dryRun support
   const oid = await writeTree({
     repo,

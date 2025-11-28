@@ -12,35 +12,25 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 
 // NOTE: we cannot actually commit a real .gitignore file in fixtures or fixtures won't be included in this repo
 const writeGitIgnore = async (repo: Repository) => {
-  if (!repo.fs) {
-    throw new Error('Filesystem not available - checkout to a WorktreeBackend first')
+  if (!repo.worktreeBackend) {
+    throw new Error('WorktreeBackend not available')
   }
-  const dir = await repo.getDir()
-  if (!dir) {
-    throw new Error('Working directory not available')
-  }
-  const { join } = await import('@awesome-os/universal-git-src/core-utils/GitPath.ts')
   const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
   const content = ['*-pattern.js', 'i.txt', 'js_modules', '.DS_Store'].join('\n')
-  await repo.fs.write(
-    join(dir, '.gitignore'),
+  await repo.worktreeBackend.write(
+    '.gitignore',
     UniversalBuffer.from(content, 'utf8')
   )
 }
 
 // NOTE: we cannot actually commit a real symlink in fixtures because it relies on core.symlinks being enabled
 const writeSymlink = async (repo: Repository) => {
-  if (!repo.fs) {
-    throw new Error('Filesystem not available - checkout to a WorktreeBackend first')
+  if (!repo.worktreeBackend) {
+    throw new Error('WorktreeBackend not available')
   }
-  const dir = await repo.getDir()
-  if (!dir) {
-    throw new Error('Working directory not available')
-  }
-  const { join } = await import('@awesome-os/universal-git-src/core-utils/GitPath.ts')
   const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
   try {
-    await repo.fs.writelink(join(dir, 'e-link.txt'), UniversalBuffer.from('c/e.txt', 'utf8'))
+    await repo.worktreeBackend.writelink('e-link.txt', 'c/e.txt')
   } catch {
     // Symlinks may not be supported
   }
@@ -53,8 +43,6 @@ describe('add', () => {
     await repo.init()
     
     // makeFixture already provides a worktreeBackend and automatically checks out to it
-    // So repo.fs is available immediately after Repository.open
-    // If we need a different WorktreeBackend, we can create one and checkout to it
     
     // Test
     await repo.add('a.txt')
@@ -298,19 +286,14 @@ describe('add', () => {
     const { repo } = await makeFixture('test-add-autocrlf')
     await repo.init()
     
-    if (!repo.fs) {
-      throw new Error('Filesystem not available')
+    if (!repo.worktreeBackend) {
+      throw new Error('WorktreeBackend not available')
     }
-    const dir = await repo.getDir()
-    if (!dir) {
-      throw new Error('Working directory not available')
-    }
-    const { join } = await import('@awesome-os/universal-git-src/core-utils/GitPath.ts')
     const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
     
     const autocrlf = await getConfig({ repo, path: 'core.autocrlf' })
     assert.strictEqual(autocrlf, 'true')
-    const files = await repo.fs.readdir(dir)
+    const files = await repo.worktreeBackend.readdir('')
     assert.ok(files !== null && files !== undefined, 'readdir should return an array')
     assert.ok(files.includes('20thcenturyfoodcourt.png'))
     assert.ok(files.includes('Test.md'))
@@ -321,10 +304,10 @@ describe('add', () => {
     const index = await listFiles({ repo })
     assert.ok(index.includes('20thcenturyfoodcourt.png'))
     assert.ok(index.includes('Test.md'))
-    const testMdData = await repo.fs.read(join(dir, 'Test.md'))
+    const testMdData = await repo.worktreeBackend.read('Test.md')
     const testMdContent = testMdData ? new TextDecoder().decode(UniversalBuffer.isBuffer(testMdData) ? testMdData : UniversalBuffer.from(testMdData, 'utf8')) : ''
     assert.ok(testMdContent.includes(`\r\n`))
-    await repo.fs.write(join(dir, 'README.md'), UniversalBuffer.from('# test', 'utf8'))
+    await repo.worktreeBackend.write('README.md', UniversalBuffer.from('# test', 'utf8'))
 
     await repo.add('README.md')
 
@@ -356,21 +339,16 @@ describe('add', () => {
     const { repo } = await makeFixture('test-add')
     await repo.init()
     
-    if (!repo.fs) {
-      throw new Error('Filesystem not available')
+    if (!repo.worktreeBackend) {
+      throw new Error('WorktreeBackend not available')
     }
-    const dir = await repo.getDir()
-    if (!dir) {
-      throw new Error('Working directory not available')
-    }
-    const { join } = await import('@awesome-os/universal-git-src/core-utils/GitPath.ts')
     const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
     
     // Create a directory with multiple files
-    await repo.fs.mkdir(join(dir, 'subdir'))
-    await repo.fs.write(join(dir, 'subdir/file1.txt'), UniversalBuffer.from('content1', 'utf8'))
-    await repo.fs.write(join(dir, 'subdir/file2.txt'), UniversalBuffer.from('content2', 'utf8'))
-    await repo.fs.write(join(dir, 'subdir/file3.txt'), UniversalBuffer.from('content3', 'utf8'))
+    await repo.worktreeBackend.mkdir('subdir')
+    await repo.worktreeBackend.write('subdir/file1.txt', UniversalBuffer.from('content1', 'utf8'))
+    await repo.worktreeBackend.write('subdir/file2.txt', UniversalBuffer.from('content2', 'utf8'))
+    await repo.worktreeBackend.write('subdir/file3.txt', UniversalBuffer.from('content3', 'utf8'))
     
     // Add directory with parallel=false
     const { add } = await import('@awesome-os/universal-git-src/commands/add.ts')
@@ -386,17 +364,12 @@ describe('add', () => {
     const { repo } = await makeFixture('test-add')
     await repo.init()
     
-    if (!repo.fs) {
-      throw new Error('Filesystem not available')
+    if (!repo.worktreeBackend) {
+      throw new Error('WorktreeBackend not available')
     }
-    const dir = await repo.getDir()
-    if (!dir) {
-      throw new Error('Working directory not available')
-    }
-    const { join } = await import('@awesome-os/universal-git-src/core-utils/GitPath.ts')
     
     // Create an empty directory
-    await repo.fs.mkdir(join(dir, 'empty-dir'))
+    await repo.worktreeBackend.mkdir('empty-dir')
     
     // Add empty directory - should not fail but also not add anything
     await repo.add('empty-dir')
@@ -410,18 +383,13 @@ describe('add', () => {
     const { repo } = await makeFixture('test-add')
     await repo.init()
     
-    if (!repo.fs) {
-      throw new Error('Filesystem not available')
+    if (!repo.worktreeBackend) {
+      throw new Error('WorktreeBackend not available')
     }
-    const dir = await repo.getDir()
-    if (!dir) {
-      throw new Error('Working directory not available')
-    }
-    const { join } = await import('@awesome-os/universal-git-src/core-utils/GitPath.ts')
     const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
     
     // Create a file
-    await repo.fs.write(join(dir, 'file.txt'), UniversalBuffer.from('content', 'utf8'))
+    await repo.worktreeBackend.write('file.txt', UniversalBuffer.from('content', 'utf8'))
     
     // The LFS filter might fail, but add should still work
     // This tests the catch block in the LFS filter application
@@ -435,14 +403,9 @@ describe('add', () => {
     const { repo } = await makeFixture('test-add')
     await repo.init()
     
-    if (!repo.fs) {
-      throw new Error('Filesystem not available')
+    if (!repo.worktreeBackend) {
+      throw new Error('WorktreeBackend not available')
     }
-    const dir = await repo.getDir()
-    if (!dir) {
-      throw new Error('Working directory not available')
-    }
-    const { join } = await import('@awesome-os/universal-git-src/core-utils/GitPath.ts')
     const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
     
     // Set autocrlf to true
@@ -450,7 +413,7 @@ describe('add', () => {
     await config.set('core.autocrlf', 'true', 'local')
     
     // Create a file with LF line endings
-    await repo.fs.write(join(dir, 'file.txt'), UniversalBuffer.from('line1\nline2\n', 'utf8'))
+    await repo.worktreeBackend.write('file.txt', UniversalBuffer.from('line1\nline2\n', 'utf8'))
     
     await repo.add('file.txt')
     

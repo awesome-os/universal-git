@@ -236,15 +236,21 @@ function getDefaultExecutor(): HookExecutor {
 /**
  * Runs a Git hook
  * 
- * @param fs - File system client
- * @param gitdir - Path to .git directory
+ * Supports both GitBackend (preferred) and legacy fs/gitdir parameters.
+ * 
+ * @param gitBackend - GitBackend instance (preferred)
+ * @param fs - File system client (legacy, used if gitBackend not provided)
+ * @param gitdir - Path to .git directory (legacy, used if gitBackend not provided)
  * @param hookName - Name of the hook (e.g., 'pre-commit', 'post-commit')
  * @param context - Hook execution context (environment variables, etc.)
  * @param executor - Optional custom hook executor (defaults to environment-appropriate executor)
+ * @param stdin - Optional standard input for the hook
+ * @param args - Optional command-line arguments for the hook
  * @returns Promise resolving to hook execution result
  * @throws Error if hook exists and returns non-zero exit code
  */
 export async function runHook({
+  gitBackend,
   fs,
   gitdir,
   hookName,
@@ -253,14 +259,25 @@ export async function runHook({
   stdin,
   args = [],
 }: {
-  fs: FileSystemProvider
-  gitdir: string
+  gitBackend?: import('../../backends/GitBackend.ts').GitBackend
+  fs?: FileSystemProvider
+  gitdir?: string
   hookName: string
   context?: HookContext
   executor?: HookExecutor
   stdin?: string | UniversalBuffer
   args?: string[]
 }): Promise<HookResult> {
+  // Use GitBackend if provided (preferred)
+  if (gitBackend) {
+    return await gitBackend.runHook(hookName, context, executor, stdin, args)
+  }
+
+  // Legacy: use fs/gitdir
+  if (!fs || !gitdir) {
+    throw new Error('Either gitBackend or both fs and gitdir must be provided')
+  }
+
   // Check if hook should run
   const shouldRun = await shouldRunHook({ fs, gitdir, hookName })
   if (!shouldRun) {

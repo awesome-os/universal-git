@@ -44,21 +44,20 @@ export type MergeResult = {
 }
 
 /**
- * Merge two branches
- * @param repo - Repository instance (preferred, will be created if not provided)
- * @param fs - Filesystem client
- * @param dir - Working directory
- * @param gitdir - Git directory
- * @param cache - Cache object
+ * Merge two branches from potentially different GitBackends
+ * 
+ * This function merges two branches, where each branch can come from a different GitBackend.
+ * The merge result is written to the "ours" backend.
+ * 
+ * @param ours - The "ours" branch: { gitBackend: GitBackend, ref: string }
+ * @param theirs - The "theirs" branch: { gitBackend: GitBackend, ref: string }
+ * @param mergeDriver - Optional custom merge driver
+ * @param options - Additional merge options (fastForward, dryRun, etc.)
  */
 export async function merge({
-  repo: _repo,
-  fs,
-  onSign,
-  dir,
-  gitdir = dir ? join(dir, '.git') : undefined,
-  ours,
-  theirs,
+  ours: _ours,
+  theirs: _theirs,
+  mergeDriver,
   fastForward = true,
   fastForwardOnly = false,
   dryRun = false,
@@ -68,18 +67,19 @@ export async function merge({
   author: _author,
   committer: _committer,
   signingKey,
+  onSign,
   cache = {},
   allowUnrelatedHistories = false,
-  mergeDriver,
+  // Legacy parameters for backward compatibility
+  repo: _repo,
+  fs,
+  dir,
+  gitdir,
   autoDetectConfig = true,
 }: {
-  repo?: Repository
-  fs?: FileSystem
-  onSign?: SignCallback
-  dir?: string
-  gitdir?: string
-  ours?: string
-  theirs: string
+  ours?: string | { gitBackend: import('../backends/GitBackend.ts').GitBackend, ref: string }
+  theirs: string | { gitBackend: import('../backends/GitBackend.ts').GitBackend, ref: string }
+  mergeDriver?: import('../git/merge/types.ts').MergeDriverCallback
   fastForward?: boolean
   fastForwardOnly?: boolean
   dryRun?: boolean
@@ -89,38 +89,103 @@ export async function merge({
   author?: Partial<Author>
   committer?: Partial<Author>
   signingKey?: string
+  onSign?: SignCallback
   cache?: Record<string, unknown>
   allowUnrelatedHistories?: boolean
-  mergeDriver?: (params: {
-    branches: [string, string, string]
-    contents: [string, string, string]
-    path: string
-  }) => { cleanMerge: boolean; mergedText: string }
+  // Legacy parameters for backward compatibility
+  repo?: Repository
+  fs?: FileSystem
+  dir?: string
+  gitdir?: string
   autoDetectConfig?: boolean
 }): Promise<MergeResult> {
   try {
-    const { repo } = await normalizeCommandArgs({
-      repo: _repo,
-      fs,
-      dir,
-      gitdir,
-      cache,
-      onSign,
-      ours,
-      theirs,
-      fastForward,
-      fastForwardOnly,
-      dryRun,
-      noUpdateBranch,
-      abortOnConflict,
-      message,
-      author: _author,
-      committer: _committer,
-      signingKey,
-      allowUnrelatedHistories,
-      mergeDriver,
-      autoDetectConfig,
-    })
+    // Support both new signature (two GitBackends) and legacy signature (Repository)
+    let oursBackend: import('../backends/GitBackend.ts').GitBackend
+    let theirsBackend: import('../backends/GitBackend.ts').GitBackend
+    let oursRef: string | undefined
+    let theirsRef: string
+    let repo: Repository | undefined
+
+    // Check if _ours and _theirs are objects with gitBackend property (new signature)
+    const isNewSignature = 
+      _ours && typeof _ours === 'object' && 'gitBackend' in _ours &&
+      _theirs && typeof _theirs === 'object' && 'gitBackend' in _theirs
+
+    if (isNewSignature) {
+      // New signature: two GitBackends
+      oursBackend = _ours.gitBackend
+      theirsBackend = _theirs.gitBackend
+      oursRef = _ours.ref
+      theirsRef = _theirs.ref
+      
+      // Create a Repository wrapper for the "ours" backend to access config, index, etc.
+      // This is needed for author/committer normalization and other operations
+      const { Repository } = await import('../core-utils/Repository.ts')
+      repo = new Repository({
+        gitBackend: oursBackend,
+        worktreeBackend: undefined, // No worktree needed for merge operations
+        cache,
+        autoDetectConfig,
+      })
+    } else {
+      // Legacy signature: use Repository
+      // For backward compatibility, support old signature where ours/theirs are strings
+      const legacyOurs = typeof _ours === 'string' ? _ours : (_ours as any)?.ref || undefined
+      const legacyTheirs = typeof _theirs === 'string' ? _theirs : (_theirs as any)?.ref || _theirs
+      
+      if (!_repo) {
+        const normalized = await normalizeCommandArgs({
+          repo: _repo,
+          fs,
+          dir,
+          gitdir,
+          cache,
+          onSign,
+          ours: legacyOurs,
+          theirs: legacyTheirs,
+          fastForward,
+          fastForwardOnly,
+          dryRun,
+          noUpdateBranch,
+          abortOnConflict,
+          message,
+          author: _author,
+          committer: _committer,
+          signingKey,
+          allowUnrelatedHistories,
+          mergeDriver,
+          autoDetectConfig,
+        })
+        repo = normalized.repo
+        if (!repo.gitBackend) {
+          throw new Error('Repository must have a GitBackend')
+        }
+        oursBackend = repo.gitBackend
+        theirsBackend = repo.gitBackend // Legacy: same backend
+        oursRef = legacyOurs
+        theirsRef = legacyTheirs
+      } else {
+        // Handle both Repository and TestRepo (which has a repo property)
+        if (_repo && typeof _repo === 'object' && 'repo' in _repo && typeof (_repo as any).repo === 'object') {
+          // It's a TestRepo, extract the Repository
+          repo = (_repo as any).repo
+        } else {
+          repo = _repo as Repository
+        }
+        if (!repo || !repo.gitBackend) {
+          throw new Error('Repository must have a GitBackend')
+        }
+        oursBackend = repo.gitBackend
+        theirsBackend = repo.gitBackend // Legacy: same backend
+        oursRef = legacyOurs
+        theirsRef = legacyTheirs
+      }
+    }
+
+    if (!repo) {
+      throw new MissingParameterError('repo')
+    }
 
     if (signingKey) {
       assertParameter('onSign', onSign)
@@ -160,10 +225,13 @@ export async function merge({
       }
     }
 
-    // Use Repository.merge which internally calls _merge with repo
-    return await repo.merge({
-      ours,
-      theirs,
+    // Use the new _mergeBackends function which accepts two GitBackends
+    return await _mergeBackends({
+      oursBackend,
+      theirsBackend,
+      oursRef,
+      theirsRef,
+      repo,
       fastForward,
       fastForwardOnly,
       dryRun,
@@ -176,6 +244,7 @@ export async function merge({
       onSign,
       allowUnrelatedHistories,
       mergeDriver,
+      cache,
     })
   } catch (err: any) {
     // Preserve error type and code - don't modify the error object
@@ -185,6 +254,74 @@ export async function merge({
     }
     throw err
   }
+}
+
+/**
+ * Merges two branches from potentially different GitBackends
+ * @param oursBackend - The "ours" GitBackend (where merge result is written)
+ * @param theirsBackend - The "theirs" GitBackend (source of the branch to merge)
+ * @param oursRef - The "ours" ref (branch name or OID)
+ * @param theirsRef - The "theirs" ref (branch name or OID)
+ * @param repo - Repository instance for the "ours" backend (for config, index, etc.)
+ */
+async function _mergeBackends({
+  oursBackend,
+  theirsBackend,
+  oursRef,
+  theirsRef,
+  repo,
+  fastForward = true,
+  fastForwardOnly = false,
+  dryRun = false,
+  noUpdateBranch = false,
+  abortOnConflict = true,
+  message,
+  author,
+  committer,
+  signingKey,
+  onSign,
+  allowUnrelatedHistories = false,
+  mergeDriver,
+  cache = {},
+}: {
+  oursBackend: import('../backends/GitBackend.ts').GitBackend
+  theirsBackend: import('../backends/GitBackend.ts').GitBackend
+  oursRef?: string
+  theirsRef: string
+  repo: Repository
+  fastForward?: boolean
+  fastForwardOnly?: boolean
+  dryRun?: boolean
+  noUpdateBranch?: boolean
+  abortOnConflict?: boolean
+  message?: string
+  author?: Partial<Author>
+  committer?: Partial<Author>
+  signingKey?: string
+  onSign?: SignCallback
+  allowUnrelatedHistories?: boolean
+  mergeDriver?: import('../git/merge/types.ts').MergeDriverCallback
+  cache?: Record<string, unknown>
+}): Promise<MergeResult> {
+  // For now, delegate to the existing _merge implementation
+  // TODO: Implement full cross-backend merge support
+  return await _merge({
+    repo,
+    ours: oursRef,
+    theirs: theirsRef,
+    fastForward,
+    fastForwardOnly,
+    dryRun,
+    noUpdateBranch,
+    abortOnConflict,
+    message,
+    author,
+    committer,
+    signingKey,
+    onSign,
+    allowUnrelatedHistories,
+    mergeDriver,
+  })
 }
 
 /**
@@ -229,27 +366,54 @@ export async function _merge({
   const cache = repo.cache
   const dir = repo.dir
   const gitdir = await repo.getGitdir()
+  const gitBackend = repo.gitBackend
+  
+  // Ensure we have required components
+  if (!gitBackend) {
+    throw new Error('Repository must have a GitBackend for merge operations')
+  }
   
   // Check for unmerged paths BEFORE reading index to avoid any cache issues
   // This MUST happen before any other operations to match native git behavior
-  try {
-    const index = await repo.readIndexDirect(false, false) // Force fresh read, allowUnmerged: false
-    // If there are unmerged paths, readIndexDirect will throw UnmergedPathsError
-  } catch (err: any) {
-    // Check if it's an UnmergedPathsError - this is a hard failure, must re-throw
-    if (err && typeof err === 'object') {
-      if (err.code === UnmergedPathsError.code || 
-          err.code === 'UnmergedPathsError' ||
-          err.name === 'UnmergedPathsError') {
+  if (repo.gitBackend) {
+    try {
+      const { GitIndex } = await import('../git/index/GitIndex.ts')
+      const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+      const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+      
+      let indexBuffer: UniversalBuffer
+      try {
+        indexBuffer = await repo.gitBackend.readIndex()
+      } catch {
+        // Index doesn't exist yet - allow merge to proceed
+        indexBuffer = UniversalBuffer.alloc(0)
+      }
+      
+      if (indexBuffer.length > 0) {
+        const objectFormat = await detectObjectFormat(repo.fs || undefined, await repo.getGitdir(), repo.cache, repo.gitBackend)
+        const index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+        
+        // Check for unmerged paths
+        if (index.unmergedPaths.length > 0) {
+          throw new UnmergedPathsError(index.unmergedPaths)
+        }
+      }
+    } catch (err: any) {
+      // Check if it's an UnmergedPathsError - this is a hard failure, must re-throw
+      if (err && typeof err === 'object') {
+        if (err.code === UnmergedPathsError.code || 
+            err.code === 'UnmergedPathsError' ||
+            err.name === 'UnmergedPathsError') {
+          throw err
+        }
+      }
+      if (err instanceof UnmergedPathsError) {
         throw err
       }
+      
+      // If it's a different error (e.g., index doesn't exist), ignore it and continue
+      // This allows the merge to proceed if the index doesn't exist yet
     }
-    if (err instanceof UnmergedPathsError) {
-      throw err
-    }
-    
-    // If it's a different error (e.g., index doesn't exist), ignore it and continue
-    // This allows the merge to proceed if the index doesn't exist yet
   }
   
   // Get configService - we'll use repo.readIndexDirect() for index operations
@@ -288,31 +452,81 @@ export async function _merge({
     }
   }
   
-  // Expand refs using capability modules
+  // Expand refs using GitBackend (preferred) or legacy fs/gitdir
   // At this point, ours is guaranteed to be defined
-  ours = await expandRef({ fs, gitdir, ref: ours! })
-  theirs = await expandRef({ fs, gitdir, ref: theirs })
+  if (gitBackend) {
+    ours = await expandRef({ gitBackend, ref: ours! })
+    theirs = await expandRef({ gitBackend, ref: theirs })
+  } else {
+    // Legacy: use fs/gitdir
+    if (!fs || !gitdir) {
+      throw new Error('Repository must have a GitBackend or fs/gitdir must be provided')
+    }
+    ours = await expandRef({ fs, gitdir, ref: ours! })
+    theirs = await expandRef({ fs, gitdir, ref: theirs })
+  }
   
   // Use Repository.resolveRef() for consistency
   const ourOid = await repo.resolveRef(ours)
   const theirOid = await repo.resolveRef(theirs)
   
   // Find most recent common ancestor
+  // Use GitBackend.readObject if available, otherwise fall back to fs/gitdir
+  const { parse: parseCommit } = await import('../core-utils/parsers/Commit.ts')
+  const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+  
+  const readCommit = gitBackend
+    ? async (oid: string) => {
+        // Use GitBackend to read commits
+        const result = await gitBackend.readObject(oid, 'content', cache)
+        return parseCommit(UniversalBuffer.from(result.object))
+      }
+    : undefined // Will use default implementation with fs/gitdir
+  
+  // findMergeBase requires fs, but we can provide a readCommit function that uses GitBackend
+  // fs must be provided explicitly - backends are black boxes
+  const effectiveFs = fs
+  if (!effectiveFs && !readCommit) {
+    throw new Error('Either fs or GitBackend with readCommit must be available for findMergeBase')
+  }
+  
   const baseOids = await findMergeBase({
-    fs,
+    fs: effectiveFs!,
     cache,
-    gitdir,
+    gitdir: gitdir || '',
     commits: [ourOid, theirOid],
+    readCommit,
   })
   
-  if (baseOids.length !== 1) {
-    if (baseOids.length === 0 && allowUnrelatedHistories) {
-      // 4b825…  == the empty tree used by git
-      baseOids.push('4b825dc642cb6eb9a060e54bf8d69288fbee4904')
-    } else {
-      // TODO: Recursive Merge strategy
+  // CRITICAL: Check for unrelated histories BEFORE allowing empty tree
+  // If baseOids.length === 0, the branches have no common ancestor (unrelated histories)
+  // This happens when both commits are root commits (no parents) or when they have no shared history
+  // 
+  // IMPORTANT: findMergeBase returns [] when there are no common ancestors (unrelated histories)
+  // It returns [oid] when there is exactly one common ancestor
+  // It returns [oid1, oid2, ...] when there are multiple common ancestors (octopus merge case)
+  if (baseOids.length === 0) {
+    // No common ancestor found - branches are unrelated
+    if (!allowUnrelatedHistories) {
+      // Branches are unrelated and allowUnrelatedHistories is false - throw error
       throw new MergeNotSupportedError()
     }
+    // 4b825…  == the empty tree used by git for unrelated histories (SHA-1)
+    // For SHA-256, use the empty tree OID for that format
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    let objectFormat: 'sha1' | 'sha256' = 'sha1'
+    // objectFormat must be detected from provided fs and gitdir
+    // Backends are black boxes and don't expose their internal filesystem
+    if (effectiveFs && gitdir) {
+      objectFormat = await detectObjectFormat(effectiveFs, gitdir, cache)
+    }
+    const emptyTreeOid = objectFormat === 'sha256'
+      ? '0'.repeat(64) // SHA-256 empty tree (all zeros)
+      : '4b825dc642cb6eb9a060e54bf8d69288fbee4904' // SHA-1 empty tree
+    baseOids.push(emptyTreeOid)
+  } else if (baseOids.length !== 1) {
+    // Multiple merge bases - recursive merge strategy not yet implemented
+    throw new MergeNotSupportedError()
   }
   const baseOid = baseOids[0]
   
@@ -320,7 +534,7 @@ export async function _merge({
   if (baseOid === theirOid) {
     // Already merged - ours already contains theirs
     // Get tree OID from our commit for comparison
-    const ourCommitResult = await readObject({ fs, cache, gitdir, oid: ourOid, format: 'content' })
+    const ourCommitResult = await gitBackend.readObject(ourOid, 'content', cache)
     if (ourCommitResult.type !== 'commit') {
       throw new Error('Expected commit object')
     }
@@ -353,20 +567,22 @@ export async function _merge({
         const { logRefUpdate } = await import('../git/logs/logRefUpdate.ts')
         const { abbreviateRef } = await import('../utils/abbreviateRef.ts')
         const { REFLOG_MESSAGES } = await import('../git/logs/messages.ts')
-        await logRefUpdate({
-          fs,
-          gitdir,
-          ref: ours!,
-          oldOid: oldBranchOid,
-          newOid: theirOid,
-          message: REFLOG_MESSAGES.MERGE_FF(abbreviateRef(theirs)),
-        }).catch(() => {
-          // Silently ignore reflog errors (Git's behavior)
-        })
+        if (effectiveFs && gitdir) {
+          await logRefUpdate({
+            fs: effectiveFs,
+            gitdir,
+            ref: ours!,
+            oldOid: oldBranchOid,
+            newOid: theirOid,
+            message: REFLOG_MESSAGES.MERGE_FF(abbreviateRef(theirs)),
+          }).catch(() => {
+            // Silently ignore reflog errors (Git's behavior)
+          })
+        }
       }
     }
     // Fast-forward - get tree OID from their commit
-    const theirCommitResult = await readObject({ fs, cache, gitdir, oid: theirOid, format: 'content' })
+    const theirCommitResult = await gitBackend.readObject(theirOid, 'content', cache)
     if (theirCommitResult.type !== 'commit') {
       throw new Error('Expected commit object')
     }
@@ -385,23 +601,23 @@ export async function _merge({
     
     // Write merge state files for native git interoperability
     // These files must exist before merge starts so they're available even if conflicts occur
-    if (!dryRun) {
+    if (!dryRun && effectiveFs && gitdir) {
       // Write MERGE_HEAD with the commit being merged (theirs)
-      await writeMergeHead({ fs, gitdir, oid: theirOid })
+      await writeMergeHead({ fs: effectiveFs, gitdir, oid: theirOid })
       
       // Write MERGE_MODE - "no-ff" if fast-forward is disabled, otherwise empty
       const mergeMode = fastForward ? '' : 'no-ff'
-      await writeMergeMode({ fs, gitdir, mode: mergeMode })
+      await writeMergeMode({ fs: effectiveFs, gitdir, mode: mergeMode })
       
       // Write MERGE_MSG with the merge commit message
       const mergeMessage = message || `Merge branch '${abbreviateRef(theirs)}' into ${abbreviateRef(ours!)}`
-      await writeMergeMsg({ fs, gitdir, message: mergeMessage })
+      await writeMergeMsg({ fs: effectiveFs, gitdir, message: mergeMessage })
     }
     
-    // Get tree OIDs from commits
-    const ourCommitResult = await readObject({ fs, cache, gitdir, oid: ourOid, format: 'content' })
-    const theirCommitResult = await readObject({ fs, cache, gitdir, oid: theirOid, format: 'content' })
-    const baseCommitResult = await readObject({ fs, cache, gitdir, oid: baseOid, format: 'content' })
+    // Get tree OIDs from commits using GitBackend
+    const ourCommitResult = await gitBackend.readObject(ourOid, 'content', cache)
+    const theirCommitResult = await gitBackend.readObject(theirOid, 'content', cache)
+    const baseCommitResult = await gitBackend.readObject(baseOid, 'content', cache)
     
     if (ourCommitResult.type !== 'commit' || theirCommitResult.type !== 'commit' || baseCommitResult.type !== 'commit') {
       throw new Error('Expected commit objects')
@@ -429,7 +645,22 @@ export async function _merge({
     // If objects don't exist, we'll let mergeTree handle it - it will detect conflicts first
     // before throwing NotFoundError, which allows us to properly handle conflict cases
     for (const { name, oid, commit } of treesToCheck) {
-      const exists = await hasObject({ fs, cache, gitdir, oid })
+      // Check if object exists using GitBackend.readObject or hasObject with fs
+      let exists: boolean
+      if (gitBackend) {
+        // Try to read the object - if it fails, it doesn't exist
+        try {
+          await gitBackend.readObject(oid, 'content', cache)
+          exists = true
+        } catch {
+          exists = false
+        }
+      } else if (effectiveFs && gitdir) {
+        exists = await hasObject({ fs: effectiveFs, cache, gitdir, oid })
+      } else {
+        // Can't check - assume exists and let mergeTree handle it
+        exists = true
+      }
       if (!exists) {
         // Don't throw here - let mergeTree handle missing objects
         // mergeTree will detect conflicts first (which is what we want), and only throw NotFoundError
@@ -442,9 +673,29 @@ export async function _merge({
     // MergeStream will check for unmerged paths and handle conflicts properly
     const { MergeStream } = await import('../core-utils/MergeStream.ts')
     
-    // Read index directly using Repository.readIndexDirect() - works for both bare and non-bare repos
-    // Read index directly to support bare repositories
-    const index = await repo.readIndexDirect(false) // Force fresh read, allowUnmerged: false (already checked above)
+    // Read index directly using gitBackend.readIndex() - works for both bare and non-bare repos
+    if (!repo.gitBackend) {
+      throw new MissingParameterError('gitBackend (required for merge operation)')
+    }
+    const { GitIndex } = await import('../git/index/GitIndex.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+    
+    let indexBuffer: UniversalBuffer
+    try {
+      indexBuffer = await repo.gitBackend.readIndex()
+    } catch {
+      indexBuffer = UniversalBuffer.alloc(0)
+    }
+    
+    let index: GitIndex
+    if (indexBuffer.length === 0) {
+      const objectFormat = await detectObjectFormat(repo.fs || undefined, await repo.getGitdir(), repo.cache, repo.gitBackend)
+      index = new GitIndex(null, undefined, 2)
+    } else {
+      const objectFormat = await detectObjectFormat(repo.fs || undefined, await repo.getGitdir(), repo.cache, repo.gitBackend)
+      index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+    }
     
     let mergeResult: string | MergeConflictError | undefined
     let indexWasModified = false
@@ -535,9 +786,9 @@ export async function _merge({
     }
     
     const oid = await _commit({
-      fs,
+      fs: fs || undefined,
       cache,
-      gitdir,
+      gitdir: gitdir || '',
       message,
       ref: ours!, // ours is guaranteed to be defined at this point
       tree: mergeResult as string,
@@ -556,32 +807,26 @@ export async function _merge({
     // This matches Git's native behavior for merge commits
     
     // Clean up merge state files after successful merge (for native git interoperability)
-    if (!dryRun) {
+    if (!dryRun && effectiveFs && gitdir) {
       await Promise.all([
-        deleteMergeHead({ fs, gitdir }),
-        deleteMergeMode({ fs, gitdir }),
-        deleteMergeMsg({ fs, gitdir }),
+        deleteMergeHead({ fs: effectiveFs, gitdir }),
+        deleteMergeMode({ fs: effectiveFs, gitdir }),
+        deleteMergeMsg({ fs: effectiveFs, gitdir }),
       ])
     }
     
     // Run post-merge hook (after successful merge)
-    if (!dryRun) {
+    if (!dryRun && gitBackend) {
       try {
-        const { runHook } = await import('../git/hooks/runHook.ts')
         const worktree = repo.getWorktree()
         const workTree = worktree?.dir || dir || undefined
         const gitdir = await repo.getGitdir()
         
-        await runHook({
-          fs: repo.fs,
+        await gitBackend.runHook('post-merge', {
           gitdir,
-          hookName: 'post-merge',
-          context: {
-            gitdir,
-            workTree: workTree ?? undefined,
-            newHead: oid,
-            branch: ours ? ours.replace('refs/heads/', '') : undefined,
-          },
+          workTree: workTree ?? undefined,
+          newHead: oid,
+          branch: ours ? ours.replace('refs/heads/', '') : undefined,
         })
       } catch (hookError: any) {
         // Post-merge hook failures don't abort the merge (it's already done)

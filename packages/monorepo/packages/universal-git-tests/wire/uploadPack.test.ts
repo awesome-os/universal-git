@@ -4,7 +4,6 @@ import { uploadPack } from '@awesome-os/universal-git-src/commands/uploadPack.ts
 import { collect } from '@awesome-os/universal-git-src/utils/collect.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { commit, add } from '@awesome-os/universal-git-src/index.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
 
 test('uploadPack', async (t) => {
   await t.test('advertiseRefs: true', async () => {
@@ -46,10 +45,12 @@ test('uploadPack', async (t) => {
 
   await t.test('empty repository', async () => {
     const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const dir = (await repo.getDir())!
     
     // Create an initial commit so HEAD exists
-    await repo.fs.write(join(dir, 'file.txt'), 'content')
+    if (!repo.worktreeBackend) {
+      throw new Error('Repository worktreeBackend is not available')
+    }
+    await repo.worktreeBackend.write('file.txt', 'content')
     await add({ repo, filepath: 'file.txt' })
     await commit({ 
       repo, 
@@ -69,10 +70,12 @@ test('uploadPack', async (t) => {
 
   await t.test('repository with multiple branches', async () => {
     const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const dir = (await repo.getDir())!
     
     // Create initial commit
-    await repo.fs.write(join(dir, 'file1.txt'), 'content1')
+    if (!repo.worktreeBackend) {
+      throw new Error('Repository worktreeBackend is not available')
+    }
+    await repo.worktreeBackend.write('file1.txt', 'content1')
     await add({ repo, filepath: 'file1.txt' })
     const commitOid = await commit({ 
       repo, 
@@ -90,13 +93,13 @@ test('uploadPack', async (t) => {
     }
     if (headOid) {
       // Ensure refs/heads/main exists and points to the commit
-      await repo.writeRefDirect('refs/heads/main', headOid)
+      await repo.writeRef('refs/heads/main', headOid)
       // Create a new branch from the same commit
-      await repo.writeRefDirect('refs/heads/feature', headOid)
+      await repo.writeRef('refs/heads/feature', headOid)
     } else {
       // If HEAD doesn't resolve, use the commit OID directly
-      await repo.writeRefDirect('refs/heads/main', commitOid)
-      await repo.writeRefDirect('refs/heads/feature', commitOid)
+      await repo.writeRef('refs/heads/main', commitOid)
+      await repo.writeRef('refs/heads/feature', commitOid)
     }
     
     const res = await uploadPack({ repo, advertiseRefs: true })
@@ -111,10 +114,12 @@ test('uploadPack', async (t) => {
 
   await t.test('repository with tags', async () => {
     const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const dir = (await repo.getDir())!
     
     // Create initial commit
-    await repo.fs.write(join(dir, 'file1.txt'), 'content1')
+    if (!repo.worktreeBackend) {
+      throw new Error('Repository worktreeBackend is not available')
+    }
+    await repo.worktreeBackend.write('file1.txt', 'content1')
     await add({ repo, filepath: 'file1.txt' })
     const commitOid = await commit({ 
       repo, 
@@ -123,7 +128,7 @@ test('uploadPack', async (t) => {
     })
     
     // Create a tag - use repo to write ref
-    await repo.writeRefDirect('refs/tags/v1.0.0', commitOid)
+    await repo.writeRef('refs/tags/v1.0.0', commitOid)
     
     const res = await uploadPack({ repo, advertiseRefs: true })
     
@@ -145,10 +150,12 @@ test('uploadPack', async (t) => {
   await t.test('uses dir parameter to compute gitdir', async () => {
     // Create a repository
     const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const dir = (await repo.getDir())!
     
     // Create an initial commit so HEAD exists
-    await repo.fs.write(join(dir, 'file.txt'), 'content')
+    if (!repo.worktreeBackend) {
+      throw new Error('Repository worktreeBackend is not available')
+    }
+    await repo.worktreeBackend.write('file.txt', 'content')
     await add({ repo, filepath: 'file.txt' })
     await commit({ 
       repo, 
@@ -211,11 +218,13 @@ test('uploadPack', async (t) => {
     const { repo } = await makeFixture('test-empty')
     // Use repo but with invalid gitdir - this will cause an error when uploadPack tries to list refs
     // Create a new repo with invalid gitdir by modifying the backend
+    if (!repo.fs) {
+      throw new Error('Repository fs is not available')
+    }
     const { FilesystemBackend } = await import('@awesome-os/universal-git-src/backends/FilesystemBackend.ts')
     const invalidBackend = new FilesystemBackend(repo.fs, '/nonexistent/gitdir')
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const invalidRepo = await Repository.open({
-      fs: repo.fs,
+    const invalidRepo = new Repository({
       gitBackend: invalidBackend,
       cache: {},
     })

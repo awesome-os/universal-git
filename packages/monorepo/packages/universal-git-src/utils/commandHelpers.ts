@@ -80,13 +80,14 @@ export async function normalizeCommandArgs<T extends Record<string, unknown>>(
   if (args.repo) {
     // repo is provided - extract everything from it
     repo = args.repo
-    fs = repo.fs
-    if (!fs) {
-      throw new MissingParameterError('fs (filesystem is required. Checkout to a WorktreeBackend first.)')
-    }
+    
+    // fs is not required when repo is provided - backends handle filesystem operations
+    // Only set fs if it's explicitly needed (for legacy code paths)
+    fs = args.fs ? createFileSystem(args.fs) : undefined
     gitdir = normalize(await repo.getGitdir())
-    const repoDir = await repo.getDir()
-    dir = repoDir ? normalize(repoDir) : (args.dir ? normalize(args.dir) : undefined)
+    // dir is not available from repo (worktreeBackend is a black box)
+    // Use args.dir if provided, otherwise undefined
+    dir = args.dir ? normalize(args.dir) : undefined
     cache = repo.cache
   } else {
     // No repo provided - need to create one
@@ -123,45 +124,12 @@ export async function normalizeCommandArgs<T extends Record<string, unknown>>(
         worktree = createGitWorktreeBackend({ fs, dir })
       }
     } else {
-      // Backends are provided - extract fs from them if needed
-      if (gitBackend) {
-        // Use universal interface method - backend consumers don't need to know implementation
-        if (gitBackend.getFileSystem) {
-          const backendFs = gitBackend.getFileSystem()
-          if (backendFs) {
-            fs = backendFs
-          } else if (args.fs) {
-            fs = createFileSystem(args.fs)
-          } else {
-            throw new MissingParameterError('fs (required when using non-filesystem gitBackend)')
-          }
-        } else if (args.fs) {
-          fs = createFileSystem(args.fs)
-        } else {
-          throw new MissingParameterError('fs (required when using non-filesystem gitBackend)')
-        }
-      } else if (worktree) {
-        // Use universal interface method - backend consumers don't need to know implementation
-        if (worktree.getFileSystem) {
-          const worktreeFs = worktree.getFileSystem()
-          if (worktreeFs) {
-            fs = worktreeFs
-          } else if (args.fs) {
-            fs = createFileSystem(args.fs)
-          } else {
-            throw new MissingParameterError('fs (required when using non-filesystem worktree)')
-          }
-        } else if (args.fs) {
-          fs = createFileSystem(args.fs)
-        } else {
-          throw new MissingParameterError('fs (required when using non-filesystem worktree)')
-        }
-      } else {
-        // Should not happen, but TypeScript needs this
-        if (!args.fs) {
-          throw new MissingParameterError('fs')
-        }
+      // Backends are provided - fs must be passed explicitly
+      // Backends are black boxes and don't expose their internal filesystem
+      if (args.fs) {
         fs = createFileSystem(args.fs)
+      } else {
+        throw new MissingParameterError('fs (required when using backends)')
       }
       
       // If backends are provided, gitdir/dir are ignored (already set in backends)
@@ -171,22 +139,31 @@ export async function normalizeCommandArgs<T extends Record<string, unknown>>(
     
     cache = args.cache || {}
     const autoDetectConfig = args.autoDetectConfig !== undefined ? args.autoDetectConfig : true
-    const ignoreSystemConfig = (args as any).ignoreSystemConfig !== undefined ? (args as any).ignoreSystemConfig : false
     
-    // Open repository with backends (if provided) or legacy inputs
-    // Normalize paths before passing to Repository.open() for consistency
-    const normalizedDirForOpen = dir ? normalize(dir) : undefined
-    const normalizedGitdirForOpen = args.gitdir ? normalize(args.gitdir) : undefined
-    repo = await Repository.open({
-      fs,
-      dir: normalizedDirForOpen,
-      gitdir: normalizedGitdirForOpen,
-      cache,
-      autoDetectConfig,
-      ignoreSystemConfig,
-      gitBackend,
-      worktree,
-    })
+    // Create repository with backends (if provided) or legacy inputs
+    if (gitBackend) {
+      // Use Repository constructor directly when backends are provided
+      const { Repository } = await import('../core-utils/Repository.ts')
+      repo = new Repository({
+        gitBackend,
+        worktreeBackend: worktree,
+        cache,
+        autoDetectConfig,
+      })
+    } else {
+      // Use createRepository helper when backends are not provided
+      // Normalize paths before passing to createRepository() for consistency
+      const normalizedDirForOpen = dir ? normalize(dir) : undefined
+      const normalizedGitdirForOpen = args.gitdir ? normalize(args.gitdir) : undefined
+      const { createRepository } = await import('../core-utils/createRepository.ts')
+      repo = await createRepository({
+        fs,
+        dir: normalizedDirForOpen,
+        gitdir: normalizedGitdirForOpen,
+        cache,
+        autoDetectConfig,
+      })
+    }
     
     // Normalize paths returned from repository
     gitdir = normalize(await repo.getGitdir())
@@ -203,7 +180,11 @@ export async function normalizeCommandArgs<T extends Record<string, unknown>>(
     // CRITICAL: Ensure fs matches repo.fs for consistency
     // When backends are auto-created, repo.fs should be the same instance
     // but we want to return the fs that was used (which should match repo.fs)
-    fs = repo.fs
+    const repoFs = repo.fs
+    if (!repoFs) {
+      throw new MissingParameterError('fs (filesystem is required. Checkout to a WorktreeBackend first.)')
+    }
+    fs = repoFs
   }
 
   const { repo: _, gitBackend: __, worktree: ___, fs: ____, dir: _____, gitdir: ______, cache: _______, autoDetectConfig: ________, ...rest } = args

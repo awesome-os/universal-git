@@ -40,13 +40,13 @@ export const analyzeCheckout = async ({
 }): Promise<CheckoutOperation[]> => {
   // CRITICAL: Use the Repository's fs (which is already normalized) for all file operations
   // This ensures we're using the exact same fs instance that the Repository uses
-  // CRITICAL: Always pass both dir and gitdir to prevent Repository.open() from calling findRoot
+  // CRITICAL: Always pass both dir and gitdir to prevent createRepository() from calling findRoot
   // which could find the wrong repository (e.g., the workspace repo instead of the test fixture)
   if (!dir || !gitdir) {
     throw new Error('analyzeCheckout requires both dir and gitdir to be provided to prevent auto-detection of wrong repository')
   }
-  const { Repository } = await import('../../core-utils/Repository.ts')
-  const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true, ignoreSystemConfig: false })
+  const { createRepository } = await import('../../core-utils/createRepository.ts')
+  const repo = await createRepository({ fs, dir, gitdir, cache, autoDetectConfig: true, ignoreSystemConfig: false })
   const normalizedFs = repo.fs
   
   // Check sparse checkout patterns FIRST (before building tree map for optimization)
@@ -350,12 +350,13 @@ export const executeCheckout = async ({
   // This ensures we're using the exact same fs instance that the Repository uses
   // Get the Repository instance to access normalized fs
   const { Repository } = await import('../../core-utils/Repository.ts')
-  // CRITICAL: Always pass both dir and gitdir to prevent Repository.open() from calling findRoot
+  // CRITICAL: Always pass both dir and gitdir to prevent createRepository() from calling findRoot
   // which could find the wrong repository (e.g., the workspace repo instead of the test fixture)
   if (!dir || !gitdir) {
     throw new Error('executeCheckout requires both dir and gitdir to be provided to prevent auto-detection of wrong repository')
   }
-  const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true, ignoreSystemConfig: false })
+  const { createRepository } = await import('../../core-utils/createRepository.ts')
+  const repo = await createRepository({ fs, dir, gitdir, cache, autoDetectConfig: true, ignoreSystemConfig: false })
   const normalizedFs = repo.fs
   
   // --- START OF THE FIX ---
@@ -639,11 +640,30 @@ export const getFileStatus = async ({
     }
   }
 
-  // CRITICAL: Get the index directly from the Repository instance
-  // This ensures we see the same in-memory index state that was modified by add()
-  // When force=false, readIndexDirect() returns the owned instance immediately,
-  // which contains the modifications from writeIndexDirect()
-  const index = await repo.readIndexDirect() // Use default force=false to get owned instance
+  // CRITICAL: Get the index directly from gitBackend
+  // This ensures we see the same index state that was modified by add()
+  const { GitIndex } = await import('../../git/index/GitIndex.ts')
+  const { detectObjectFormat } = await import('../../utils/detectObjectFormat.ts')
+  
+  let indexBuffer: UniversalBuffer
+  if (repo.gitBackend) {
+    try {
+      indexBuffer = await repo.gitBackend.readIndex()
+    } catch {
+      indexBuffer = UniversalBuffer.alloc(0)
+    }
+  } else {
+    throw new Error('gitBackend is required')
+  }
+  
+  let index: GitIndex
+  if (indexBuffer.length === 0) {
+    index = new GitIndex()
+  } else {
+    const objectFormat = await detectObjectFormat(fs, gitdir, repo.cache, repo.gitBackend)
+    index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+  }
+  
   const indexEntry = index.entriesMap.get(filepath)
   const indexOid: string | null = indexEntry ? indexEntry.oid : null
 
@@ -721,14 +741,34 @@ export const checkout = async ({
   // Read the index ONCE and pass it to both analyzeCheckout and executeCheckout.
   // This ensures both functions operate on the same index object, and changes made
   // by executeCheckout are persisted when we write it back.
-  // CRITICAL: Always pass both dir and gitdir to prevent Repository.open() from calling findRoot
+  // CRITICAL: Always pass both dir and gitdir to prevent createRepository() from calling findRoot
   // which could find the wrong repository (e.g., the workspace repo instead of the test fixture)
   if (!dir || !gitdir) {
     throw new Error('WorkdirManager.checkout requires both dir and gitdir to be provided to prevent auto-detection of wrong repository')
   }
-  const { Repository } = await import('../../core-utils/Repository.ts')
-  const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true, ignoreSystemConfig: false })
-  const gitIndex = await repo.readIndexDirect(false) // Force fresh read
+  const { createRepository } = await import('../../core-utils/createRepository.ts')
+  const repo = await createRepository({ fs, dir, gitdir, cache, autoDetectConfig: true, ignoreSystemConfig: false })
+  const { GitIndex } = await import('../../git/index/GitIndex.ts')
+  const { detectObjectFormat } = await import('../../utils/detectObjectFormat.ts')
+  
+  let indexBuffer: UniversalBuffer
+  if (repo.gitBackend) {
+    try {
+      indexBuffer = await repo.gitBackend.readIndex()
+    } catch {
+      indexBuffer = UniversalBuffer.alloc(0)
+    }
+  } else {
+    throw new Error('gitBackend is required')
+  }
+  
+  let gitIndex: GitIndex
+  if (indexBuffer.length === 0) {
+    gitIndex = new GitIndex()
+  } else {
+    const objectFormat = await detectObjectFormat(fs, gitdir, repo.cache, repo.gitBackend)
+    gitIndex = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+  }
   
   // Analyze the checkout. Pass the live index object to it.
   const operations = await analyzeCheckout({ 

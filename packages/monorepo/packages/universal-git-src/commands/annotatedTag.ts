@@ -13,6 +13,7 @@ import { join } from "../utils/join.ts"
 import { normalizeAuthorObject } from "../utils/normalizeAuthorObject.ts"
 import { Repository } from "../core-utils/Repository.ts"
 import { MissingNameError } from "../errors/MissingNameError.ts"
+import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
 import type { FileSystemProvider } from "../models/FileSystem.ts"
 import type { SignCallback } from "../core-utils/Signing.ts"
 import type { Author } from "../models/GitCommit.ts"
@@ -85,25 +86,43 @@ export async function annotatedTag({
   cache?: Record<string, unknown>
 }): Promise<void> {
   try {
-    const { repo, fs, gitdir: effectiveGitdir } = await normalizeCommandArgs({
-      repo: _repo,
-      fs: _fs,
-      dir,
-      gitdir,
-      cache,
-      onSign,
-      ref,
-      tagger: _tagger,
-      message,
-      gpgsig,
-      object,
-      signingKey,
-      force,
-    })
-
     assertParameter('ref', ref)
     if (signingKey) {
       assertParameter('onSign', onSign)
+    }
+
+    // If repo is provided, use it directly without requiring fs
+    let repo: Repository
+    let effectiveGitdir: string
+    let effectiveFs: FileSystemProvider | null = null
+
+    if (_repo) {
+      repo = _repo
+      effectiveGitdir = await repo.getGitdir()
+      effectiveFs = repo.fs
+    } else {
+      // Fall back to normalizeCommandArgs when only fs is provided
+      if (!_fs) {
+        throw new MissingParameterError('fs (filesystem is required when repo is not provided)')
+      }
+      const normalized = await normalizeCommandArgs({
+        repo: _repo,
+        fs: _fs,
+        dir,
+        gitdir,
+        cache,
+        onSign,
+        ref,
+        tagger: _tagger,
+        message,
+        gpgsig,
+        object,
+        signingKey,
+        force,
+      })
+      repo = normalized.repo
+      effectiveGitdir = normalized.gitdir
+      effectiveFs = normalized.fs
     }
 
     // Fill in missing arguments with default values
@@ -111,8 +130,9 @@ export async function annotatedTag({
     if (!tagger) throw new MissingNameError('tagger')
 
     return await _annotatedTag({
-      fs: fs as any,
-      cache,
+      repo,
+      fs: effectiveFs as any,
+      cache: repo.cache,
       onSign,
       gitdir: effectiveGitdir,
       ref,
@@ -134,6 +154,7 @@ export async function annotatedTag({
  * @internal - Exported for use by other commands
  */
 export async function _annotatedTag({
+  repo,
   fs,
   cache,
   onSign,
@@ -146,6 +167,7 @@ export async function _annotatedTag({
   signingKey,
   force = false,
 }: {
+  repo?: Repository
   fs: FileSystemProvider
   cache: Record<string, unknown>
   onSign?: SignCallback
@@ -162,7 +184,11 @@ export async function _annotatedTag({
 
   if (!force) {
     try {
-      await resolveRef({ fs, gitdir, ref })
+      if (repo) {
+        await repo.resolveRef(ref)
+      } else {
+        await resolveRef({ fs, gitdir, ref })
+      }
       // Tag exists
       throw new AlreadyExistsError('tag', ref)
     } catch (e) {
@@ -172,14 +198,26 @@ export async function _annotatedTag({
   }
 
   // Resolve passed value
-  const oid = await resolveRef({
-    fs,
-    gitdir,
-    ref: object || 'HEAD',
-  })
+  let oid: string
+  if (repo) {
+    oid = await repo.resolveRef(object || 'HEAD')
+  } else {
+    oid = await resolveRef({
+      fs,
+      gitdir,
+      ref: object || 'HEAD',
+    })
+  }
 
   // Get object type
-  const { object: objContent } = await readObject({ fs, cache, gitdir, oid })
+  let objContent: UniversalBuffer
+  if (repo) {
+    const result = await repo.gitBackend.readObject(oid, 'content', cache)
+    objContent = result.object
+  } else {
+    const result = await readObject({ fs, cache, gitdir, oid })
+    objContent = result.object
+  }
   // Determine type from object (simplified - would need to check object header)
   const type = 'commit' // Default assumption, would need proper detection
 
@@ -214,23 +252,33 @@ export async function _annotatedTag({
     // This ensures the format matches exactly what we'll read back
     const signedTagBuffer = signedTag.toObject()
     const value = await writeTag({
+      repo,
       fs,
       gitdir,
       tagBuffer: signedTagBuffer,
       format: 'content',
     })
 
-    await writeRef({ fs, gitdir, ref, value })
+    if (repo) {
+      await repo.writeRef(ref, value)
+    } else {
+      await writeRef({ fs, gitdir, ref, value })
+    }
     return
   }
   
   // Write tag object (unsigned) using writeTag
   const value = await writeTag({
+    repo,
     fs,
     gitdir,
     tag: tagObject,
   })
 
-  await writeRef({ fs, gitdir, ref, value })
+  if (repo) {
+    await repo.writeRef(ref, value)
+  } else {
+    await writeRef({ fs, gitdir, ref, value })
+  }
 }
 

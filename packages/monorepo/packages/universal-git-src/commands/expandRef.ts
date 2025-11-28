@@ -44,7 +44,7 @@ export async function expandRef({
   cache = {},
 }: CommandWithRefOptions): Promise<string> {
   try {
-    const { repo, fs, gitdir: effectiveGitdir } = await normalizeCommandArgs({
+    const { repo, gitdir: effectiveGitdir } = await normalizeCommandArgs({
       repo: _repo,
       fs: _fs,
       dir,
@@ -60,12 +60,11 @@ export async function expandRef({
       return ref
     }
     
-    // Read packed refs
+    // Read packed refs using backend method
     let packedMap = new Map<string, string>()
     try {
-      const packedRefsPath = join(effectiveGitdir, 'packed-refs')
-      const content = await fs.read(packedRefsPath, 'utf8')
-      if (typeof content === 'string') {
+      const content = await repo.gitBackend.readPackedRefs()
+      if (content) {
         packedMap = parsePackedRefs(content)
       }
     } catch {
@@ -75,12 +74,12 @@ export async function expandRef({
     // Look in all the proper paths, in this order
     const allpaths = refpaths(ref)
     for (const refPath of allpaths) {
-      try {
-        const exists = await fs.exists(join(effectiveGitdir, refPath))
-        if (exists) return refPath
-      } catch {
-        // Continue to next path
+      // Check if ref exists using backend method
+      const refValue = await repo.gitBackend.readRef(refPath)
+      if (refValue) {
+        return refPath
       }
+      // Also check packed refs
       if (packedMap.has(refPath)) return refPath
     }
     

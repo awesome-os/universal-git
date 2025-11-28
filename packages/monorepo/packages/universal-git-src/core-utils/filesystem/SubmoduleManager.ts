@@ -12,69 +12,44 @@ type SubmoduleInfo = {
 
 /**
  * Parses .gitmodules file and returns submodule definitions
+ * Gets submodule info from GitBackend (which manages submodule config)
  */
 export const parseGitmodules = async ({
   repo,
-  fs,
-  dir,
 }: {
-  repo?: Repository
-  fs?: FileSystemProvider
-  dir?: string
+  repo: Repository
 }): Promise<Map<string, SubmoduleInfo>> => {
-  // Extract from repo if provided, otherwise use provided parameters
-  let effectiveFs: FileSystemProvider
-  let effectiveDir: string
-  
-  if (repo) {
-    effectiveFs = repo.fs
-    const repoDir = await repo.getDir()
-    if (!repoDir) {
-      throw new Error('Repository must have a working directory for submodule operations')
-    }
-    effectiveDir = repoDir
-  } else {
-    if (!fs || !dir) {
-      throw new Error('Either repo or both fs and dir must be provided')
-    }
-    effectiveFs = fs
-    effectiveDir = dir
+  if (!repo.worktreeBackend) {
+    throw new Error('Repository must have a worktreeBackend for submodule operations')
   }
   
-  const gitmodulesPath = join(effectiveDir, '.gitmodules')
+  // Get .gitmodules from GitBackend (which manages submodule config)
+  const content = await repo.gitBackend.readGitmodules(repo.worktreeBackend)
   const submodules = new Map<string, SubmoduleInfo>()
 
-  try {
-    const content = await effectiveFs.read(gitmodulesPath)
-    // Handle case where fs.read() returns null for non-existent files
-    if (content === null || content === undefined) {
-      return submodules
-    }
-    const buffer = UniversalBuffer.isBuffer(content) ? content : UniversalBuffer.from(content as string, 'utf8')
-    const config = parseConfig(buffer)
+  if (content === null || content === undefined) {
+    return submodules
+  }
+  
+  const buffer = UniversalBuffer.from(content, 'utf8')
+  const config = parseConfig(buffer)
 
-    // Extract submodule sections
-    const subsections = config.getSubsections('submodule')
-    for (const name of subsections) {
-      if (name) {
-        const path = config.get(`submodule.${name}.path`) as string | undefined
-        const url = config.get(`submodule.${name}.url`) as string | undefined
-        const branch = config.get(`submodule.${name}.branch`) as string | undefined
+  // Extract submodule sections
+  const subsections = config.getSubsections('submodule')
+  for (const name of subsections) {
+    if (name) {
+      const path = config.get(`submodule.${name}.path`) as string | undefined
+      const url = config.get(`submodule.${name}.url`) as string | undefined
+      const branch = config.get(`submodule.${name}.branch`) as string | undefined
 
-        if (path && url) {
-          submodules.set(name, {
-            path,
-            url,
-            branch: branch || undefined,
-          })
-        }
+      if (path && url) {
+        submodules.set(name, {
+          path,
+          url,
+          branch: branch || undefined,
+        })
       }
     }
-  } catch (err) {
-    if ((err as { code?: string }).code !== 'NOENT') {
-      throw err
-    }
-    // .gitmodules doesn't exist, return empty map
   }
 
   return submodules
@@ -85,16 +60,12 @@ export const parseGitmodules = async ({
  */
 export const getSubmoduleByPath = async ({
   repo,
-  fs,
-  dir,
   path,
 }: {
-  repo?: Repository
-  fs?: FileSystemProvider
-  dir?: string
+  repo: Repository
   path: string
 }): Promise<{ name: string } & SubmoduleInfo | null> => {
-  const submodules = await parseGitmodules({ repo, fs, dir })
+  const submodules = await parseGitmodules({ repo })
   for (const [name, info] of submodules.entries()) {
     if (info.path === path) {
       return { name, ...info }
@@ -108,16 +79,12 @@ export const getSubmoduleByPath = async ({
  */
 export const getSubmoduleByName = async ({
   repo,
-  fs,
-  dir,
   name,
 }: {
-  repo?: Repository
-  fs?: FileSystemProvider
-  dir?: string
+  repo: Repository
   name: string
 }): Promise<{ name: string } & SubmoduleInfo | null> => {
-  const submodules = await parseGitmodules({ repo, fs, dir })
+  const submodules = await parseGitmodules({ repo })
   const info = submodules.get(name)
   if (info) {
     return { name, ...info }
@@ -130,16 +97,12 @@ export const getSubmoduleByName = async ({
  */
 export const isSubmodule = async ({
   repo,
-  fs,
-  dir,
   path,
 }: {
-  repo?: Repository
-  fs?: FileSystemProvider
-  dir?: string
+  repo: Repository
   path: string
 }): Promise<boolean> => {
-  const submodule = await getSubmoduleByPath({ repo, fs, dir, path })
+  const submodule = await getSubmoduleByPath({ repo, path })
   return submodule !== null
 }
 

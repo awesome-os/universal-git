@@ -104,7 +104,7 @@ export async function deleteRemote({
     // We need to use the low-level config parser for section deletion
     let configBuffer: UniversalBuffer = UniversalBuffer.alloc(0)
     try {
-      const configData = await fs.read(join(effectiveGitdir, 'config'))
+      const configData = await repo.gitBackend.readConfig()
       configBuffer = configData ? UniversalBuffer.from(configData as string | Uint8Array) : UniversalBuffer.alloc(0)
     } catch (err) {
       // Config doesn't exist, nothing to delete
@@ -113,7 +113,10 @@ export async function deleteRemote({
     const parsedConfig = parseConfig(configBuffer)
     parsedConfig.deleteSection('remote', remote)
     const updatedConfig = serializeConfig(parsedConfig)
-    await fs.write(join(effectiveGitdir, 'config'), updatedConfig)
+    await repo.gitBackend.writeConfig(updatedConfig)
+    
+    // Reload config to ensure cache is updated
+    await repo.gitBackend.reloadConfig()
     
     // Invalidate remote cache since we've deleted a remote
     // This ensures Repository.getRemote() won't return a stale backend

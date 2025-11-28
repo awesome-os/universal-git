@@ -1,13 +1,12 @@
-// ConfigAccess import removed - using Repository.getConfig() directly
 import { compareStats } from "../utils/compareStats.ts"
 import { join } from "../utils/join.ts"
 import { normalizeStats } from "../utils/normalizeStats.ts"
 import { shasum } from "../utils/shasum.ts"
-import { createFileSystem } from '../utils/createFileSystem.ts'
 import { UniversalBuffer } from '../utils/UniversalBuffer.ts'
-import type { Repository } from "../core-utils/Repository.ts"
 import type { Stat } from './FileSystem.ts'
 import type { WalkerEntry } from './Walker.ts'
+import type { GitBackend } from '../backends/GitBackend.ts'
+import type { GitWorktreeBackend } from '../git/worktree/GitWorktreeBackend.ts'
 
 import { GitObject } from './GitObject.ts'
 
@@ -22,11 +21,13 @@ type WorkdirEntry = {
 }
 
 export class GitWalkerFs {
-  private repo: Repository
+  private worktreeBackend: GitWorktreeBackend
+  private gitBackend: GitBackend
   ConstructEntry: new (fullpath: string) => WorkdirEntry
 
-  constructor({ repo }: { repo: Repository }) {
-    this.repo = repo
+  constructor({ worktreeBackend, gitBackend }: { worktreeBackend: GitWorktreeBackend; gitBackend: GitBackend }) {
+    this.worktreeBackend = worktreeBackend
+    this.gitBackend = gitBackend
     const walker = this
     this.ConstructEntry = class WorkdirEntry {
       _fullpath: string
@@ -70,16 +71,10 @@ export class GitWalkerFs {
 
   async readdir(entry: WorkdirEntry): Promise<string[] | null> {
     const filepath = entry._fullpath
-    // CRITICAL: Use repo.getDir() instead of repo.dir to ensure we get the correct workdir
-    // repo.dir is a private property and may not be initialized correctly
-    const dir = await this.repo.getDir()
-    if (!dir) {
-      throw new Error('Cannot readdir in bare repository')
-    }
-    const normalizedFs = createFileSystem(this.repo.fs)
-    const names = await normalizedFs.readdir(join(dir, filepath))
+    const names = await this.worktreeBackend.readdir(filepath || '.')
     if (names === null) return null
-    return names.map(name => join(filepath, name))
+    const { join } = await import('../utils/join.ts')
+    return names.map(name => join(filepath || '.', name))
   }
 
   async type(entry: WorkdirEntry): Promise<'tree' | 'blob' | 'special'> {
@@ -111,13 +106,7 @@ export class GitWalkerFs {
 
   async stat(entry: WorkdirEntry): Promise<Stat | undefined> {
     if (entry._stat === false) {
-      // CRITICAL: Use repo.getDir() instead of repo.dir to ensure we get the correct workdir
-      const dir = await this.repo.getDir()
-      if (!dir) {
-        throw new Error('Cannot stat in bare repository')
-      }
-      const normalizedFs = createFileSystem(this.repo.fs)
-      let stat = await normalizedFs.lstat(`${dir}/${entry._fullpath}`)
+      const stat = await this.worktreeBackend.lstat(entry._fullpath)
       if (!stat) {
         // File doesn't exist in workdir - return undefined instead of throwing
         // This allows walk() to handle files that exist in other trees (e.g., HEAD, STAGE) but not in workdir
@@ -126,8 +115,8 @@ export class GitWalkerFs {
         entry._mode = false
         return undefined
       }
-      let type: 'tree' | 'blob' | 'special' = (stat as any).isDirectory() ? 'tree' : 'blob'
-      if (type === 'blob' && !(stat as any).isFile() && !(stat as any).isSymbolicLink()) {
+      let type: 'tree' | 'blob' | 'special' = stat.isDirectory() ? 'tree' : 'blob'
+      if (type === 'blob' && !stat.isFile() && !stat.isSymbolicLink()) {
         type = 'special'
       }
       entry._type = type
@@ -144,22 +133,12 @@ export class GitWalkerFs {
 
   async content(entry: WorkdirEntry): Promise<Uint8Array | undefined> {
     if (entry._content === false) {
-      // CRITICAL: Use repo.getDir() instead of repo.dir to ensure we get the correct workdir
-      const dir = await this.repo.getDir()
-      if (!dir) {
-        throw new Error('Cannot read content in bare repository')
-      }
-      const gitdir = await this.repo.getGitdir()
-      const fs = this.repo.fs
-      const normalizedFs = createFileSystem(fs)
       if ((await this.type(entry)) === 'tree') {
         entry._content = undefined
       } else {
-        // CRITICAL: Use Repository's config service directly instead of cached ConfigAccess
-        // This ensures we always get the latest config values, even after setConfig() calls
-        const configService = await this.repo.getConfig()
-        const autocrlf = (await configService.get('core.autocrlf')) as string | undefined
-        const content = await normalizedFs.read(`${dir}/${entry._fullpath}`, { autocrlf })
+        // Get autocrlf config from gitBackend
+        const autocrlf = (await this.gitBackend.getConfig('core.autocrlf')) as string | undefined
+        const content = await this.worktreeBackend.read(entry._fullpath, { autocrlf })
         if (content) {
           const contentBuffer = UniversalBuffer.isBuffer(content) ? content : UniversalBuffer.from(content as string | Uint8Array)
           // workaround for a BrowserFS edge case
@@ -180,7 +159,23 @@ export class GitWalkerFs {
     if (entry._oid === false) {
       let oid: string | undefined
       // See if we can use the SHA1 hash in the index.
-      const index = await this.repo.readIndexDirect()
+      const { GitIndex } = await import('../git/index/GitIndex.ts')
+      const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+      const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+      
+      let indexBuffer: UniversalBuffer
+      try {
+        indexBuffer = await this.gitBackend.readIndex()
+      } catch {
+        return undefined
+      }
+      
+      if (indexBuffer.length === 0) {
+        return undefined
+      }
+      
+      const objectFormat = await detectObjectFormat(undefined, undefined, {}, this.gitBackend)
+      const index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
       if (!index) {
         return undefined
       }
@@ -189,10 +184,8 @@ export class GitWalkerFs {
       if (!stats) {
         oid = undefined
       } else {
-        // CRITICAL: Use Repository's config service directly instead of cached ConfigAccess
-        // This ensures we always get the latest config values, even after setConfig() calls
-        const configService = await this.repo.getConfig()
-        const filemode = (await configService.get('core.filemode')) as boolean | undefined
+        // Get config from gitBackend
+        const filemode = (await this.gitBackend.getConfig('core.filemode')) as boolean | undefined
         const trustino =
           typeof process !== 'undefined'
             ? !(process.platform === 'win32')
@@ -220,7 +213,7 @@ export class GitWalkerFs {
                 oid,
               })
               // Write the updated index back
-              await this.repo.writeIndexDirect(index)
+              await this.gitBackend.writeIndex(await index.toBuffer())
             }
           }
         } else {

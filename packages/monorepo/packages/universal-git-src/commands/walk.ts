@@ -24,7 +24,9 @@ import { WalkerReduceFlat, WalkerIterate as WalkerIterateFn } from "../models/Wa
  *
  */
 export async function _walk({
-  repo,
+  gitBackend,
+  worktreeBackend,
+  cache,
   trees,
   map = async (_: string, entry: WalkerEntry[]) => entry,
   // The default reducer is a flatmap that filters out undefineds.
@@ -72,7 +74,9 @@ export async function _walk({
     return results
   }),
 }: {
-  repo: Repository
+  gitBackend: import('../backends/GitBackend.ts').GitBackend
+  worktreeBackend?: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend
+  cache?: Record<string, unknown>
   trees: Walker[]
   map?: WalkerMap
   reduce?: WalkerReduce
@@ -85,7 +89,11 @@ export async function _walk({
   const walkers = await Promise.all(
     trees.map((proxy, i) => {
       log(`  Creating walker ${i}...`)
-      return proxy[GitWalkSymbol]({ repo })
+      return proxy[GitWalkSymbol]({ 
+        gitBackend,
+        worktreeBackend,
+        cache: cache || {},
+      })
     })
   )
   log('Walkers created', { walkersCount: walkers.length })
@@ -338,14 +346,18 @@ export async function walk({
       treesCount: normalized.trees.length,
       gitdir: normalized.gitdir,
       dir: normalized.dir,
-      repoDir: normalized.repo ? await normalized.repo.getDir() : 'no repo'
     })
 
     assertParameter('trees', normalized.trees)
     
     log('Calling _walk...')
+    if (!normalized.repo?.gitBackend) {
+      throw new Error('gitBackend is required for walk')
+    }
     const result = await _walk({
-      repo: normalized.repo,
+      gitBackend: normalized.repo.gitBackend,
+      worktreeBackend: normalized.repo.worktreeBackend || undefined,
+      cache: normalized.repo.cache,
       trees: normalized.trees,
       map: normalized.map,
       reduce: normalized.reduce,

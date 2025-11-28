@@ -1,10 +1,8 @@
-import type { FileSystemProvider } from '@awesome-os/universal-git-src/models/FileSystem.ts'
 import { listFiles } from '@awesome-os/universal-git-src/index.ts'
 import { GitIndex } from '@awesome-os/universal-git-src/git/index/GitIndex.ts'
 import { resolveFilepath } from '@awesome-os/universal-git-src/utils/resolveFilepath.ts'
-import { createFileSystem } from '@awesome-os/universal-git-src/utils/createFileSystem.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
 import { normalize as normalizePath } from '@awesome-os/universal-git-src/core-utils/GitPath.ts'
+import type { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 
 /**
  * Reset the entire index to match a specific tree (e.g., HEAD)
@@ -12,36 +10,28 @@ import { normalize as normalizePath } from '@awesome-os/universal-git-src/core-u
  * Uses Repository.writeIndexDirect() to ensure cache consistency
  */
 export async function resetIndexToTree({
-  fs,
-  dir,
-  gitdir,
+  repo,
   ref = 'HEAD',
-  cache = {},
 }: {
-  fs: FileSystemProvider
-  dir: string
-  gitdir: string
+  repo: Repository
   ref?: string
-  cache?: Record<string, unknown>
 }): Promise<void> {
-  const normalizedFs = createFileSystem(fs)
-  
-  // Use Repository to ensure cache consistency
-  const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-  const repo = await Repository.open({ fs, dir, cache, autoDetectConfig: true })
   const effectiveGitdir = await repo.getGitdir()
+  const cache = repo.cache
   
   // Get all file paths from the tree using listFiles (handles nested trees)
-  const filePaths = await listFiles({ fs, dir, gitdir: effectiveGitdir, ref, cache })
+  const filePaths = await listFiles({ repo, ref })
   
-  // Resolve the commit/tree OID
-  const { resolveRef } = await import('@awesome-os/universal-git-src/git/refs/readRef.ts')
+  // Resolve the commit/tree OID using gitBackend methods
+  const { GitCommit } = await import('@awesome-os/universal-git-src/models/GitCommit.ts')
   let treeOid: string
   try {
-    const commitOid = await resolveRef({ fs, gitdir: effectiveGitdir, ref })
-    const { readObject } = await import('@awesome-os/universal-git-src/git/objects/readObject.ts')
-    const { GitCommit } = await import('@awesome-os/universal-git-src/models/GitCommit.ts')
-    const commitResult = await readObject({ fs, cache, gitdir: effectiveGitdir, oid: commitOid, format: 'content' })
+    const commitOid = await repo.gitBackend.readRef(ref, 5, cache)
+    if (!commitOid) {
+      // Ref doesn't exist, return early
+      return
+    }
+    const commitResult = await repo.gitBackend.readObject(commitOid, 'content', cache)
     if (commitResult.type === 'commit') {
       const commit = GitCommit.from(commitResult.object).parse()
       treeOid = commit.tree
@@ -64,21 +54,51 @@ export async function resetIndexToTree({
   const index = new GitIndex()
   
   // Add all entries from the tree
+  // Use gitBackend.readObject to resolve filepaths in the tree
+  // We can't access fs directly - backends are black boxes
   for (const filepath of filePaths) {
     try {
       // Resolve the OID for this filepath in the tree
-      const blobOid = await resolveFilepath({
-        fs,
-        cache,
-        gitdir: effectiveGitdir,
-        oid: treeOid,
-        filepath,
-      })
+      // Use a helper that works with gitBackend instead of requiring fs
+      const { resolveFilepathInTree } = await import('@awesome-os/universal-git-src/utils/resolveFilepath.ts')
+      // For now, we'll need to read the tree and traverse it manually
+      // Since resolveFilepath requires fs, we need a different approach
+      // Let's use gitBackend.readObject to read tree objects
+      const pathParts = filepath.split('/')
+      let currentTreeOid = treeOid
+      let blobOid: string | undefined
+      
+      for (let i = 0; i < pathParts.length; i++) {
+        const part = pathParts[i]
+        const isLast = i === pathParts.length - 1
+        
+        const treeResult = await repo.gitBackend.readObject(currentTreeOid, 'content', cache)
+        if (treeResult.type !== 'tree') {
+          throw new Error(`Expected tree object, got ${treeResult.type}`)
+        }
+        const { parseTree } = await import('@awesome-os/universal-git-src/git/objects/parseTree.ts')
+        const tree = parseTree(treeResult.object)
+        const entry = tree.find(e => e.path === part)
+        
+        if (!entry) {
+          throw new Error(`Path part ${part} not found in tree`)
+        }
+        
+        if (isLast) {
+          blobOid = entry.oid
+        } else {
+          currentTreeOid = entry.oid
+        }
+      }
+      
+      if (!blobOid) {
+        throw new Error(`Could not resolve filepath ${filepath}`)
+      }
       
       // Get stats from working directory if file exists
       let stats
       try {
-        stats = await normalizedFs.lstat(join(dir, filepath))
+        stats = await repo.worktreeBackend!.lstat(filepath)
       } catch {
         // File doesn't exist in workdir, use default stats
         stats = {

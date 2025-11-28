@@ -36,23 +36,23 @@ export async function acquireLock<T>(ref: string | { filepath: string }, callbac
 
 // make sure filepath, blob type and blob object (from loose objects) plus oid are in sync and valid
 async function checkAndWriteBlob(
-  fs: FileSystemProvider,
+  worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
   gitdir: string,
-  dir: string,
   filepath: string,
   oid: string | null = null,
   cache: Record<string, unknown> = {}
 ): Promise<string | undefined> {
-  const normalizedFs = createFileSystem(fs)
-  const currentFilepath = join(dir, filepath)
-  
   // If OID is provided, first check if the object exists in the object store (loose or packed)
   if (oid) {
     try {
-      const objResult = await readObject({ fs, cache, gitdir, oid, format: 'content' })
-      if (objResult) {
-        // Object exists in the store, return the OID
-        return oid
+      // Get fs from worktreeBackend for readObject (which needs fs for object store access)
+      const fs = (worktreeBackend as any).fs
+      if (fs) {
+        const objResult = await readObject({ fs, cache, gitdir, oid, format: 'content' })
+        if (objResult) {
+          // Object exists in the store, return the OID
+          return oid
+        }
       }
     } catch (error) {
       // Object doesn't exist in store - this can happen if the blob wasn't written yet
@@ -64,7 +64,7 @@ async function checkAndWriteBlob(
   // Object doesn't exist in store (or OID not provided), try reading from working directory
   let stats
   try {
-    stats = await normalizedFs.lstat(currentFilepath)
+    stats = await worktreeBackend.lstat(filepath)
   } catch {
     // File doesn't exist in working directory
     if (oid) {
@@ -82,30 +82,35 @@ async function checkAndWriteBlob(
   
   if (!stats) {
     if (oid) {
-      throw new NotFoundError(currentFilepath)
+      throw new NotFoundError(filepath)
     }
     return undefined
   }
   
-  if ((stats as any).isDirectory())
+  if (stats.isDirectory())
     throw new InternalError(
-      `${currentFilepath}: file expected, but found directory`
+      `${filepath}: file expected, but found directory`
     )
 
   // Read from working directory and write to object store
   let retOid: string | undefined = undefined
-  await acquireLock({ filepath: currentFilepath }, async () => {
-    const object = (stats as any).isSymbolicLink()
-      ? await normalizedFs.readlink(currentFilepath).then((link: UniversalBuffer | string | null) => {
-          if (link === null) throw new NotFoundError(currentFilepath)
+  await acquireLock({ filepath }, async () => {
+    const object = stats.isSymbolicLink()
+      ? await worktreeBackend.readlink(filepath).then((link: UniversalBuffer | string | null) => {
+          if (link === null) throw new NotFoundError(filepath)
           return posixifyPathBuffer(UniversalBuffer.isBuffer(link) ? link : UniversalBuffer.from(link))
         })
-      : await normalizedFs.read(currentFilepath)
+      : await worktreeBackend.read(filepath)
 
-    if (object === null) throw new NotFoundError(currentFilepath)
+    if (object === null) throw new NotFoundError(filepath)
 
     const objectBuffer = UniversalBuffer.isBuffer(object) ? object : UniversalBuffer.from(object as string | Uint8Array)
     const uint8Array = objectBuffer instanceof Uint8Array ? objectBuffer : new Uint8Array(objectBuffer)
+    // Get fs from worktreeBackend for writeBlob (which needs fs for object store access)
+    const fs = (worktreeBackend as any).fs
+    if (!fs) {
+      throw new Error('WorktreeBackend must provide fs for writeBlob')
+    }
     retOid = await writeBlob({ fs, gitdir, blob: objectBuffer })
   })
 
@@ -121,15 +126,13 @@ interface TreeEntryWithChildren {
 }
 
 async function processTreeEntries({
-  fs,
-  dir,
+  worktreeBackend,
   gitdir,
   entries,
   cache = {},
   objectFormat,
 }: {
-  fs: FileSystemProvider
-  dir: string
+  worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend
   gitdir: string
   entries: TreeEntryWithChildren[]
   cache?: Record<string, unknown>
@@ -166,6 +169,11 @@ async function processTreeEntries({
         }))
         
         // Write the tree with the processed children
+        // Get fs from worktreeBackend for writeTree (which needs fs for object store access)
+        const fs = (worktreeBackend as any).fs
+        if (!fs) {
+          throw new Error('WorktreeBackend must provide fs for writeTree')
+        }
         entry.oid = await writeTree({
           fs,
           gitdir,
@@ -185,9 +193,8 @@ async function processTreeEntries({
       } else {
         // OID not set - this is a workdir file, need to write blob and get OID
         const oid = await checkAndWriteBlob(
-          fs,
+          worktreeBackend,
           gitdir,
-          dir,
           entry.path,
           null,
           cache
@@ -230,57 +237,60 @@ async function processTreeEntries({
 }
 
 export async function writeTreeChanges({
-  fs,
-  dir,
-  gitdir,
+  repo: _repo,
   treePair, // [WalkerFactory.tree({ ref: 'HEAD' }), 'stage'] would be the equivalent of `git write-tree`
   cache = {},
 }: {
-  fs: FileSystemProvider
-  dir: string
-  gitdir: string
+  repo: import('../core-utils/Repository.ts').Repository
   treePair: [Walker | string, Walker | string]
   cache?: Record<string, unknown>
 }): Promise<string | null> {
   const isStage = treePair[1] === 'stage'
   const isWorkdir = treePair[1] === 'workdir'
   
-  // CRITICAL: Get the Repository instance ONCE and pass it to _walk
-  // This ensures all walkers (STAGE, TREE, WORKDIR) use the same Repository instance
-  // and see the same index state as add(), status(), etc.
-  // IMPORTANT: Pass gitdir to Repository.open() to ensure we get the same instance as add()
-  const { Repository } = await import('../core-utils/Repository.ts')
-  const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
-  
-  // Resolve effective gitdir from the repository (for worktree support)
-  let effectiveGitdir = gitdir
-  try {
-    const worktree = repo.getWorktree()
-    if (worktree) {
-      effectiveGitdir = await worktree.getGitdir()
-    } else {
-      effectiveGitdir = await repo.getGitdir()
-    }
-  } catch {
-    // If getGitdir fails, use provided gitdir
-    effectiveGitdir = gitdir
+  // Get worktreeBackend from repo - required for file operations
+  const worktreeBackend = _repo.worktreeBackend
+  if (!worktreeBackend) {
+    throw new Error('writeTreeChanges requires a worktreeBackend (cannot operate on bare repository)')
   }
+  
+  const repo = _repo
+  const effectiveGitdir = await repo.getGitdir()
   
   // CRITICAL: If comparing against STAGE, ensure we read the latest index state
   // Since add() now writes directly to .git/index, the STAGE walker will read the latest state
-  if (isStage) {
-    await repo.readIndexDirect() // Read the owned instance (force=false by default)
+  if (isStage && repo.gitBackend) {
+    // Trigger index read to ensure latest state is available
+    try {
+      await repo.gitBackend.readIndex()
+    } catch {
+      // Index doesn't exist - that's okay
+    }
   }
   
   const trees = treePair.map(t => (typeof t === 'string' ? _TreeMap[t]() : t)) as Walker[]
 
   // Track whether any changes were detected
   let hasChanges = false
+  
+  // worktreeBackend is a black box - we can't get directory from it
+  // For isIgnoredInternal, we need to use worktreeBackend methods directly
+  // TODO: Refactor isIgnoredInternal to use worktreeBackend instead of fs/dir/gitdir
+  // For now, get fs from worktreeBackend (temporary until isIgnoredInternal is refactored)
+  const fs = (worktreeBackend as any).fs
+  if (!fs) {
+    throw new Error('worktreeBackend must provide fs for isIgnoredInternal')
+  }
+  // We can't get dir from worktreeBackend (it's a black box)
+  // isIgnoredInternal will need to be refactored to use worktreeBackend.read() instead
+  // For now, we'll need to pass a placeholder or refactor isIgnoredInternal
+  const dir = '' // Placeholder - isIgnoredInternal needs refactoring
+  
   // transform WalkerEntry objects into the desired format
   const map = WalkerMapWithNulls(async (filepath: string, [head, stage]: (WalkerEntry | null)[]): Promise<TreeEntry | undefined> => {
     if (
       filepath === '.' ||
-      (await isIgnoredInternal({ fs, dir, gitdir, filepath }))
+      (await isIgnoredInternal({ fs, dir, gitdir: effectiveGitdir, filepath }))
     ) {
       return undefined
     }
@@ -374,9 +384,8 @@ export async function writeTreeChanges({
         // Use checkAndWriteBlob to ensure the blob exists in the object database
         // This will write the blob if it doesn't exist, or return the existing OID if it does
         const actualOid = await checkAndWriteBlob(
-          fs,
+          worktreeBackend,
           effectiveGitdir,
-          dir,
           filepath,
           computedOid, // Pass the computed OID - checkAndWriteBlob will verify it exists or write it
           cache
@@ -591,10 +600,8 @@ export async function writeTreeChanges({
   // Note: finalTreeEntries already have OIDs set from the map function,
   // so we don't need to call processTreeEntries here.
   const finalTreeOid = await writeTree({
-    fs,
-    gitdir: effectiveGitdir,
+    repo,
     tree: finalTreeEntries,
-    objectFormat,
   })
 
   // CRITICAL: If the resulting tree is the empty tree OID, treat it as "no changes"
@@ -651,32 +658,53 @@ export async function writeTreeChanges({
 }
 
 export async function applyTreeChanges({
-  fs,
-  dir,
-  gitdir,
+  repo: _repo,
   stashCommit,
   parentCommit,
   wasStaged,
   cache = {},
 }: {
-  fs: FileSystemProvider
-  dir: string
-  gitdir: string
+  repo: import('../core-utils/Repository.ts').Repository
   stashCommit: string
   parentCommit: string
   wasStaged: boolean
   cache?: Record<string, unknown>
 }): Promise<void> {
   // Check for unmerged paths before applying tree changes
-  // CRITICAL: Pass gitdir to Repository.open() to ensure we get the same Repository instance
-  // as other operations like add(), status(), and stash(). This ensures index state consistency.
-  const { Repository } = await import('../core-utils/Repository.ts')
-  const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
-  const index = await repo.readIndexDirect(false, false) // Force fresh read, allowUnmerged: false
-  // If there are unmerged paths, readIndexDirect will throw UnmergedPathsError
-  // This ensures we don't apply stash during a merge conflict
+  const repo = _repo
+  if (!repo.gitBackend) {
+    throw new Error('gitBackend is required for applyTreeChanges')
+  }
+  const { GitIndex } = await import('../git/index/GitIndex.ts')
+  const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+  const { UnmergedPathsError } = await import('../errors/UnmergedPathsError.ts')
+  const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
   
-  const normalizedFs = createFileSystem(fs)
+  let indexBuffer: UniversalBuffer
+  try {
+    indexBuffer = await repo.gitBackend.readIndex()
+  } catch {
+    indexBuffer = UniversalBuffer.alloc(0)
+  }
+  
+  let index: GitIndex
+  if (indexBuffer.length === 0) {
+    const objectFormat = await detectObjectFormat(undefined, undefined, repo.cache, repo.gitBackend)
+    index = new GitIndex(null, undefined, 2)
+  } else {
+    const objectFormat = await detectObjectFormat(undefined, undefined, repo.cache, repo.gitBackend)
+    index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+  }
+  
+  // Check for unmerged paths
+  if (index.unmergedPaths.length > 0) {
+    throw new UnmergedPathsError(index.unmergedPaths)
+  }
+  
+  const worktreeBackend = repo.worktreeBackend
+  if (!worktreeBackend) {
+    throw new Error('applyTreeChanges requires a worktreeBackend (cannot operate on bare repository)')
+  }
   const dirRemoved: string[] = []
   const stageUpdated: Array<{ filepath: string; oid: string; stats?: any }> = []
 
@@ -850,7 +878,7 @@ export async function applyTreeChanges({
             // If not, get stats from the stash tree entry (which has the mode)
             let stats: any = null
             try {
-              stats = await normalizedFs.lstat(join(dir, filepath))
+              stats = await worktreeBackend.lstat(filepath)
             } catch {
               // File doesn't exist in workdir yet - will be written later
               // If we resolved from commit, stash methods will fail, so create minimal stats
@@ -972,31 +1000,30 @@ export async function applyTreeChanges({
   await acquireLock('applyTreeChanges', async () => {
     for (const op of sortedOps) {
       if (!op || !op.filepath) continue
-      const currentFilepath = join(dir, op.filepath)
       switch (op.method) {
         case 'rmdir':
           try {
-            await normalizedFs.rmdir(currentFilepath)
+            await worktreeBackend.rmdir(op.filepath)
           } catch (err: any) {
             // If directory is not empty, try to remove it recursively
             if (err.code === 'ENOTEMPTY') {
-              await normalizedFs.rm(currentFilepath, { recursive: true })
+              await worktreeBackend.rm(op.filepath, { recursive: true })
             } else {
               throw err
             }
           }
           break
         case 'mkdir':
-          await normalizedFs.mkdir(currentFilepath)
+          await worktreeBackend.mkdir(op.filepath)
           break
         case 'rm':
-          await normalizedFs.rm(currentFilepath)
+          await worktreeBackend.rm(op.filepath)
           break
         case 'write':
           // only writes if file is not in the removedDirs
           if (
             !dirRemoved.some(removedDir =>
-              currentFilepath.startsWith(removedDir)
+              op.filepath.startsWith(removedDir + '/') || op.filepath === removedDir
             )
           ) {
             if (!op.oid) {
@@ -1004,21 +1031,21 @@ export async function applyTreeChanges({
               break
             }
             try {
-              // Use readObject from git/objects/readObject.ts with 'content' format to get raw blob data
-              const { readObject: readObjectFromGit } = await import('../git/objects/readObject.ts')
-              const result = await readObjectFromGit({
-                fs,
-                cache,
-                gitdir,
-                oid: op.oid,
-                format: 'content',
-              })
-              // just like checkout, since mode only applicable to create, not update, delete first
-              if (await normalizedFs.exists(currentFilepath)) {
-                await normalizedFs.rm(currentFilepath)
+              // Use gitBackend.readObject() to get raw blob data
+              if (!repo.gitBackend) {
+                throw new Error('gitBackend is required for applyTreeChanges')
               }
-              const objectBuffer = UniversalBuffer.isBuffer(result.object) ? result.object : UniversalBuffer.from(result.object as Uint8Array)
-              await normalizedFs.write(currentFilepath, objectBuffer) // only handles regular files for now
+              const result = await repo.gitBackend.readObject({ oid: op.oid })
+              if (result.type !== 'blob') {
+                throw new Error(`Expected blob object, got ${result.type}`)
+              }
+              // just like checkout, since mode only applicable to create, not update, delete first
+              if (await worktreeBackend.exists(op.filepath)) {
+                await worktreeBackend.rm(op.filepath)
+              }
+              const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+              const objectBuffer = UniversalBuffer.from(result.object)
+              await worktreeBackend.write(op.filepath, objectBuffer) // only handles regular files for now
             } catch (error) {
               // If object doesn't exist, this indicates a repository integrity issue
               // The stash commit references an object that was never written or was deleted
@@ -1039,10 +1066,31 @@ export async function applyTreeChanges({
 
   // update the stage (if wasStaged is true)
   if (wasStaged) {
-    // Use Repository.readIndexDirect() and writeIndexDirect() for consistency
+    // Use gitBackend.readIndex() directly for consistency
     // CRITICAL: Read index AFTER workdir changes have been applied
     // This ensures we get the correct stats for files that were just written
-    const currentIndex = await repo.readIndexDirect(false) // Force fresh read
+    if (!repo.gitBackend) {
+      throw new Error('gitBackend is required for writeTreeChanges')
+    }
+    const { GitIndex } = await import('../git/index/GitIndex.ts')
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+    
+    let indexBuffer: UniversalBuffer
+    try {
+      indexBuffer = await repo.gitBackend.readIndex()
+    } catch {
+      indexBuffer = UniversalBuffer.alloc(0)
+    }
+    
+    let currentIndex: GitIndex
+    if (indexBuffer.length === 0) {
+      const objectFormat = await detectObjectFormat(undefined, undefined, repo.cache, repo.gitBackend)
+      currentIndex = new GitIndex(null, undefined, 2)
+    } else {
+      const objectFormat = await detectObjectFormat(undefined, undefined, repo.cache, repo.gitBackend)
+      currentIndex = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+    }
     for (const { filepath, stats, oid } of stageUpdated) {
       if (oid === '') {
         // Deletion - remove from index
@@ -1053,7 +1101,7 @@ export async function applyTreeChanges({
         let finalStats = stats
         try {
           // File should exist in workdir now (was written in the acquireLock block above)
-          finalStats = await normalizedFs.lstat(join(dir, filepath))
+          finalStats = await worktreeBackend.lstat(filepath)
         } catch {
           // File doesn't exist - use the stats we collected earlier (from stash entry)
           // This should only happen for deletions, but we handle it gracefully

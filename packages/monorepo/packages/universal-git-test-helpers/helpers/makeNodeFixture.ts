@@ -76,14 +76,12 @@ export async function makeNodeFixture(fixture: string, options?: { init?: boolea
   // Create WorktreeBackend (GitWorktreeFs)
   const worktreeBackend = createGitWorktreeBackend({ fs, dir })
 
-  // Create Repository instance with explicit backends
-  // Repository is not exported as subpath, use relative path
-  const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-  const repo = await Repository.open({
+  // Create Repository instance using createRepository helper
+  const { createRepository } = await import('@awesome-os/universal-git-src/core-utils/createRepository.ts')
+  const repo = await createRepository({
     fs,
     dir, // Explicitly pass dir to ensure _dir is set
-    gitBackend,
-    worktree: worktreeBackend,
+    gitdir, // Explicitly pass gitdir
     cache: {},
     autoDetectConfig: true,
     init: options?.init || false,

@@ -96,12 +96,12 @@ export async function commitInWorktree({
   branch?: string
 }): Promise<string> {
   // Repository is not exported, use relative path from packages/test-helpers/helpers to src
-  const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
+  const { createRepository } = await import('@awesome-os/universal-git-src/core-utils/createRepository.ts')
   const mainGitdir = await repo.getGitdir()
   
-  // Open repository for the worktree
-  const worktreeRepo = await Repository.open({
-    fs: repo.fs,
+  // Create repository for the worktree
+  const worktreeRepo = await createRepository({
+    fs: repo.fs!,
     dir: worktreePath,
     gitdir: mainGitdir,
     cache: repo.cache,

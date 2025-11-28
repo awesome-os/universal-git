@@ -74,7 +74,7 @@ export async function updateIndex({
   force,
 }: UpdateIndexOptions): Promise<string | void> {
   try {
-    const { repo, fs, gitdir: effectiveGitdir, dir: effectiveDir } = await normalizeCommandArgs({
+    const { repo, gitdir: effectiveGitdir } = await normalizeCommandArgs({
       repo: _repo,
       fs: _fs,
       dir,
@@ -89,117 +89,26 @@ export async function updateIndex({
     })
 
     assertParameter('filepath', filepath)
-    
-    // updateIndex requires a working directory
-    if (!effectiveDir) {
-      throw new MissingParameterError('dir')
+
+    const worktreeBackend = repo?.worktreeBackend ?? null
+    if (!worktreeBackend) {
+      throw new MissingParameterError('worktreeBackend (required for updateIndex operation)')
     }
 
-    if (remove) {
-      // Use Repository.readIndexDirect() and writeIndexDirect() for consistency
-      const index = await repo.readIndexDirect(false) // Force fresh read
-      
-      if (!force) {
-        // Check if the file is still present in the working directory
-        const fileStats = await fs.lstat(join(effectiveDir, filepath))
-
-        if (fileStats) {
-          if (fileStats.isDirectory()) {
-            // Removing directories should not work
-            throw new InvalidFilepathError('directory')
-          }
-
-          // Do nothing if we don't force and the file still exists in the workdir
-          return
-        }
-      }
-
-      // Directories are not allowed, so we make sure the provided filepath exists in the index
-      if (index.has({ filepath })) {
-        index.delete({
-          filepath,
-        })
-        await repo.writeIndexDirect(index)
-      }
-      return
+    // Get gitBackend from repo if not provided directly
+    const effectiveGitBackend = repo?.gitBackend
+    if (!effectiveGitBackend) {
+      throw new MissingParameterError('gitBackend (required for updateIndex operation)')
     }
 
-    // Test if it is a file and exists on disk if `remove` is not provided, only of no oid is provided
-    let fileStats: any
-
-    if (!oid) {
-      fileStats = await fs.lstat(join(effectiveDir, filepath))
-
-      if (!fileStats) {
-        throw new NotFoundError(
-          `file at "${filepath}" on disk and "remove" not set`
-        )
-      }
-
-      if (fileStats.isDirectory()) {
-        throw new InvalidFilepathError('directory')
-      }
-    }
-
-    // Use Repository.readIndexDirect() and writeIndexDirect() for consistency
-    const index = await repo.readIndexDirect(false) // Force fresh read
-    
-    if (!add && !index.has({ filepath })) {
-      // If the index does not contain the filepath yet and `add` is not set, we should throw
-      throw new NotFoundError(
-        `file at "${filepath}" in index and "add" not set`
-      )
-    }
-
-    let stats: any
-    if (!oid) {
-      stats = fileStats
-
-      // Write the file to the object database
-      const object = stats.isSymbolicLink()
-        ? await fs.readlink(join(effectiveDir, filepath))
-        : await fs.read(join(effectiveDir, filepath))
-
-      // Convert string to UniversalBuffer if needed, skip if null
-      if (object) {
-        const objectBuffer = typeof object === 'string' 
-          ? UniversalBuffer.from(object) 
-          : object
-        oid = await writeObjectInternal({
-          fs,
-          gitdir: effectiveGitdir,
-          type: 'blob',
-          format: 'content',
-          object: objectBuffer,
-        })
-      }
-    } else {
-      // By default we use 0 for the stats of the index file
-      stats = {
-        ctime: new Date(0),
-        mtime: new Date(0),
-        dev: 0,
-        ino: 0,
-        mode,
-        uid: 0,
-        gid: 0,
-        size: 0,
-      }
-    }
-
-    // Ensure oid is defined before inserting
-    if (!oid) {
-      throw new Error('oid is required for index.insert')
-    }
-
-    index.insert({
-      filepath,
+    // Delegate to gitBackend.updateIndex
+    return await effectiveGitBackend.updateIndex(worktreeBackend, filepath, {
       oid,
-      stats,
+      mode,
+      add,
+      remove,
+      force,
     })
-
-    await repo.writeIndexDirect(index)
-    return oid
   } catch (err) {
     ;(err as { caller?: string }).caller = 'git.updateIndex'
     throw err
