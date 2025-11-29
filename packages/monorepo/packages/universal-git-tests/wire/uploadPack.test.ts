@@ -4,7 +4,7 @@ import { uploadPack } from '@awesome-os/universal-git-src/commands/uploadPack.ts
 import { collect } from '@awesome-os/universal-git-src/utils/collect.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { commit, add } from '@awesome-os/universal-git-src/index.ts'
-
+import fs from 'node:fs';
 test('uploadPack', async (t) => {
   await t.test('advertiseRefs: true', async () => {
     const { repo } = await makeFixture('test-uploadPack')
@@ -218,11 +218,11 @@ test('uploadPack', async (t) => {
     const { repo } = await makeFixture('test-empty')
     // Use repo but with invalid gitdir - this will cause an error when uploadPack tries to list refs
     // Create a new repo with invalid gitdir by modifying the backend
-    if (!repo.fs) {
-      throw new Error('Repository fs is not available')
-    }
-    const { FilesystemBackend } = await import('@awesome-os/universal-git-src/backends/FilesystemBackend.ts')
-    const invalidBackend = new FilesystemBackend(repo.fs, '/nonexistent/gitdir')
+
+
+
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(fs, '/nonexistent/gitdir')
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     const invalidRepo = new Repository({
       gitBackend: invalidBackend,

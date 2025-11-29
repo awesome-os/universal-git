@@ -120,7 +120,7 @@ describe('merge', () => {
   it('error:UnmergedPathsError', async () => {
         // Setup
         const { repo } = await makeFixture('test-GitIndex-unmerged')
-        const dir = await repo.getDir()!
+        if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
         const gitdir = await repo.getGitdir()
 
         // Verify the fixture has unmerged paths first

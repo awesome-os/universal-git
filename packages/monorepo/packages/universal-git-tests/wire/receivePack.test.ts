@@ -3,8 +3,6 @@ import assert from 'node:assert'
 import { processReceivePack, formatReceivePackResponse, type ReceivePackResult } from '@awesome-os/universal-git-src/wire/receivePack.ts'
 import { GitPktLine } from '@awesome-os/universal-git-src/models/GitPktLine.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { readRef } from '@awesome-os/universal-git-src/git/refs/readRef.ts'
-import { writeRef } from '@awesome-os/universal-git-src/git/refs/writeRef.ts'
 
 import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
 const createStream = UniversalBuffer.createStream
@@ -19,8 +17,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -43,8 +40,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -53,7 +49,7 @@ test('processReceivePack', async (t) => {
     assert.strictEqual(result.refs.get(ref)?.ok, true)
     
     // Verify ref was updated
-    const refValue = await readRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref })
+    const refValue = await repo.gitBackend.readRef(ref, 5, {})
     assert.strictEqual(refValue, newOid)
   })
 
@@ -76,8 +72,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -87,8 +82,8 @@ test('processReceivePack', async (t) => {
     assert.strictEqual(result.refs.get(ref2)?.ok, true)
     
     // Verify refs were updated
-    const refValue1 = await readRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref: ref1 })
-    const refValue2 = await readRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref: ref2 })
+    const refValue1 = await repo.gitBackend.readRef(ref1, 5, {})
+    const refValue2 = await repo.gitBackend.readRef(ref2, 5, {})
     assert.strictEqual(refValue1, newOid1)
     assert.strictEqual(refValue2, newOid2)
   })
@@ -99,7 +94,7 @@ test('processReceivePack', async (t) => {
     
     // Create a ref first
     const existingOid = 'a'.repeat(40)
-    await writeRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref: 'refs/heads/feature', value: existingOid })
+    await repo.gitBackend.writeRef('refs/heads/feature', existingOid, false, {})
     
     const zeroOid = '0'.repeat(40)
     const ref = 'refs/heads/feature'
@@ -112,8 +107,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -123,7 +117,7 @@ test('processReceivePack', async (t) => {
     
     // Verify ref was deleted
     try {
-      await readRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref })
+      await repo.gitBackend.readRef(ref, 5, {})
       assert.fail('Ref should have been deleted')
     } catch (error) {
       // Expected - ref doesn't exist
@@ -137,7 +131,7 @@ test('processReceivePack', async (t) => {
     
     // Create a ref first
     const oldOid = 'a'.repeat(40)
-    await writeRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref: 'refs/heads/main', value: oldOid })
+    await repo.gitBackend.writeRef('refs/heads/main', oldOid, false, {})
     
     const newOid = 'b'.repeat(40)
     const ref = 'refs/heads/main'
@@ -150,8 +144,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -160,7 +153,7 @@ test('processReceivePack', async (t) => {
     assert.strictEqual(result.refs.get(ref)?.ok, true)
     
     // Verify ref was updated
-    const refValue = await readRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref })
+    const refValue = await repo.gitBackend.readRef(ref, 5, {})
     assert.strictEqual(refValue, newOid)
   })
 
@@ -170,7 +163,7 @@ test('processReceivePack', async (t) => {
     
     // Create a ref with different OID
     const actualOid = 'a'.repeat(40)
-    await writeRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref: 'refs/heads/main', value: actualOid })
+    await repo.gitBackend.writeRef('refs/heads/main', actualOid, false, {})
     
     const wrongOldOid = 'b'.repeat(40)
     const newOid = 'c'.repeat(40)
@@ -184,8 +177,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -195,7 +187,7 @@ test('processReceivePack', async (t) => {
     assert.ok(result.refs.get(ref)?.error?.includes('ref update conflict'))
     
     // Verify ref was NOT updated
-    const refValue = await readRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref })
+    const refValue = await repo.gitBackend.readRef(ref, 5, {})
     assert.strictEqual(refValue, actualOid)
   })
 
@@ -215,8 +207,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -242,8 +233,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -264,8 +254,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -290,8 +279,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -317,8 +305,7 @@ test('processReceivePack', async (t) => {
     
     // Use invalid gitdir to cause error
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/gitdir',
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -342,8 +329,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
       context: {
         remoteUrl: 'https://example.com/repo.git',
@@ -372,8 +358,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -390,8 +375,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -416,8 +400,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -442,8 +425,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -467,8 +449,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -493,8 +474,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -519,8 +499,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -529,7 +508,7 @@ test('processReceivePack', async (t) => {
     assert.strictEqual(result.refs.get(ref)?.ok, true)
     
     // Verify ref was created
-    const refValue = await readRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref })
+    const refValue = await repo.gitBackend.readRef(ref, 5, {})
     assert.strictEqual(refValue, newOid)
   })
 
@@ -539,11 +518,11 @@ test('processReceivePack', async (t) => {
     
     // Create first ref
     const existingOid1 = 'a'.repeat(40)
-    await writeRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref: 'refs/heads/branch1', value: existingOid1 })
+    await repo.gitBackend.writeRef('refs/heads/branch1', existingOid1, false, {})
     
     // Create second ref with different OID (valid hex)
     const existingOid2 = 'b'.repeat(40)
-    await writeRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref: 'refs/heads/branch2', value: existingOid2 })
+    await repo.gitBackend.writeRef('refs/heads/branch2', existingOid2, false, {})
     
     const oldOid1 = existingOid1
     const newOid1 = 'c'.repeat(40)
@@ -562,8 +541,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -577,7 +555,6 @@ test('processReceivePack', async (t) => {
 
   await t.test('handles filesystem error during ref read', async () => {
     const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
     
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
@@ -589,10 +566,11 @@ test('processReceivePack', async (t) => {
     ]
     const stream = createStream(request)
     
-    // Use invalid gitdir path to cause filesystem error
+    // Use invalid gitdir path to cause filesystem error - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/path/to/gitdir')
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/path/to/gitdir',
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -602,7 +580,6 @@ test('processReceivePack', async (t) => {
 
   await t.test('handles object format detection failure', async () => {
     const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
     
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
@@ -614,10 +591,11 @@ test('processReceivePack', async (t) => {
     ]
     const stream = createStream(request)
     
-    // Use invalid gitdir - will cause filesystem error
+    // Use invalid gitdir - will cause filesystem error - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/invalid/gitdir',
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -641,8 +619,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -667,8 +644,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -683,11 +659,11 @@ test('processReceivePack', async (t) => {
     
     // Create first ref
     const existingOid1 = 'a'.repeat(40)
-    await writeRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref: 'refs/heads/success1', value: existingOid1 })
+    await repo.gitBackend.writeRef('refs/heads/success1', existingOid1, false, {})
     
     // Create second ref with different OID (so wrong oldOid will cause conflict)
     const existingOid2 = 'b'.repeat(40)
-    await writeRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref: 'refs/heads/fail1', value: existingOid2 })
+    await repo.gitBackend.writeRef('refs/heads/fail1', existingOid2, false, {})
     
     // Second ref with wrong oldOid (will fail)
     const wrongOldOid2 = 'd'.repeat(40) // Different from existingOid2
@@ -706,8 +682,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -738,8 +713,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -762,8 +736,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -786,8 +759,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -816,10 +788,11 @@ test('processReceivePack', async (t) => {
     ]
     const stream = createStream(request)
     
-    // Use invalid gitdir path that will cause ENOENT when reading ref
+    // Use invalid gitdir path that will cause ENOENT when reading ref - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/gitdir/path')
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/gitdir/path',
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -845,10 +818,11 @@ test('processReceivePack', async (t) => {
     ]
     const stream = createStream(request)
     
-    // Use gitdir path that will cause error with /nonexistent/ in message
+    // Use gitdir path that will cause error with /nonexistent/ in message - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/invalid/gitdir',
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -879,8 +853,7 @@ test('processReceivePack', async (t) => {
     // For now, we test that the code path exists and handles hook errors gracefully
     // The hook will likely not exist in test environment, so it will be skipped
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -904,8 +877,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -935,8 +907,7 @@ test('processReceivePack', async (t) => {
     
     // Use invalid gitdir to potentially trigger error path
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/gitdir',
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -959,10 +930,11 @@ test('processReceivePack', async (t) => {
     ]
     const stream = createStream(request)
     
-    // Use invalid gitdir to cause system error (not validation error)
+    // Use invalid gitdir to cause system error (not validation error) - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/system/error')
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/system/error',
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -992,8 +964,7 @@ test('processReceivePack', async (t) => {
     
     // Use invalid gitdir to potentially trigger error without message
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/gitdir',
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -1018,8 +989,7 @@ test('processReceivePack', async (t) => {
     
     // Use invalid gitdir to trigger outer catch
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/gitdir',
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -1044,8 +1014,7 @@ test('processReceivePack', async (t) => {
     
     // Use invalid gitdir to cause error with code
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/gitdir',
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -1079,8 +1048,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -1131,8 +1099,7 @@ test('processReceivePack', async (t) => {
     
     // Use invalid gitdir to cause system errors for all refs
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/gitdir',
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -1161,8 +1128,7 @@ test('processReceivePack', async (t) => {
     
     // Use invalid gitdir to cause error with errno
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/gitdir',
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -1178,14 +1144,14 @@ test('processReceivePack', async (t) => {
     // Create an update hook that rejects (non-ENOENT error)
     const { join } = await import('@awesome-os/universal-git-src/utils/join.ts')
     const hooksDir = join(gitdir, 'hooks')
-    await repo.fs.mkdir(hooksDir, { recursive: true })
+    await repo.gitBackend.getFs().mkdir(hooksDir, { recursive: true })
     
     // Create update hook script that rejects
     const hookScript = `#!/usr/bin/env node
 console.error('Update hook rejected this ref');
 process.exit(1);
 `
-    await repo.fs.write(join(hooksDir, 'update'), hookScript, { mode: 0o755 })
+    await repo.gitBackend.getFs().write(join(hooksDir, 'update'), hookScript, { mode: 0o755 })
     
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
@@ -1198,8 +1164,7 @@ process.exit(1);
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -1223,14 +1188,14 @@ process.exit(1);
     // Create a post-receive hook that errors
     const { join } = await import('@awesome-os/universal-git-src/utils/join.ts')
     const hooksDir = join(gitdir, 'hooks')
-    await repo.fs.mkdir(hooksDir, { recursive: true })
+    await repo.gitBackend.getFs().mkdir(hooksDir, { recursive: true })
     
     // Create post-receive hook script that errors
     const hookScript = `#!/usr/bin/env node
 console.error('Post-receive hook error');
 process.exit(1);
 `
-    await repo.fs.write(join(hooksDir, 'post-receive'), hookScript, { mode: 0o755 })
+    await repo.gitBackend.getFs().write(join(hooksDir, 'post-receive'), hookScript, { mode: 0o755 })
     
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
@@ -1243,8 +1208,7 @@ process.exit(1);
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -1262,13 +1226,13 @@ process.exit(1);
     // Create an update hook that rejects with "hook rejected" message
     const { join } = await import('@awesome-os/universal-git-src/utils/join.ts')
     const hooksDir = join(gitdir, 'hooks')
-    await repo.fs.mkdir(hooksDir, { recursive: true })
+    await repo.gitBackend.getFs().mkdir(hooksDir, { recursive: true })
     
     const hookScript = `#!/usr/bin/env node
 console.error('hook rejected: ref update not allowed');
 process.exit(1);
 `
-    await repo.fs.write(join(hooksDir, 'update'), hookScript, { mode: 0o755 })
+    await repo.gitBackend.getFs().write(join(hooksDir, 'update'), hookScript, { mode: 0o755 })
     
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
@@ -1281,8 +1245,7 @@ process.exit(1);
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -1343,8 +1306,7 @@ process.exit(1);
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -1402,13 +1364,13 @@ process.exit(1);
     // Create an update hook that rejects with "update hook" in message
     const { join } = await import('@awesome-os/universal-git-src/utils/join.ts')
     const hooksDir = join(gitdir, 'hooks')
-    await repo.fs.mkdir(hooksDir, { recursive: true })
+    await repo.gitBackend.getFs().mkdir(hooksDir, { recursive: true })
     
     const hookScript = `#!/usr/bin/env node
 console.error('update hook: ref update not allowed');
 process.exit(1);
 `
-    await repo.fs.write(join(hooksDir, 'update'), hookScript, { mode: 0o755 })
+    await repo.gitBackend.getFs().write(join(hooksDir, 'update'), hookScript, { mode: 0o755 })
     
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
@@ -1421,8 +1383,7 @@ process.exit(1);
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -1441,7 +1402,7 @@ process.exit(1);
     
     // Create two refs - one with conflict, one that succeeds
     const existingOid1 = 'a'.repeat(40)
-    await writeRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref: 'refs/heads/branch1', value: existingOid1 })
+    await repo.gitBackend.writeRef('refs/heads/branch1', existingOid1, false, {})
     
     const wrongOldOid1 = 'x'.repeat(40)
     const newOid1 = 'b'.repeat(40)
@@ -1459,8 +1420,7 @@ process.exit(1);
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -1492,8 +1452,7 @@ process.exit(1);
     
     // Use invalid gitdir to cause error early (sets unpackError)
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/gitdir',
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -1508,7 +1467,7 @@ process.exit(1);
     
     // Create a ref first
     const existingOid = 'a'.repeat(40)
-    await writeRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref: 'refs/heads/existing', value: existingOid })
+    await repo.gitBackend.writeRef('refs/heads/existing', existingOid, false, {})
     
     const oldOid = existingOid
     const newOid = 'b'.repeat(40)
@@ -1540,7 +1499,7 @@ process.exit(1);
     
     // Create a ref first
     const existingOid = 'a'.repeat(40)
-    await writeRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref: 'refs/heads/test', value: existingOid })
+    await repo.gitBackend.writeRef('refs/heads/test', existingOid, false, {})
     
     const oldOid = existingOid
     const newOid = 'b'.repeat(40)
@@ -1580,8 +1539,7 @@ process.exit(1);
     
     // Use invalid gitdir to trigger error with enoent in message
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/gitdir',
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -1596,7 +1554,7 @@ process.exit(1);
     
     // Create a ref with specific OID
     const existingOid = 'a'.repeat(40)
-    await writeRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref: 'refs/heads/branch', value: existingOid })
+    await repo.gitBackend.writeRef('refs/heads/branch', existingOid, false, {})
     
     // Try to update with wrong oldOid (will cause conflict)
     const wrongOldOid = 'b'.repeat(40) // Different from existingOid
@@ -1610,8 +1568,7 @@ process.exit(1);
     const stream = createStream(request)
     
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: await repo.getGitdir(),
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -1628,7 +1585,7 @@ process.exit(1);
     
     // Create one ref that will have a conflict (validation error)
     const existingOid1 = 'a'.repeat(40)
-    await writeRef({ fs: repo.fs, gitdir: await repo.getGitdir(), ref: 'refs/heads/conflict', value: existingOid1 })
+    await repo.gitBackend.writeRef('refs/heads/conflict', existingOid1, false, {})
     
     const wrongOldOid1 = 'b'.repeat(40) // Different from existingOid1
     const newOid1 = 'b'.repeat(40)
@@ -1648,8 +1605,7 @@ process.exit(1);
     
     // Use invalid gitdir to cause system error for second ref
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/gitdir',
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -1674,8 +1630,7 @@ process.exit(1);
     
     // Use invalid gitdir to cause error with code
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/gitdir',
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     
@@ -1705,8 +1660,7 @@ process.exit(1);
     
     // Use invalid gitdir to cause error
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/gitdir',
+      gitBackend: repo.gitBackend,
       requestBody: stream,
     })
     

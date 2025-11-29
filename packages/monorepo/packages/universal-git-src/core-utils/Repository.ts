@@ -124,7 +124,7 @@ export class Repository {
    * @example
    * ```typescript
    * // Create backends first
-   * const gitBackend = new FilesystemBackend(fs, gitdir)
+   * const gitBackend = new GitBackendFs(fs, gitdir)
    * const worktreeBackend = new GitWorktreeFs(fs, dir)
    * 
    * // Create repository
@@ -153,7 +153,7 @@ export class Repository {
     } = options
 
     // fs is not stored in Repository - backends are black boxes
-    // Only FilesystemBackend and GitWorktreeFs hold internal _fs for their own use
+    // Only GitBackendFs and GitWorktreeFs hold internal _fs for their own use
     this._fs = null
     
     // Derive gitdir from gitBackend (will be done on-demand via getGitdir() for non-filesystem backends)
@@ -200,7 +200,7 @@ export class Repository {
   /**
    * Get filesystem instance - removed
    * Repository should not expose fs - backends are black boxes
-   * Only FilesystemBackend and GitWorktreeFs hold internal _fs for their own use
+   * Only GitBackendFs and GitWorktreeFs hold internal _fs for their own use
    */
   get fs(): FileSystemProvider | null {
     // fs is no longer exposed - backends are black boxes
@@ -255,8 +255,8 @@ export class Repository {
     }
     // Use gitBackend if available
     if (this._gitBackend) {
-      const { FilesystemBackend } = await import('../backends/FilesystemBackend.ts')
-      if (this._gitBackend instanceof FilesystemBackend) {
+      const { GitBackendFs } = await import('../backends/GitBackendFs/index.ts')
+      if (this._gitBackend instanceof GitBackendFs) {
         this._gitdir = this._gitBackend.getGitdir()
         return this._gitdir
       }
@@ -1546,7 +1546,7 @@ export class Repository {
     // Delegate initialization to the GitBackend
     // init() always creates a bare repository
     // Backend-specific implementations will handle:
-    // - Creating directory structure (FilesystemBackend)
+    // - Creating directory structure (GitBackendFs)
     // - Creating database tables (SQL backend)
     // - Setting initial config values (core.bare = true)
     // - Setting HEAD to default branch
@@ -2216,8 +2216,8 @@ export class Repository {
 
     // Create submodule Repository instance
     // Reuse the same filesystem and cache from parent repository
-    const { FilesystemBackend } = await import('../backends/FilesystemBackend.ts')
-    const submoduleGitBackend = new FilesystemBackend(this.fs!, submoduleGitdir)
+    const { GitBackendFs } = await import('../backends/GitBackendFs/index.ts')
+    const submoduleGitBackend = new GitBackendFs(this.fs!, submoduleGitdir)
     const submoduleRepo = new Repository({
       gitBackend: submoduleGitBackend,
       worktreeBackend: submoduleWorktreeBackend,
@@ -2397,20 +2397,14 @@ export class Repository {
     if (await this.isBare()) {
       throw new Error('Cannot get status: repository is bare')
     }
-    if (!this.fs) {
-      throw new Error('Cannot get status: filesystem is required. Checkout to a WorktreeBackend first.')
-    }
-    const { status: _status } = await import('../commands/status.ts')
-    const gitdir = await this.getGitdir()
     if (!this._worktreeBackend) {
       throw new Error('Cannot get status: worktreeBackend is required. Checkout to a WorktreeBackend first.')
     }
+    const { status: _status } = await import('../commands/status.ts')
     // worktreeBackend is a black box - pass repo directly to status command
+    // status command will use repo.worktreeBackend for file operations
     return _status({
       repo: this,
-      fs: this.fs,
-      dir,
-      gitdir,
       cache: this.cache,
       filepath,
     })

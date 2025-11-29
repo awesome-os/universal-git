@@ -1,11 +1,11 @@
 import { join } from "../utils/join.ts"
 import { ConfigAccess } from "../utils/configAccess.ts"
 import { writeSymbolicRef } from "../git/refs/writeRef.ts"
-import { FilesystemBackend } from '../backends/index.ts'
+import { GitBackendFs } from '../backends/GitBackendFs/index.ts'
 import { assertParameter } from "../utils/assertParameter.ts"
 import type { ObjectFormat } from "../utils/detectObjectFormat.ts"
 import type { FileSystemProvider } from "../models/FileSystem.ts"
-import type { GitBackend } from '../backends/index.ts'
+import type { GitBackend } from '../backends/GitBackend.ts'
 import type { Repository } from '../core-utils/Repository.ts'
 
 /**
@@ -38,7 +38,7 @@ export async function init({
     let effectiveGitdir: string | undefined
 
     if (_repo) {
-      // Get fs from gitBackend if it's a FilesystemBackend
+      // Get fs from gitBackend if it's a GitBackendFs
       if (_repo.gitBackend && 'getFs' in _repo.gitBackend) {
         fs = (_repo.gitBackend as any).getFs()
       } else {
@@ -106,7 +106,7 @@ export async function _init({
 }): Promise<void> {
   // Use backend if provided, otherwise create filesystem backend
   const resolvedGitdir = gitdir! // Asserted by assertParameter above
-  const gitBackend = backend || new FilesystemBackend(fs, resolvedGitdir)
+  const gitBackend = backend || new GitBackendFs(fs, resolvedGitdir)
 
   // Delegate to backend's init method
   // init() always creates a bare repository

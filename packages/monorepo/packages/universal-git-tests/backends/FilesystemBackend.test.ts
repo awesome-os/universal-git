@@ -1,20 +1,20 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
-import { FilesystemBackend } from '@awesome-os/universal-git-src/backends/FilesystemBackend.ts'
+import { GitBackendFs } from '@awesome-os/universal-git-src/backends/GitBackendFs/index.ts'
 import { makeNodeFixture } from '../helpers/makeNodeFixture.ts'
 import { join } from '@awesome-os/universal-git-src/utils/join.ts'
 
-test('FilesystemBackend', async (t) => {
+test('GitBackendFs', async (t) => {
   await t.test('getType - returns filesystem', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-type')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     assert.strictEqual(backend.getType(), 'filesystem')
   })
 
   await t.test('HEAD operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-head')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Read default HEAD (should return default when file doesn't exist)
     const defaultHead = await backend.readHEAD()
@@ -33,7 +33,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('Config operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-config')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Read default config (empty when file doesn't exist)
     const defaultConfig = await backend.readConfig()
@@ -49,7 +49,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('Index operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-index')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Read default index (empty when file doesn't exist)
     const defaultIndex = await backend.readIndex()
@@ -65,7 +65,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('Description operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-desc')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Read default description (null when file doesn't exist)
     const defaultDesc = await backend.readDescription()
@@ -79,7 +79,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('State file operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-state')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Read non-existent state file
     const missing = await backend.readStateFile('FETCH_HEAD')
@@ -106,7 +106,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('Sequencer file operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-sequencer')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Read non-existent sequencer file
     const missing = await backend.readSequencerFile('sequencer')
@@ -133,7 +133,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('Loose object operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-objects')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Initialize backend to create directory structure
     await backend.initialize()
@@ -167,7 +167,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('Packfile operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-packfiles')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Read non-existent packfile
     const missing = await backend.readPackfile('pack-abc123.pack')
@@ -190,7 +190,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('Pack index operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-packidx')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Read non-existent pack index
     const missing = await backend.readPackIndex('pack-abc123.idx')
@@ -206,7 +206,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('Pack bitmap operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-bitmap')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Read non-existent bitmap
     const missing = await backend.readPackBitmap('pack-abc123.bitmap')
@@ -222,7 +222,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('ODB info file operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-odb')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Read non-existent info file
     const missing = await backend.readODBInfoFile('alternates')
@@ -241,7 +241,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('Multi-pack index operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-midx')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Read non-existent multi-pack index
     const missing = await backend.readMultiPackIndex()
@@ -262,7 +262,7 @@ test('FilesystemBackend', async (t) => {
     // reflog, locking, and validation work consistently.
     // This test verifies that backend ref methods work correctly.
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-refs')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Initialize backend to create directory structure
     await backend.initialize()
@@ -310,7 +310,7 @@ test('FilesystemBackend', async (t) => {
     // which automatically handle both loose and packed refs.
     // This test verifies that packed-refs are handled correctly through readRef/writeRef.
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-packed')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Initialize backend
     await backend.initialize()
@@ -330,7 +330,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('Reflog operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-reflog')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Initialize backend to create directory structure
     await backend.initialize()
@@ -371,7 +371,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('Info file operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-info')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Read non-existent info file
     const missing = await backend.readInfoFile('exclude')
@@ -390,7 +390,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('Hook operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-hooks')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Read non-existent hook
     const missing = await backend.readHook('pre-commit')
@@ -423,7 +423,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('Submodule config operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-submodule')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Read non-existent submodule config
     const missing = await backend.readSubmoduleConfig('submodule1')
@@ -437,7 +437,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('Worktree config operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-worktree')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Read non-existent worktree config
     const missing = await backend.readWorktreeConfig('worktree1')
@@ -447,7 +447,7 @@ test('FilesystemBackend', async (t) => {
     const worktreeConfig = '[core]\n\tworktree = /path/to/worktree\n'
     await backend.writeWorktreeConfig('worktree1', worktreeConfig)
     const config = await backend.readWorktreeConfig('worktree1')
-    // FilesystemBackend may add trailing newline when writing
+    // GitBackendFs may add trailing newline when writing
     assert.ok(config !== null)
     assert.ok(config!.includes('[core]'))
     assert.ok(config!.includes('worktree = /path/to/worktree'))
@@ -461,7 +461,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('Shallow operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-shallow')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Read default shallow (null when file doesn't exist)
     const defaultShallow = await backend.readShallow()
@@ -480,7 +480,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('LFS file operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-lfs')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Read non-existent LFS file
     const missing = await backend.readLFSFile('abc123')
@@ -503,7 +503,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('Git daemon export operations', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-daemon')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Read default (false when file doesn't exist)
     const defaultExport = await backend.readGitDaemonExportOk()
@@ -522,7 +522,7 @@ test('FilesystemBackend', async (t) => {
 
   await t.test('Initialize and close', async () => {
     const { fs, gitdir } = await makeNodeFixture('test-fs-backend-init')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
     
     // Check initialization status (config file doesn't exist yet)
     assert.strictEqual(await backend.isInitialized(), false)

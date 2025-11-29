@@ -102,6 +102,7 @@ export async function commit({
     }
 
     // Use gitBackend.commit() with worktreeBackend for file operations
+    const gitBackend = repo?.gitBackend
     if (!gitBackend) {
       throw new MissingParameterError('gitBackend (required for commit operation)')
     }
@@ -120,6 +121,7 @@ export async function commit({
       ref,
       parent,
       tree,
+      noVerify: false,
     })
   } catch (err) {
     ;(err as { caller?: string }).caller = 'git.commit'
@@ -167,11 +169,9 @@ export async function _commit({
   repo?: Repository
 }): Promise<string> {
   // Extract parameters from Repository if provided
-  const fs = repo?.fs || _fs!
   const cache = repo?.cache || _cache || {}
   let gitdir = _gitdir || (repo ? await repo.getGitdir() : undefined)
   
-  if (!fs) throw new MissingParameterError('fs')
   if (!gitdir) throw new MissingParameterError('gitdir')
   
   // If Repository is provided, use worktree's gitdir to ensure we're using the correct index
@@ -184,11 +184,14 @@ export async function _commit({
   
   // Detect object format from repository or gitdir
   let objectFormat: ObjectFormat = 'sha1'
-  if (repo) {
-    objectFormat = await repo.getObjectFormat()
-  } else {
+  if (repo?.gitBackend) {
     const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
-    objectFormat = await detectObjectFormat(fs, gitdir)
+    objectFormat = await detectObjectFormat(undefined, undefined, cache, repo.gitBackend)
+  } else if (_fs && gitdir) {
+    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const { createFileSystem } = await import('../utils/createFileSystem.ts')
+    const fs = createFileSystem(_fs)
+    objectFormat = await detectObjectFormat(fs, gitdir, cache)
   }
   // Determine ref and the commit pointed to by ref, and if it is the initial commit
   let initialCommit = false
@@ -201,19 +204,32 @@ export async function _commit({
       // We'll resolve the ref to OID separately below
       if (repo) {
         ref = await repo.resolveRef('HEAD', 1) // depth 1 to get ref name from symbolic ref
-      } else {
+      } else if (_fs && gitdir) {
         const { resolveRef } = await import('../git/refs/readRef.ts')
+        const { createFileSystem } = await import('../utils/createFileSystem.ts')
+        const fs = createFileSystem(_fs)
         ref = await resolveRef({ fs, gitdir, ref: 'HEAD', depth: 1 })
+      } else {
+        throw new MissingParameterError('fs or repo (required to resolve HEAD)')
       }
     } catch {
       // HEAD doesn't exist - get default branch from config (defaults to 'master')
       let defaultBranch = 'master'
       try {
-        const { ConfigAccess } = await import('../utils/configAccess.ts')
-        const configAccess = new ConfigAccess(fs, gitdir)
-        const initDefaultBranch = await configAccess.getConfigValue('init.defaultBranch')
-        if (initDefaultBranch && typeof initDefaultBranch === 'string') {
-          defaultBranch = initDefaultBranch
+        if (repo?.gitBackend) {
+          const initDefaultBranch = await repo.gitBackend.getConfig('init.defaultBranch')
+          if (initDefaultBranch && typeof initDefaultBranch === 'string') {
+            defaultBranch = initDefaultBranch
+          }
+        } else if (_fs && gitdir) {
+          const { ConfigAccess } = await import('../utils/configAccess.ts')
+          const { createFileSystem } = await import('../utils/createFileSystem.ts')
+          const fs = createFileSystem(_fs)
+          const configAccess = new ConfigAccess(fs, gitdir)
+          const initDefaultBranch = await configAccess.getConfigValue('init.defaultBranch')
+          if (initDefaultBranch && typeof initDefaultBranch === 'string') {
+            defaultBranch = initDefaultBranch
+          }
         }
       } catch {
         // Config doesn't exist or can't be read, use 'master'
@@ -295,15 +311,17 @@ export async function _commit({
       } catch {
         // Index doesn't exist yet
       }
-    } else if (fs && gitdir) {
+    } else if (_fs && gitdir) {
       // Fallback: try to create a repo to get gitBackend
       try {
         const { createRepository } = await import('../core-utils/createRepository.ts')
+        const { createFileSystem } = await import('../utils/createFileSystem.ts')
+        const fs = createFileSystem(_fs)
         const tempRepo = await createRepository({ fs, gitdir, cache, autoDetectConfig: false })
         if (tempRepo.gitBackend) {
           indexBuffer = await tempRepo.gitBackend.readIndex()
         } else {
-          // Fallback to fs
+          // Fallback to fs (fs is already created above)
           const indexData = await fs.read(indexPath)
           indexBuffer = UniversalBuffer.from(indexData as string | Uint8Array)
         }
@@ -320,7 +338,16 @@ export async function _commit({
       index = new GitIndex(null, undefined, 2)
     } else {
       // Detect object format for index parsing
-      const format = await detectObjectFormat(fs || undefined, gitdir || '', cache, repo?.gitBackend)
+      let format: ObjectFormat = 'sha1'
+      if (repo?.gitBackend) {
+        const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+        format = await detectObjectFormat(undefined, undefined, cache, repo.gitBackend)
+      } else if (_fs && gitdir) {
+        const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+        const { createFileSystem } = await import('../utils/createFileSystem.ts')
+        const fs = createFileSystem(_fs)
+        format = await detectObjectFormat(fs, gitdir, cache)
+      }
       index = await GitIndex.fromBuffer(indexBuffer, format)
     }
 

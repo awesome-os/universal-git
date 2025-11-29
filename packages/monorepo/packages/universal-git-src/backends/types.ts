@@ -97,7 +97,7 @@ export type BackendFactory = (options: BackendOptions) => GitBackend
  * Options for creating a backend
  */
 export type BackendOptions =
-  | FilesystemBackendOptions
+  | GitBackendFsOptions
   | SQLiteBackendOptions
   | BlobStorageBackendOptions
   | InMemoryBackendOptions
@@ -107,13 +107,19 @@ export type BackendOptions =
   | CustomBackendOptions
 
 /**
- * Options for filesystem backend
+ * Options for filesystem backend (GitBackendFs)
+ * @deprecated Use GitBackendFsOptions instead. This alias is kept for backward compatibility.
  */
-export interface FilesystemBackendOptions {
+export type FilesystemBackendOptions = GitBackendFsOptions
+
+/**
+ * Options for GitBackendFs (filesystem backend)
+ */
+export interface GitBackendFsOptions {
   type: 'filesystem'
   /**
    * Filesystem client - can be RawFileSystemProvider (callback or promise-based) or FileSystemProvider.
-   * The factory will normalize this using createFileSystem before creating FilesystemBackend.
+   * The factory will normalize this using createFileSystem before creating GitBackendFs.
    */
   fs: any // RawFileSystemProvider | FileSystemProvider (typed as any, factory normalizes it)
   gitdir: string

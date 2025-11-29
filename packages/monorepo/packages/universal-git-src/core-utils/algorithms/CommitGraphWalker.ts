@@ -11,24 +11,13 @@ type ReadCommitFn = (oid: string) => Promise<CommitObject>
  * Returns all reachable commits in topological order (oldest first)
  */
 export const topologicalSort = async ({
-  fs,
-  cache,
-  gitdir,
   heads,
   readCommit,
 }: {
-  fs: FileSystemProvider
-  cache: Record<string, unknown>
-  gitdir: string
   heads: string[]
-  readCommit?: ReadCommitFn
+  readCommit: ReadCommitFn
 }): Promise<string[]> => {
-  const read: ReadCommitFn =
-    readCommit ||
-    (async (oid: string) => {
-      const { object } = await readObject({ fs, cache, gitdir, oid })
-      return GitCommit.from(UniversalBuffer.from(object)).parse()
-    })
+  const read: ReadCommitFn = readCommit
 
   const visited = new Set<string>()
   const result: string[] = []
@@ -104,24 +93,13 @@ export const topologicalSort = async ({
  * Implements the merge-base algorithm
  */
 export const findMergeBase = async ({
-  fs,
-  cache,
-  gitdir,
   commits,
   readCommit,
 }: {
-  fs: FileSystemProvider
-  cache: Record<string, unknown>
-  gitdir: string
   commits: string[]
-  readCommit?: ReadCommitFn
+  readCommit: ReadCommitFn
 }): Promise<string[]> => {
-  const read: ReadCommitFn =
-    readCommit ||
-    (async (oid: string) => {
-      const { object } = await readObject({ fs, cache, gitdir, oid })
-      return GitCommit.from(UniversalBuffer.from(object)).parse()
-    })
+  const read: ReadCommitFn = readCommit
 
   // If we start N independent walkers, one at each of the given commits, and walk backwards
   // through ancestors, eventually we'll discover a commit where each one of these N walkers

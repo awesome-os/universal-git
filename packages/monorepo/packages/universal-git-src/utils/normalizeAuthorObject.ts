@@ -1,6 +1,7 @@
 import { assignDefined } from './assignDefined.ts'
 import type { Author, CommitObject } from "../models/GitCommit.ts"
 import type { Repository } from "../core-utils/Repository.ts"
+import type { GitBackend } from "../backends/GitBackend.ts"
 
 /**
  * Return author object by using properties following this priority:
@@ -9,7 +10,8 @@ import type { Repository } from "../core-utils/Repository.ts"
  * -> (3) Config and current date/time
  *
  * @param {Object} args
- * @param {Repository} args.repo - Repository instance (required for config access)
+ * @param {Repository} [args.repo] - Repository instance (for backward compatibility)
+ * @param {GitBackend} [args.gitBackend] - GitBackend instance (preferred, for isolation)
  * @param {Object} [args.author] - The author object.
  * @param {CommitObject} [args.commit] - A commit object.
  *
@@ -17,23 +19,32 @@ import type { Repository } from "../core-utils/Repository.ts"
  */
 export async function normalizeAuthorObject({
   repo,
+  gitBackend,
   author,
   commit,
   configService,
 }: {
-  repo: Repository
+  repo?: Repository
+  gitBackend?: GitBackend
   author?: Partial<Author>
   commit?: CommitObject
   configService?: Awaited<ReturnType<Repository['getConfig']>>
 }): Promise<Author | undefined> {
-  // CRITICAL: Use the Repository's config service to ensure state consistency
-  // This ensures that setConfig() and getAuthor() use the same UnifiedConfigService instance
+  // CRITICAL: Use GitBackend directly for config access to maintain isolation
+  // Prefer gitBackend over repo to avoid creating Repository instances in backends
   let nameConfig: string | undefined
   let emailConfig: string | undefined
   try {
-    const config = configService ?? await repo.getConfig()
-    nameConfig = (await config.get('user.name')) as string | undefined
-    emailConfig = ((await config.get('user.email')) as string | undefined) || ''
+    if (gitBackend) {
+      // Use GitBackend.getConfig() directly
+      nameConfig = (await gitBackend.getConfig('user.name')) as string | undefined
+      emailConfig = ((await gitBackend.getConfig('user.email')) as string | undefined) || ''
+    } else if (repo) {
+      // Fallback to Repository for backward compatibility
+      const config = configService ?? await repo.getConfig()
+      nameConfig = (await config.get('user.name')) as string | undefined
+      emailConfig = ((await config.get('user.email')) as string | undefined) || ''
+    }
     // Ensure nameConfig is truly undefined (not empty string) if config is missing
     if (nameConfig === '' || nameConfig === null) {
       nameConfig = undefined

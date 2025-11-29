@@ -13,7 +13,7 @@ import type { FileSystemProvider } from '../models/FileSystem.ts'
 import type { BaseCommandOptions } from '../types/commandOptions.ts'
 import type { GitBackend } from '../backends/GitBackend.ts'
 import type { GitWorktreeBackend } from '../git/worktree/GitWorktreeBackend.ts'
-import { createBackend } from '../backends/index.ts'
+import { GitBackendFs } from '../backends/GitBackendFs/index.ts'
 import { createGitWorktreeBackend } from '../git/worktree/index.ts'
 
 /**
@@ -81,9 +81,22 @@ export async function normalizeCommandArgs<T extends Record<string, unknown>>(
     // repo is provided - extract everything from it
     repo = args.repo
     
-    // fs is not required when repo is provided - backends handle filesystem operations
-    // Only set fs if it's explicitly needed (for legacy code paths)
-    fs = args.fs ? createFileSystem(args.fs) : undefined
+    // Get filesystem from backend if available (needed for legacy code paths that still use fs directly)
+    // If args.fs is provided, use it (for backward compatibility)
+    if (args.fs) {
+      fs = createFileSystem(args.fs)
+    } else {
+      // Try to get fs from backend
+      const repoGitBackend = repo.gitBackend
+      if (repoGitBackend && 'getFs' in repoGitBackend && typeof repoGitBackend.getFs === 'function') {
+        fs = repoGitBackend.getFs()
+      } else if (repo.worktreeBackend && 'getFs' in repo.worktreeBackend && typeof repo.worktreeBackend.getFs === 'function') {
+        fs = repo.worktreeBackend.getFs()
+      } else {
+        // fs is not available - some commands may fail, but that's expected for bare repos
+        fs = undefined as any
+      }
+    }
     gitdir = normalize(await repo.getGitdir())
     // dir is not available from repo (worktreeBackend is a black box)
     // Use args.dir if provided, otherwise undefined
@@ -112,14 +125,12 @@ export async function normalizeCommandArgs<T extends Record<string, unknown>>(
       
       // Auto-create backends from legacy inputs
       // Use the same fs instance for both backends to ensure consistency
-      gitBackend = createBackend({
-        type: 'filesystem',
-        fs,
-        gitdir: effectiveGitdir,
-      })
+      // Create GitBackendFs directly (new Repository(new GitBackend, new WorktreeBackend) pattern)
+      gitBackend = new GitBackendFs(fs, effectiveGitdir)
       
       // Only create worktree backend if dir is provided AND dir !== gitdir (not a bare repo)
       // For bare repos, dir === gitdir, so we skip worktree backend creation
+      // This follows: new Repository(GitBackend) for bare, new Repository(GitBackend, WorktreeBackend) for non-bare
       if (dir && dir !== effectiveGitdir) {
         worktree = createGitWorktreeBackend({ fs, dir })
       }
@@ -172,19 +183,19 @@ export async function normalizeCommandArgs<T extends Record<string, unknown>>(
       const worktreeDir = worktree.getDirectory()
       dir = worktreeDir ? normalize(worktreeDir) : undefined
     }
-    // Fallback to repo.getDir() if still not set
-    const repoDir = await repo.getDir()
-    dir = repoDir ? normalize(repoDir) : dir
     cache = repo.cache
     
-    // CRITICAL: Ensure fs matches repo.fs for consistency
-    // When backends are auto-created, repo.fs should be the same instance
-    // but we want to return the fs that was used (which should match repo.fs)
-    const repoFs = repo.fs
-    if (!repoFs) {
+    // CRITICAL: Get filesystem from backend if available
+    // GitBackendFs has getFs() method, but not all backends do
+    // If no filesystem is available, we'll throw an error
+    const repoGitBackend = repo.gitBackend
+    if (repoGitBackend && 'getFs' in repoGitBackend && typeof repoGitBackend.getFs === 'function') {
+      fs = repoGitBackend.getFs()
+    } else if (worktree && 'getFs' in worktree && typeof worktree.getFs === 'function') {
+      fs = worktree.getFs()
+    } else {
       throw new MissingParameterError('fs (filesystem is required. Checkout to a WorktreeBackend first.)')
     }
-    fs = repoFs
   }
 
   const { repo: _, gitBackend: __, worktree: ___, fs: ____, dir: _____, gitdir: ______, cache: _______, autoDetectConfig: ________, ...rest } = args

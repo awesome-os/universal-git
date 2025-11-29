@@ -125,7 +125,7 @@ describe('merge', () => {
         if (!isGitAvailable()) {
         // Fallback to fixture-based test if git is not available
         const { repo } = await makeFixture('test-merge')
-        const dir = await repo.getDir()!
+        if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
         const gitdir = await repo.getGitdir()
         const testFile = `${gitdir}/o.conflict.example`
         const outFile = `${dir}/o.txt`

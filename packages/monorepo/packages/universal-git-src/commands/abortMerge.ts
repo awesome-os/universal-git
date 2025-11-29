@@ -1,16 +1,8 @@
 import { readTree } from './readTree.ts'
 import { Repository } from "../core-utils/Repository.ts"
-import { normalizeCommandArgs } from '../utils/commandHelpers.ts'
 import { MissingParameterError } from "../errors/MissingParameterError.ts"
-import { createFileSystem } from '../utils/createFileSystem.ts'
-import { assertParameter } from "../utils/assertParameter.ts"
-import { join } from "../utils/join.ts"
-import { readObject } from "../git/objects/readObject.ts"
 import { hashObject } from '../core-utils/ShaHasher.ts'
-import { deleteMergeHead } from '../git/state/index.ts'
-import { deleteMergeMode } from '../git/state/MERGE_MODE.ts'
-import { deleteMergeMsg } from '../git/state/MERGE_MSG.ts'
-import type { FileSystem } from "../models/FileSystem.ts"
+// Merge state files are now handled via GitBackend.deleteStateFile
 import type { TreeEntry } from '../models/GitTree.ts'
 import { getIndexEntryStage } from '../utils/indexHelpers.ts'
 import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
@@ -62,16 +54,10 @@ async function pMap<T>(
  */
 export async function abortMerge({
   repo: _repo,
-  fs: _fs,
-  dir,
-  gitdir: _gitdir,
   commit = 'HEAD',
   cache = {},
 }: {
-  repo?: Repository
-  fs?: FileSystem
-  dir?: string
-  gitdir?: string
+  repo: Repository
   commit?: string
   cache?: Record<string, unknown>
 }): Promise<void> {
@@ -80,27 +66,27 @@ export async function abortMerge({
   
   try {
     log('Starting abortMerge')
-    log('normalizeCommandArgs...')
-    const { repo, fs, dir: normalizedDir, gitdir: normalizedGitdir, cache: effectiveCache } = await normalizeCommandArgs({
-      repo: _repo,
-      fs: _fs,
-      dir,
-      gitdir: _gitdir,
-      cache,
-      commit,
-    })
     
-    // CRITICAL: Use the dir from normalizeCommandArgs, not repo.getDir()
-    // normalizeCommandArgs returns the actual dir that was provided or inferred
-    // repo.getDir() might return null or the wrong directory if Repository was cached incorrectly
-    const effectiveDir = normalizedDir || await repo.getDir()
-    const effectiveGitdir = normalizedGitdir || await repo.getGitdir()
-    log('normalizeCommandArgs done', { effectiveDir, effectiveGitdir, normalizedDir, repoDir: await repo.getDir() })
-
-    // abortMerge requires a working directory
-    if (!effectiveDir) {
-      throw new MissingParameterError('dir')
+    if (!_repo) {
+      throw new MissingParameterError('repo')
     }
+    
+    const repo = _repo
+    const worktreeBackend = repo.worktreeBackend
+    const gitBackend = repo.gitBackend
+    const effectiveCache = repo.cache || cache
+    
+    // abortMerge requires a worktree backend
+    if (!worktreeBackend) {
+      throw new MissingParameterError('worktreeBackend (Repository must have a worktree backend for abortMerge)')
+    }
+    
+    if (!gitBackend) {
+      throw new MissingParameterError('gitBackend (Repository must have a GitBackend for abortMerge)')
+    }
+    
+    const effectiveGitdir = await repo.getGitdir()
+    log('abortMerge initialized', { effectiveGitdir })
 
     // 2. Load HEAD tree and Index in PARALLEL for better performance
     log('Resolving HEAD and reading Index in parallel...')
@@ -127,11 +113,11 @@ export async function abortMerge({
           indexBuffer = UniversalBuffer.alloc(0)
         }
         
+        // Use gitBackend.getObjectFormat instead of detectObjectFormat with fs
+        const objectFormat = await repo.gitBackend.getObjectFormat(repo.cache)
         if (indexBuffer.length === 0) {
-          const objectFormat = await detectObjectFormat(repo.fs || undefined, await repo.getGitdir(), repo.cache, repo.gitBackend)
           return new GitIndex(null, undefined, 2)
         } else {
-          const objectFormat = await detectObjectFormat(repo.fs || undefined, await repo.getGitdir(), repo.cache, repo.gitBackend)
           return await GitIndex.fromBuffer(indexBuffer, objectFormat)
         }
       })()
@@ -168,24 +154,22 @@ export async function abortMerge({
     const allRelevantPaths = Array.from(new Set([...headTreeEntries.keys(), ...indexEntries.keys()]))
     
     log(`Checking workdir OIDs for ${allRelevantPaths.length} files (parallel, concurrency: 20)...`)
-    log(`  effectiveDir: ${effectiveDir}`)
     log(`  allRelevantPaths: ${JSON.stringify(allRelevantPaths)}`)
     let processedCount = 0
     await pMap(allRelevantPaths, async (filepath) => {
       processedCount++
       log(`  [${processedCount}/${allRelevantPaths.length}] Processing ${filepath}...`)
-      const fullPath = join(effectiveDir, filepath)
-      log(`    fullPath: ${fullPath}`)
       try {
-        log(`    Calling fs.lstat(${fullPath})...`)
-        const stat = await fs.lstat(fullPath)
-        log(`    lstat returned: ${stat ? `isDir=${stat.isDirectory()}` : 'null'}`)
+        log(`    Calling worktreeBackend.stat(${filepath})...`)
+        const stat = await worktreeBackend.stat(filepath)
+        log(`    stat returned: ${stat ? `isDir=${stat.isDirectory()}` : 'null'}`)
         if (stat && !stat.isDirectory()) {
           log(`    Reading file content...`)
-          const content = await fs.read(fullPath)
-          log(`    Content read, length: ${content ? (typeof content === 'string' ? content.length : (content as Uint8Array).length) : 0}`)
+          const content = await worktreeBackend.read(filepath)
+          log(`    Content read, length: ${content ? (typeof content === 'string' ? content.length : (content instanceof Uint8Array ? content.length : (content as any).length || 0)) : 0}`)
           log(`    Hashing content...`)
-          const oid = await hashObject({ type: 'blob', content: content as UniversalBuffer | Uint8Array })
+          const contentBuffer = UniversalBuffer.isBuffer(content) ? content : (typeof content === 'string' ? UniversalBuffer.from(content, 'utf8') : UniversalBuffer.from(content))
+          const oid = await hashObject({ type: 'blob', content: contentBuffer })
           log(`    Hash computed: ${oid}`)
           workdirOids.set(filepath, oid)
           log(`  [${processedCount}/${allRelevantPaths.length}] Workdir OID for ${filepath}: ${oid}`)
@@ -292,26 +276,25 @@ export async function abortMerge({
     // Files that exist in workdir but not in index were added after merge started and should be preserved
     // This matches git's behavior: "keeps those which are different between the index and working tree"
     log('Scanning workdir for files to delete...')
-    async function listWorkdirFiles(dir: string, basePath: string = ''): Promise<string[]> {
+    async function listWorkdirFiles(relativePath: string = ''): Promise<string[]> {
       const files: string[] = []
       try {
-        const entries = await fs.readdir(dir)
+        const entries = await worktreeBackend.readdir(relativePath || '.')
         if (!entries) return files
         for (const entry of entries) {
           // Skip .git directory
           if (entry === '.git') continue
           
-          const fullPath = join(dir, entry)
-          const relativePath = basePath ? `${basePath}/${entry}` : entry
+          const entryPath = relativePath ? `${relativePath}/${entry}` : entry
           try {
-            const stat = await fs.lstat(fullPath)
+            const stat = await worktreeBackend.stat(entryPath)
             if (stat && stat.isDirectory()) {
               // Recursively list files in subdirectory
-              const subFiles = await listWorkdirFiles(fullPath, relativePath)
+              const subFiles = await listWorkdirFiles(entryPath)
               files.push(...subFiles)
             } else if (stat && !stat.isDirectory()) {
               // It's a file
-              files.push(relativePath)
+              files.push(entryPath)
             }
           } catch {
             // Skip entries we can't stat
@@ -324,7 +307,7 @@ export async function abortMerge({
     }
     
     try {
-      const workdirFiles = await listWorkdirFiles(effectiveDir)
+      const workdirFiles = await listWorkdirFiles()
       log(`Workdir files found: ${workdirFiles.length}`)
       
       // Only delete files that are in the index but not in HEAD
@@ -360,22 +343,24 @@ export async function abortMerge({
     await pMap(operations, async (op) => {
       opCount++
       log(`  [${opCount}/${operations.length}] Executing ${op.op} on ${op.path}...`)
-      const fullPath = join(effectiveDir, op.path)
-      log(`    fullPath: ${fullPath}`)
+      const relativePath = op.path // op.path is already relative to worktree root
+      log(`    relativePath: ${relativePath}`)
       
       if (op.op === 'update') {
         log(`    Reading object ${op.oid}...`)
-        const { object } = await readObject({ fs, cache: effectiveCache, gitdir: effectiveGitdir, oid: op.oid! })
+        // Use gitBackend.readObject instead of readObject with fs
+        const result = await gitBackend.readObject(op.oid!, 'content', effectiveCache)
+        const object = result.object
         log(`    Object read, size: ${object ? (object instanceof Uint8Array ? object.length : (object as any).length || 'unknown') : 0}`)
         const modeNum = parseInt(op.mode!, 8)
         log(`    Mode: ${op.mode} (${modeNum.toString(8)})`)
         
-        // Ensure directory exists (mkdir is usually safe even if parallel)
-        const dirPath = fullPath.substring(0, fullPath.lastIndexOf('/'))
-        if (dirPath && dirPath !== effectiveDir) {
+        // Ensure directory exists using worktreeBackend
+        const dirPath = relativePath.substring(0, relativePath.lastIndexOf('/'))
+        if (dirPath) {
           try {
             log(`    Creating directory: ${dirPath}`)
-            await fs.mkdir(dirPath)
+            await worktreeBackend.mkdir(dirPath)
             log(`    Directory created`)
           } catch (err) {
             // Directory might already exist, that's okay
@@ -383,24 +368,23 @@ export async function abortMerge({
           }
         }
 
-        const blobBuffer = object
+        const blobBuffer = UniversalBuffer.isBuffer(object) ? object : UniversalBuffer.from(object)
         log(`    Writing file...`)
         
         if (modeNum === 0o100755) {
-          await fs.write(fullPath, blobBuffer, { mode: 0o777 })
+          await worktreeBackend.write(relativePath, blobBuffer, { mode: 0o777 })
         } else if (modeNum === 0o120000) {
-          await (fs as { writelink?: (path: string, target: UniversalBuffer) => Promise<void> }).writelink?.(
-            fullPath,
-            blobBuffer
-          )
+          // Symlink - convert blob to string target
+          const target = blobBuffer.toString('utf8').trim()
+          await worktreeBackend.writelink(relativePath, target)
         } else {
-          await fs.write(fullPath, blobBuffer)
+          await worktreeBackend.write(relativePath, blobBuffer)
         }
         log(`    File written successfully`)
       } else if (op.op === 'delete') {
         try {
           log(`    Deleting file...`)
-          await fs.rm(fullPath)
+          await worktreeBackend.remove(relativePath)
           log(`    File deleted successfully`)
         } catch (err) {
           // File might not exist in workdir, that's okay
@@ -430,11 +414,11 @@ export async function abortMerge({
     }
     
     let finalIndex: GitIndex
+    // Use gitBackend.getObjectFormat instead of detectObjectFormat with fs
+    const objectFormat = await repo.gitBackend.getObjectFormat(repo.cache)
     if (indexBuffer.length === 0) {
-      const objectFormat = await detectObjectFormat(repo.fs || undefined, await repo.getGitdir(), repo.cache, repo.gitBackend)
       finalIndex = new GitIndex(null, undefined, 2)
     } else {
-      const objectFormat = await detectObjectFormat(repo.fs || undefined, await repo.getGitdir(), repo.cache, repo.gitBackend)
       finalIndex = await GitIndex.fromBuffer(indexBuffer, objectFormat)
     }
     
@@ -451,8 +435,7 @@ export async function abortMerge({
     await pMap(entriesToInsert, async ([filepath, entry]) => {
       if (!entry.stats) {
         try {
-          const fullPath = join(effectiveDir, filepath)
-          entry.stats = await fs.lstat(fullPath)
+          entry.stats = await worktreeBackend.stat(filepath)
         } catch {
           // File might not exist if update failed, that's okay
         }

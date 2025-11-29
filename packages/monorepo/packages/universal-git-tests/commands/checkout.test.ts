@@ -21,7 +21,7 @@ test('checkout', async (t) => {
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
     const onPostCheckout: any[] = []
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
     const gitdir = await repo.getGitdir()
     
     await checkout({
@@ -32,7 +32,8 @@ test('checkout', async (t) => {
       },
     })
     
-    const files = await repo.fs.readdir(dir)
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const files = await repo.worktreeBackend.readdir('.') || []
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('.babelrc'), 'Should have .babelrc')
     assert.ok(files.includes('src'), 'Should have src directory')
@@ -66,7 +67,7 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
     
     await checkout({
       repo,
@@ -74,7 +75,8 @@ test('checkout', async (t) => {
       force: true,
     })
     
-    const files = await repo.fs.readdir(dir)
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const files = await repo.worktreeBackend.readdir('.') || []
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('src'), 'Should have src directory')
     
@@ -86,7 +88,7 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
     
     await checkout({
       repo,
@@ -94,7 +96,8 @@ test('checkout', async (t) => {
       force: true,
     })
     
-    const files = await repo.fs.readdir(dir)
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const files = await repo.worktreeBackend.readdir('.') || []
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('src'), 'Should have src directory')
     
@@ -131,7 +134,7 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
     const gitdir = await repo.getGitdir()
     // Create branch without checking it out (we'll use worktree instead)
     await branch({ repo, ref: 'other', checkout: false })
@@ -153,12 +156,15 @@ test('checkout', async (t) => {
       await worktree({ repo, add: true, path: testBranchWorktreePath, ref: 'test-branch' })
       
       // Create files in the worktree
-      await repo.fs.write(`${testBranchWorktreePath}/regular-file.txt`, 'regular file', { mode: 0o666 })
-      await repo.fs.write(`${testBranchWorktreePath}/executable-file.sh`, 'executable file', { mode: 0o777 })
+      // Note: testBranchWorktreePath is a different worktree, so we need to use fs directly
+      // This is a test-specific case where we're writing to a different worktree path
+      const fs = repo.gitBackend.getFs()
+      await fs.write(`${testBranchWorktreePath}/regular-file.txt`, 'regular file', { mode: 0o666 })
+      await fs.write(`${testBranchWorktreePath}/executable-file.sh`, 'executable file', { mode: 0o777 })
       
       // Capture expected file modes from worktree
-      const regularFileStat = await repo.fs.lstat(`${testBranchWorktreePath}/regular-file.txt`)
-      const executableFileStat = await repo.fs.lstat(`${testBranchWorktreePath}/executable-file.sh`)
+      const regularFileStat = await fs.lstat(`${testBranchWorktreePath}/regular-file.txt`)
+      const executableFileStat = await fs.lstat(`${testBranchWorktreePath}/executable-file.sh`)
       assert.ok(regularFileStat, 'regular-file.txt stat should not be null')
       assert.ok(executableFileStat, 'executable-file.sh stat should not be null')
       const expectedRegularFileMode = regularFileStat.mode
@@ -197,8 +203,9 @@ test('checkout', async (t) => {
       })
       
       // Verify files exist and have correct permissions in main worktree
-      const actualRegularFileStat = await repo.fs.lstat(`${dir}/regular-file.txt`)
-      const actualExecutableFileStat = await repo.fs.lstat(`${dir}/executable-file.sh`)
+      if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+      const actualRegularFileStat = await repo.worktreeBackend.stat('regular-file.txt')
+      const actualExecutableFileStat = await repo.worktreeBackend.stat('executable-file.sh')
       
       assert.ok(actualRegularFileStat, 'regular-file.txt should exist')
       assert.ok(actualExecutableFileStat, 'executable-file.sh should exist')
@@ -217,13 +224,16 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
 
-    await repo.fs.write(`${dir}/regular-file.txt`, 'regular file', { mode: 0o666 })
-    await repo.fs.write(`${dir}/executable-file.sh`, 'executable file', { mode: 0o777 })
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    await repo.worktreeBackend.write('regular-file.txt', 'regular file', { mode: 0o666 })
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    await repo.worktreeBackend.write('executable-file.sh', 'executable file', { mode: 0o777 })
     
-    const regularFileStat = await repo.fs.lstat(`${dir}/regular-file.txt`)
-    const executableFileStat = await repo.fs.lstat(`${dir}/executable-file.sh`)
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const regularFileStat = await repo.worktreeBackend.stat('regular-file.txt')
+    const executableFileStat = await repo.worktreeBackend.stat('executable-file.sh')
     assert.ok(regularFileStat, 'regular-file.txt stat should not be null')
     assert.ok(executableFileStat, 'executable-file.sh stat should not be null')
     const { mode: expectedRegularFileMode } = regularFileStat
@@ -234,7 +244,8 @@ test('checkout', async (t) => {
       ref: 'regular-file',
       force: true,
     })
-    const helloStat1 = await repo.fs.lstat(`${dir}/hello.sh`)
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const helloStat1 = await repo.worktreeBackend.stat('hello.sh')
     assert.ok(helloStat1, 'hello.sh stat should not be null')
     const { mode: actualRegularFileMode } = helloStat1
     assert.strictEqual(actualRegularFileMode, expectedRegularFileMode, 'File mode should match')
@@ -244,7 +255,8 @@ test('checkout', async (t) => {
       ref: 'executable-file',
       force: true,
     })
-    const helloStat2 = await repo.fs.lstat(`${dir}/hello.sh`)
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const helloStat2 = await repo.worktreeBackend.stat('hello.sh')
     assert.ok(helloStat2, 'hello.sh stat should not be null')
     const { mode: actualExecutableFileMode } = helloStat2
     assert.strictEqual(actualExecutableFileMode, expectedExecutableFileMode, 'Executable mode should match')
@@ -254,7 +266,7 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
 
     await checkout({
       repo,
@@ -262,7 +274,8 @@ test('checkout', async (t) => {
       filepaths: ['src/models', 'test'],
     })
     
-    const files = await repo.fs.readdir(dir)
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const files = await repo.worktreeBackend.readdir('.') || []
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('src'), 'Should have src directory')
     assert.ok(files.includes('test'), 'Should have test directory')
@@ -277,7 +290,7 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
 
     await checkout({
       repo,
@@ -285,7 +298,8 @@ test('checkout', async (t) => {
       filepaths: ['src/models/GitBlob.js', 'src/utils/write.js'],
     })
     
-    const files = await repo.fs.readdir(dir)
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const files = await repo.worktreeBackend.readdir('.') || []
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('src'), 'Should have src directory')
     assert.strictEqual(files.length, 1, 'Should only have src')
@@ -299,9 +313,10 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
 
-    await repo.fs.write(`${dir}/README.md`, 'Hello world', 'utf8')
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    await repo.worktreeBackend.write('README.md', 'Hello world', 'utf8')
     
     let error: unknown = null
     try {
@@ -324,9 +339,10 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
 
-    await repo.fs.write(`${dir}/README.md`, 'Hello world', 'utf8')
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    await repo.worktreeBackend.write('README.md', 'Hello world', 'utf8')
     
     let error: unknown = null
     try {
@@ -341,7 +357,8 @@ test('checkout', async (t) => {
     }
     
     assert.strictEqual(error, null, 'Should not throw error with force and dryRun')
-    const content = await repo.fs.read(`${dir}/README.md`, 'utf8')
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const content = await repo.worktreeBackend.read('README.md', 'utf8')
     assert.strictEqual(content, 'Hello world', 'File should not be changed in dry run')
   })
 
@@ -349,9 +366,10 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
 
-    await repo.fs.write(`${dir}/README.md`, 'Hello world', 'utf8')
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    await repo.worktreeBackend.write('README.md', 'Hello world', 'utf8')
     
     let error: unknown = null
     try {
@@ -365,7 +383,8 @@ test('checkout', async (t) => {
     }
     
     assert.strictEqual(error, null, 'Should not throw error with force')
-    const content = await repo.fs.read(`${dir}/README.md`, 'utf8')
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const content = await repo.worktreeBackend.read('README.md', 'utf8')
     assert.notStrictEqual(content, 'Hello world', 'File should be changed when force is true')
   })
 
@@ -373,14 +392,15 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
 
     await checkout({
       repo,
       ref: 'test-branch',
     })
 
-    await repo.fs.write(`${dir}/README.md`, 'Hello world', 'utf8')
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    await repo.worktreeBackend.write('README.md', 'Hello world', 'utf8')
     
     let error: unknown = null
     try {
@@ -393,7 +413,8 @@ test('checkout', async (t) => {
     }
     
     assert.strictEqual(error, null, 'Should not throw error')
-    const content = await repo.fs.read(`${dir}/README.md`, 'utf8')
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const content = await repo.worktreeBackend.read('README.md', 'utf8')
     assert.notStrictEqual(content, 'Hello world', 'File should be restored to HEAD')
   })
 
@@ -401,7 +422,7 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
 
     await checkout({
       repo,
@@ -415,7 +436,8 @@ test('checkout', async (t) => {
       force: true,
     })
     
-    const files = await repo.fs.readdir(dir)
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const files = await repo.worktreeBackend.readdir('.') || []
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('README.md'), 'README.md should still exist')
   })
@@ -473,7 +495,7 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
     // Checkout the test-branch
     await checkout({
       repo,
@@ -489,12 +511,14 @@ test('checkout', async (t) => {
     })
     
     // Add a regular file to the ignored dir
-    await repo.fs.write(`${dir}/ignored/regular-file.txt`, 'regular file', { mode: 0o666 })
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    await repo.worktreeBackend.write('ignored/regular-file.txt', 'regular file', { mode: 0o666 })
 
     // Add and commit a gitignore, ignoring everything but itself
     const gitignoreContent = `*
 !.gitignore`
-    await repo.fs.write(`${dir}/ignored/.gitignore`, gitignoreContent, { mode: 0o666 })
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    await repo.worktreeBackend.write('ignored/.gitignore', gitignoreContent, { mode: 0o666 })
     await add({ repo, filepath: 'ignored/.gitignore' })
 
     await commit({
@@ -511,7 +535,8 @@ test('checkout', async (t) => {
       force: true,
     })
     
-    const files = await repo.fs.readdir(`${dir}/ignored`)
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const files = await repo.worktreeBackend.readdir('ignored') || []
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('regular-file.txt'), 'regular-file.txt should still exist')
     assert.strictEqual(files.includes('.gitignore'), false, '.gitignore should be removed (was tracked)')
@@ -521,11 +546,12 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
     
     await repo.checkout('test-branch', {})
     
-    const files = await repo.fs.readdir(dir)
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const files = await repo.worktreeBackend.readdir('.') || []
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('.babelrc'), 'Should have .babelrc')
     assert.ok(files.includes('src'), 'Should have src directory')
@@ -538,7 +564,7 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
     const gitdir = await repo.getGitdir()
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     
@@ -587,7 +613,7 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
     
     // First checkout a branch to set up state
     await checkout({
@@ -596,7 +622,8 @@ test('checkout', async (t) => {
     })
     
     // Modify a file
-    await repo.fs.write(`${dir}/README.md`, 'modified', 'utf8')
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    await repo.worktreeBackend.write('README.md', 'modified', 'utf8')
     
     // Checkout with no ref (should default noUpdateHead to true)
     await checkout({
@@ -606,7 +633,8 @@ test('checkout', async (t) => {
     })
     
     // File should be restored but HEAD should not change
-    const content = await repo.fs.read(`${dir}/README.md`, 'utf8')
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const content = await repo.worktreeBackend.read('README.md', 'utf8')
     assert.notStrictEqual(content, 'modified', 'File should be restored')
     
     const headRef = await repo.gitBackend!.readSymbolicRef('HEAD')
@@ -617,7 +645,7 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
     // First checkout a branch to set up state
     await checkout({
       repo,
@@ -625,7 +653,8 @@ test('checkout', async (t) => {
     })
     
     // Modify a file
-    await repo.fs.write(`${dir}/README.md`, 'modified', 'utf8')
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    await repo.worktreeBackend.write('README.md', 'modified', 'utf8')
     
     // Checkout with no ref but noUpdateHead explicitly false
     await checkout({
@@ -636,7 +665,8 @@ test('checkout', async (t) => {
     })
     
     // File should be restored
-    const content = await repo.fs.read(`${dir}/README.md`, 'utf8')
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const content = await repo.worktreeBackend.read('README.md', 'utf8')
     assert.notStrictEqual(content, 'modified', 'File should be restored')
   })
 
@@ -644,7 +674,7 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
     // First checkout a branch to set up state
     await checkout({
       repo,
@@ -652,7 +682,8 @@ test('checkout', async (t) => {
     })
     
     // Modify a file
-    await repo.fs.write(`${dir}/README.md`, 'modified', 'utf8')
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    await repo.worktreeBackend.write('README.md', 'modified', 'utf8')
     
     // Checkout with no ref parameter (should default to HEAD)
     await checkout({
@@ -662,7 +693,8 @@ test('checkout', async (t) => {
     })
     
     // File should be restored to HEAD state
-    const content = await repo.fs.read(`${dir}/README.md`, 'utf8')
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const content = await repo.worktreeBackend.read('README.md', 'utf8')
     assert.notStrictEqual(content, 'modified', 'File should be restored to HEAD')
   })
 
@@ -689,14 +721,15 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
     
     await checkout({
       repo,
       ref: 'v1.0.0',
     })
     
-    const files = await repo.fs.readdir(dir)
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const files = await repo.worktreeBackend.readdir('.') || []
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('src'), 'Should have src directory')
     assert.ok(files.includes('test'), 'Should have test directory')
@@ -706,7 +739,7 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
     
     // Checkout without providing dir (should use repo.dir)
     await checkout({
@@ -714,7 +747,8 @@ test('checkout', async (t) => {
       ref: 'v1.0.0',
     })
     
-    const files = await repo.fs.readdir(dir)
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const files = await repo.worktreeBackend.readdir('.') || []
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('.babelrc'), 'Should have .babelrc')
     assert.ok(files.includes('src'), 'Should have src directory')
@@ -724,14 +758,15 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
 
     await checkout({
       repo,
       ref: 'v1.0.0',
     })
     
-    const files = await repo.fs.readdir(dir)
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const files = await repo.worktreeBackend.readdir('.') || []
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('.babelrc'), 'Should have .babelrc')
     assert.ok(files.includes('src'), 'Should have src directory')
@@ -741,14 +776,15 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
 
     await checkout({
       repo,
       ref: 'test-branch',
     })
     
-    const files = await repo.fs.readdir(dir)
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const files = await repo.worktreeBackend.readdir('.') || []
     assert.ok(files, 'Files should not be null')
     assert.ok(files.includes('.babelrc'), 'Should have .babelrc')
     assert.ok(files.includes('src'), 'Should have src directory')
@@ -758,9 +794,10 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo } = await makeFixture('test-checkout')
-    const dir = await repo.getDir()!
+    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
     // Get initial state
-    const initialFiles = await repo.fs.readdir(dir)
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const initialFiles = await repo.worktreeBackend.readdir('.') || []
     
     await checkout({
       repo,
@@ -773,7 +810,8 @@ test('checkout', async (t) => {
     assert.strictEqual(headRef, 'refs/heads/test-branch', 'HEAD should point to test-branch')
     
     // Working directory should remain unchanged
-    const files = await repo.fs.readdir(dir)
+    if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
+    const files = await repo.worktreeBackend.readdir('.') || []
     assert.ok(files, 'Files should not be null')
     assert.ok(initialFiles, 'Initial files should not be null')
     assert.deepStrictEqual(files.sort(), initialFiles.sort(), 'Working directory should not change')

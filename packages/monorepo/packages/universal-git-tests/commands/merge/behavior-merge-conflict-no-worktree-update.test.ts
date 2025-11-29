@@ -120,9 +120,9 @@ describe('merge', () => {
   it('behavior:merge-conflict-no-worktree-update', async () => {
         // Setup
         const { repo } = await makeFixture('test-merge')
-        const dir = await repo.getDir()!
+        if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
         // Test
-        const outFile = `${dir}/o.txt`
+        const outFile = 'o.txt'
 
         let error: unknown = null
         try {
@@ -142,14 +142,14 @@ describe('merge', () => {
         error = e
         }
         // Note: In Node.js fs, reading a non-existent file throws, so we check if it exists first
-        const outExists = await repo.fs!.exists(outFile)
+        const outExists = await repo.worktreeBackend.exists(outFile)
         if (outExists) {
-        const outContent = await repo.fs!.read(outFile, 'utf-8')
+        const outContent = await repo.worktreeBackend.read(outFile, 'utf-8')
         // In abortOnConflict mode, the file should not be modified
         // The content should remain unchanged or be empty
         assert.ok(outContent === '' || outContent === null || outContent === undefined, 'File should not be modified in abortOnConflict mode')
         }
-        const dirContents = await repo.fs!.readdir(dir!)
+        const dirContents = await repo.worktreeBackend.listFiles('.')
         assert.deepStrictEqual(dirContents, [])
         assert.notStrictEqual(error, null, 'Merge should throw an error when conflicts occur')
         // Check for MergeConflictError - handle module boundary issues

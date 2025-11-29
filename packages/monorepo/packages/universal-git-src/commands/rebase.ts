@@ -133,11 +133,10 @@ export async function rebase({
     // Get commits to rebase (commits in current branch but not in upstream)
     // This is commits reachable from currentHead but not from upstreamOid
     const commitsToRebase = await getCommitsToRebase({
-      fs,
-      cache,
-      gitdir: effectiveGitdir,
+      repo,
       from: currentHead,
       to: baseOid,
+      cache,
     })
 
     if (commitsToRebase.length === 0) {
@@ -506,33 +505,41 @@ async function applyRebaseCommit({
  * Gets commits to rebase (commits in 'from' but not in 'to')
  */
 async function getCommitsToRebase({
-  fs,
-  cache,
-  gitdir,
+  repo,
   from,
   to,
+  cache = {},
 }: {
-  fs: FileSystemProvider
-  cache: Record<string, unknown>
-  gitdir: string
+  repo: Repository
   from: string
   to: string
+  cache?: Record<string, unknown>
 }): Promise<Array<{ oid: string; message: string; parent: string[] }>> {
+  // Use GitBackend to read commits - no fs needed
+  const gitBackend = repo.gitBackend
+  if (!gitBackend) {
+    throw new Error('Repository must have a GitBackend for rebase operations')
+  }
+  
+  const { parse: parseCommit } = await import('../core-utils/parsers/Commit.ts')
+  const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+  
+  const readCommit = async (oid: string) => {
+    const result = await gitBackend.readObject(oid, 'content', cache)
+    return parseCommit(UniversalBuffer.from(result.object))
+  }
+  
   // Get all commits reachable from 'from'
   const fromCommits = await topologicalSort({
-    fs,
-    cache,
-    gitdir,
     heads: [from],
+    readCommit,
   })
 
   // Get all commits reachable from 'to'
   const toCommits = new Set(
     await topologicalSort({
-      fs,
-      cache,
-      gitdir,
       heads: [to],
+      readCommit,
     })
   )
 
@@ -542,15 +549,12 @@ async function getCommitsToRebase({
 
   for (const oid of fromCommits) {
     if (!toCommits.has(oid)) {
-      const commitResult = await readObject({ fs, cache, gitdir, oid, format: 'content' })
-      if (commitResult.type === 'commit') {
-        const commit = parseCommit(commitResult.object) as CommitObject
-        commitsToRebase.push({
-          oid,
-          message: commit.message,
-          parent: commit.parent || [],
-        })
-      }
+      const commit = await readCommit(oid)
+      commitsToRebase.push({
+        oid,
+        message: commit.message,
+        parent: commit.parent || [],
+      })
     }
   }
 

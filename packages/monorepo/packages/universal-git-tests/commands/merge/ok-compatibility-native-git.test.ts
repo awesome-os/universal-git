@@ -139,9 +139,9 @@ describe('merge', () => {
 
         // Open repository using Repository class (new constructor pattern)
         const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-        const { FilesystemBackend } = await import('@awesome-os/universal-git-src/backends/FilesystemBackend.ts')
+        const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
         const { GitWorktreeFs } = await import('@awesome-os/universal-git-src/git/worktree/fs/GitWorktreeFs.ts')
-        const gitBackend = new FilesystemBackend(fs, join(sourceRepoPath, '.git'))
+        const gitBackend = new GitBackendFs(fs, join(sourceRepoPath, '.git'))
         const worktreeBackend = new GitWorktreeFs(fs, sourceRepoPath)
         const repository = new Repository({
         gitBackend,
@@ -228,9 +228,9 @@ describe('merge', () => {
         // Note: sourceRepoPath is a separate repo, not using NativeGitBackend
         // So we need to use execSync here or create a Repository instance
         const { Repository: RepoClass } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-        const { FilesystemBackend: FsBackend } = await import('@awesome-os/universal-git-src/backends/FilesystemBackend.ts')
+        const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
         const { GitWorktreeFs } = await import('@awesome-os/universal-git-src/git/worktree/fs/GitWorktreeFs.ts')
-        const sourceGitBackend = new FsBackend(fs, join(sourceRepoPath, '.git'))
+        const sourceGitBackend = new GitBackendFs(fs, join(sourceRepoPath, '.git'))
         const sourceWorktreeBackend = new GitWorktreeFs(fs, sourceRepoPath)
         const sourceRepo = new RepoClass({
         gitBackend: sourceGitBackend,
@@ -257,8 +257,7 @@ describe('merge', () => {
         // Note: cloneRepoPath is a separate repo, not using NativeGitBackend
         // So we need to create a Repository instance
         const { Repository: RepoClass2 } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-        const { FilesystemBackend: CloneFsBackend } = await import('@awesome-os/universal-git-src/backends/FilesystemBackend.ts')
-        const cloneGitBackend = new CloneFsBackend(fs, cloneRepoPath)
+        const cloneGitBackend = new GitBackendFs(fs, cloneRepoPath)
         const cloneRepo = new RepoClass2({
         gitBackend: cloneGitBackend
         })

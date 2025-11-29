@@ -2,7 +2,7 @@ import type { GitWorkerAPI, RepositoryOptions, GitBackendOptions, GitWorktreeBac
 import type { GitBackend } from '../backends/GitBackend.ts'
 import type { GitWorktreeBackend } from '../git/worktree/GitWorktreeBackend.ts'
 import { Repository } from '../core-utils/Repository.ts'
-import { createBackend } from '../backends/index.ts'
+import { GitBackendFs } from '../backends/GitBackendFs/index.ts'
 import { GitWorktreeFs } from '../git/worktree/fs/GitWorktreeFs.ts'
 import { createFileSystem } from '../utils/createFileSystem.ts'
 import type { FileSystemProvider, RawFileSystemProvider } from '../models/FileSystem.ts'
@@ -57,12 +57,15 @@ export class GitWorkerImpl implements GitWorkerAPI {
     }
     
     // Create backend using factory (maintains consistency with main thread)
-    const backend = await createBackend({
-      type: options.type || 'filesystem',
-      fs,
-      gitdir: options.gitdir,
-      dbPath: options.dbPath,
-    })
+    // Create GitBackendFs directly (new Repository(new GitBackend, new WorktreeBackend) pattern)
+    // For now, only filesystem backend is supported in workers
+    if (options.type && options.type !== 'filesystem') {
+      throw new Error(`Backend type '${options.type}' is not supported in worker threads. Only 'filesystem' is supported.`)
+    }
+    if (!options.gitdir) {
+      throw new Error('gitdir is required for GitBackendFs')
+    }
+    const backend = new GitBackendFs(fs, options.gitdir)
     
     // Explicitly proxy the backend via Comlink (Comlink will handle this automatically, but we make it explicit for TypeScript)
     return Comlink.proxy(backend) as unknown as ProxiedGitBackend

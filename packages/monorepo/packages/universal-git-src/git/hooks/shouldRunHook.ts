@@ -50,7 +50,7 @@ export async function getHooksPath({
     }
 
     // Default to hooks (relative to gitdir, but we can't resolve it here)
-    // The actual path resolution will happen in FilesystemBackend.runHook
+    // The actual path resolution will happen in GitBackendFs.runHook
     return 'hooks'
   }
 

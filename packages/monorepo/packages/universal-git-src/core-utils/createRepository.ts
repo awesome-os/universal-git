@@ -30,7 +30,7 @@
  * })
  * 
  * // Or create backends yourself for more control
- * const gitBackend = new FilesystemBackend(fs, gitdir)
+ * const gitBackend = new GitBackendFs(fs, gitdir)
  * const worktreeBackend = new GitWorktreeFs(fs, dir)
  * const repo = new Repository({
  *   gitBackend,
@@ -42,7 +42,7 @@
 import { createFileSystem } from '../utils/createFileSystem.ts'
 import { normalize, join } from './GitPath.ts'
 import { Repository } from './Repository.ts'
-import { FilesystemBackend } from '../backends/FilesystemBackend.ts'
+import { GitBackendFs } from '../backends/GitBackendFs/index.ts'
 import { createGitWorktreeBackend } from '../git/worktree/index.ts'
 import { findRoot } from '../commands/findRoot.ts'
 import { NotFoundError } from '../errors/NotFoundError.ts'
@@ -121,7 +121,7 @@ export async function createRepository(options: {
   }
   
   // Create GitBackend
-  const gitBackend = new FilesystemBackend(fs, finalGitdir)
+  const gitBackend = new GitBackendFs(fs, finalGitdir)
   
   // Create WorktreeBackend if dir is provided and it's not a bare repo
   let worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend | undefined

@@ -7,14 +7,10 @@
 
 import { GitPktLine } from '../models/GitPktLine.ts'
 import { collect } from '../utils/collect.ts'
-import { writeRef } from '../git/refs/writeRef.ts'
 import { readRef, resolveRef } from '../git/refs/readRef.ts'
 import { NotFoundError } from '../errors/NotFoundError.ts'
 import { runServerHooks, type RefUpdate } from '../git/hooks/serverHooks.ts'
-import { detectObjectFormat } from '../utils/detectObjectFormat.ts'
-import { createFileSystem } from '../utils/createFileSystem.ts'
-import { join } from '../utils/join.ts'
-import type { FileSystemProvider } from '../models/FileSystem.ts'
+import type { GitBackend } from '../backends/GitBackend.ts'
 import type { HookContext } from '../git/hooks/runHook.ts'
 import { UniversalBuffer } from '../utils/UniversalBuffer.ts'
 
@@ -33,23 +29,49 @@ export interface ReceivePackResult {
 /**
  * Processes a receive-pack request (push operation) with server-side hook support
  * 
- * @param fs - File system client
- * @param gitdir - Path to .git directory
+ * @param gitBackend - Git backend for repository operations
  * @param requestBody - Request body (pkt-line ref updates + packfile)
  * @param context - Hook context (remote info, etc.)
  * @returns Promise resolving to receive-pack result
  */
 export async function processReceivePack({
-  fs,
-  gitdir,
+  gitBackend,
   requestBody,
   context = {},
+  // Legacy parameters for backward compatibility
+  fs: _fs,
+  gitdir: _gitdir,
 }: {
-  fs: FileSystemProvider
-  gitdir: string
+  gitBackend?: GitBackend
   requestBody: AsyncIterableIterator<Uint8Array>
   context?: Omit<HookContext, 'pushedRefs' | 'gitdir'>
+  // Legacy parameters for backward compatibility
+  fs?: any
+  gitdir?: string
 }): Promise<ReceivePackResult> {
+  // Support both new signature (gitBackend) and legacy signature (fs/gitdir)
+  let backend: GitBackend
+  let fs: any
+  let gitdir: string
+  
+  if (gitBackend) {
+    backend = gitBackend
+    gitdir = backend.getGitdir()
+    // Get fs from backend if available (for GitBackendFs)
+    if ('getFs' in backend && typeof backend.getFs === 'function') {
+      fs = backend.getFs()
+    } else {
+      throw new Error('GitBackend must provide getFs() method for processReceivePack')
+    }
+  } else if (_fs && _gitdir) {
+    // Legacy: create a temporary backend or use fs directly
+    // For now, we'll use fs directly but this should be refactored
+    fs = _fs
+    gitdir = _gitdir
+    throw new Error('processReceivePack requires gitBackend parameter')
+  } else {
+    throw new Error('Either gitBackend or (fs and gitdir) must be provided')
+  }
   const result: ReceivePackResult = {
     unpackOk: false,
     refs: new Map(),
@@ -114,23 +136,14 @@ export async function processReceivePack({
 
     // Check if gitdir exists before processing
     // This helps catch filesystem errors early
-    const normalizedFs = createFileSystem(fs)
     try {
-      const gitdirExists = await normalizedFs.exists(join(gitdir, 'HEAD'))
-      // If HEAD doesn't exist, check if gitdir itself exists
-      if (!gitdirExists) {
-        // Try to read a file in gitdir to see if it exists
-        try {
-          await normalizedFs.readdir(gitdir)
-        } catch (dirErr: any) {
-          // If gitdir doesn't exist, this is a filesystem error
-          const errorMsg = dirErr?.message || String(dirErr)
-          const errorCode = dirErr?.code || dirErr?.errno || ''
-          if (errorCode === 'ENOENT' || errorMsg.toLowerCase().includes('enoent') || 
-              errorMsg.includes('/nonexistent/') || errorMsg.toLowerCase().includes('/nonexistent/')) {
-            throw new Error(`Git directory does not exist: ${gitdir}`)
-          }
-        }
+      // Use backend to check if HEAD exists
+      const headExists = await backend.readHEAD().catch(() => null)
+      if (!headExists) {
+        // Try to read config to verify gitdir exists
+        await backend.readConfig().catch(() => {
+          throw new Error(`Git directory does not exist: ${gitdir}`)
+        })
       }
     } catch (dirCheckErr) {
       // Gitdir doesn't exist or is invalid - this is a system error
@@ -139,13 +152,12 @@ export async function processReceivePack({
       return result
     }
 
-    // Detect object format
-    // This may fail for invalid gitdir, but we'll catch it in the outer try-catch
+    // Get object format from backend
     let objectFormat: 'sha1' | 'sha256'
     try {
-      objectFormat = await detectObjectFormat(fs, gitdir)
+      objectFormat = await backend.getObjectFormat({})
     } catch {
-      // If detectObjectFormat fails, default to sha1 and continue
+      // If getObjectFormat fails, default to sha1 and continue
       // The actual error will occur during ref operations
       objectFormat = 'sha1'
     }
@@ -197,10 +209,10 @@ export async function processReceivePack({
         // Read current ref value to verify oldOid matches
         let currentOid: string | null = null
         try {
-          // Use resolveRef instead of readRef - it throws NotFoundError for missing refs
+          // Use backend.readRef instead of resolveRef
           // This makes it easier to distinguish between "ref not found" (expected) 
           // and filesystem errors (unexpected)
-          currentOid = await resolveRef({ fs, gitdir, ref: triplet.ref, objectFormat })
+          currentOid = await backend.readRef(triplet.ref, 5, {}) || null
         } catch (readErr: any) {
           // NotFoundError means ref doesn't exist yet (new ref) - this is expected
           if (readErr instanceof NotFoundError) {
@@ -255,17 +267,10 @@ export async function processReceivePack({
         // Update the ref
         if (triplet.oid === zeroOid) {
           // Delete ref (zero OID)
-          const { deleteRefs } = await import('../git/refs/deleteRef.ts')
-          await deleteRefs({ fs, gitdir, refs: [triplet.ref] })
+          await backend.deleteRef(triplet.ref, {})
         } else {
-          // Write new ref value
-          await writeRef({
-            fs,
-            gitdir,
-            ref: triplet.ref,
-            value: triplet.oid,
-            objectFormat,
-          })
+          // Write new ref value using gitBackend.writeRef directly
+          await backend.writeRef(triplet.ref, triplet.oid, false, {})
         }
 
         // Mark as successful

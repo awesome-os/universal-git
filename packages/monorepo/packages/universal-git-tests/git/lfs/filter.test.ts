@@ -10,7 +10,7 @@ import {
   applyCleanFilter,
 } from '@awesome-os/universal-git-src/git/lfs/filter.ts'
 import { parsePointer, generatePointer } from '@awesome-os/universal-git-src/git/lfs/pointer.ts'
-import { FilesystemBackend } from '@awesome-os/universal-git-src/backends/FilesystemBackend.ts'
+import { GitBackendFs } from '@awesome-os/universal-git-src/backends/GitBackendFs/index.ts'
 import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 
 test('LFS Filter', async (t) => {
@@ -65,7 +65,7 @@ test('LFS Filter', async (t) => {
     const repo = await Repository.open({ fs, dir })
     const gitdir = await repo.getGitdir()
     if (!gitdir) throw new Error('gitdir is required')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
 
     // Create actual file content
     const actualContent = Buffer.from('Large file content for LFS\n', 'utf8')
@@ -94,7 +94,7 @@ test('LFS Filter', async (t) => {
     const repo = await Repository.open({ fs, dir })
     const gitdir = await repo.getGitdir()
     if (!gitdir) throw new Error('gitdir is required')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
 
     const pointerText = `version https://git-lfs.github.com/spec/v1
 oid sha256:nonexistent123456789012345678901234567890123456789012345678901234567890
@@ -115,7 +115,7 @@ size 100
     const repo = await Repository.open({ fs, dir })
     const gitdir = await repo.getGitdir()
     if (!gitdir) throw new Error('gitdir is required')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
 
     // Create actual file with different size than pointer says
     const actualContent = Buffer.from('content', 'utf8')
@@ -145,7 +145,7 @@ size 1000
     const repo = await Repository.open({ fs, dir })
     const gitdir = await repo.getGitdir()
     if (!gitdir) throw new Error('gitdir is required')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
 
     const fileContent = Buffer.from('Large file content for LFS\n', 'utf8')
 
@@ -172,7 +172,7 @@ size 1000
     const repo = await Repository.open({ fs, dir })
     const gitdir = await repo.getGitdir()
     if (!gitdir) throw new Error('gitdir is required')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
 
     const blobContent = Buffer.from('Regular file content\n', 'utf8')
 
@@ -195,7 +195,7 @@ size 1000
     const repo = await Repository.open({ fs, dir })
     const gitdir = await repo.getGitdir()
     if (!gitdir) throw new Error('gitdir is required')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
 
     // Create .gitattributes
     await fs.write(`${dir}/.gitattributes`, '*.psd filter=lfs\n', 'utf8')
@@ -231,7 +231,7 @@ size 1000
     const repo = await Repository.open({ fs, dir })
     const gitdir = await repo.getGitdir()
     if (!gitdir) throw new Error('gitdir is required')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
 
     // Create .gitattributes
     await fs.write(`${dir}/.gitattributes`, '*.psd filter=lfs\n', 'utf8')
@@ -263,7 +263,7 @@ size 100
     const repo = await Repository.open({ fs, dir })
     const gitdir = await repo.getGitdir()
     if (!gitdir) throw new Error('gitdir is required')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
 
     const fileContent = Buffer.from('Regular file content\n', 'utf8')
 
@@ -286,7 +286,7 @@ size 100
     const repo = await Repository.open({ fs, dir })
     const gitdir = await repo.getGitdir()
     if (!gitdir) throw new Error('gitdir is required')
-    const backend = new FilesystemBackend(fs, gitdir)
+    const backend = new GitBackendFs(fs, gitdir)
 
     // Create .gitattributes
     await fs.write(`${dir}/.gitattributes`, '*.psd filter=lfs\n', 'utf8')

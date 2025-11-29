@@ -1,6 +1,7 @@
 import { assignDefined } from './assignDefined.ts'
 import type { Author, CommitObject } from "../models/GitCommit.ts"
 import type { Repository } from "../core-utils/Repository.ts"
+import type { GitBackend } from "../backends/GitBackend.ts"
 
 /**
  * Return committer object by using properties with this priority:
@@ -10,7 +11,8 @@ import type { Repository } from "../core-utils/Repository.ts"
  * -> (4) Config and current date/time
  *
  * @param {Object} args
- * @param {Repository} args.repo - Repository instance (required for config access)
+ * @param {Repository} [args.repo] - Repository instance (for backward compatibility)
+ * @param {GitBackend} [args.gitBackend] - GitBackend instance (preferred, for isolation)
  * @param {Object} [args.author] - The author object.
  * @param {Object} [args.committer] - The committer object.
  * @param {CommitObject} [args.commit] - A commit object.
@@ -20,24 +22,42 @@ import type { Repository } from "../core-utils/Repository.ts"
  */
 export async function normalizeCommitterObject({
   repo,
+  gitBackend,
   author,
   committer,
   commit,
   amend = false,
   configService,
 }: {
-  repo: Repository
+  repo?: Repository
+  gitBackend?: GitBackend
   author?: Partial<Author>
   committer?: Partial<Author>
   commit?: CommitObject
   amend?: boolean
   configService?: Awaited<ReturnType<Repository['getConfig']>>
 }): Promise<Author | undefined> {
-  // CRITICAL: Use the Repository's config service to ensure state consistency
-  // This ensures that setConfig() and getCommitter() use the same UnifiedConfigService instance
-  const config = configService ?? await repo.getConfig()
-  const nameConfig = (await config.get('user.name')) as string | undefined
-  const emailConfig = ((await config.get('user.email')) as string | undefined) || '' // committer.email is allowed to be empty string
+  // CRITICAL: Use GitBackend directly for config access to maintain isolation
+  // Prefer gitBackend over repo to avoid creating Repository instances in backends
+  let nameConfig: string | undefined
+  let emailConfig: string | undefined
+  try {
+    if (gitBackend) {
+      // Use GitBackend.getConfig() directly
+      nameConfig = (await gitBackend.getConfig('user.name')) as string | undefined
+      emailConfig = ((await gitBackend.getConfig('user.email')) as string | undefined) || ''
+    } else if (repo) {
+      // Fallback to Repository for backward compatibility
+      const config = configService ?? await repo.getConfig()
+      nameConfig = (await config.get('user.name')) as string | undefined
+      emailConfig = ((await config.get('user.email')) as string | undefined) || ''
+    }
+  } catch {
+    // If config access fails, use undefined
+    nameConfig = undefined
+    emailConfig = undefined
+  }
+  // committer.email is allowed to be empty string
   
   // CRITICAL: When amending, don't use the commit's timestamp/timezoneOffset as fallback
   // The committer timestamp should be updated to current time when amending (unless explicitly provided)

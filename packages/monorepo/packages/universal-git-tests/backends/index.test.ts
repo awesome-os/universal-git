@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { createBackend } from '@awesome-os/universal-git-src/backends/index.ts'
 import { BackendRegistry } from '@awesome-os/universal-git-src/backends/BackendRegistry.ts'
-import { FilesystemBackend } from '@awesome-os/universal-git-src/backends/FilesystemBackend.ts'
+import { GitBackendFs } from '@awesome-os/universal-git-src/backends/GitBackendFs/index.ts'
 import { InMemoryBackend } from '@awesome-os/universal-git-src/backends/InMemoryBackend.ts'
 import { createFileSystem } from '@awesome-os/universal-git-src/utils/createFileSystem.ts'
 import { makeNodeFixture } from '../helpers/makeNodeFixture.ts'
@@ -21,7 +21,7 @@ test('createBackend', async (t) => {
     
     const backend = createBackend(options)
     
-    assert.ok(backend instanceof FilesystemBackend)
+    assert.ok(backend instanceof GitBackendFs)
     assert.strictEqual(backend.getType(), 'filesystem')
   })
 
@@ -38,7 +38,7 @@ test('createBackend', async (t) => {
     // This should auto-register filesystem backend
     const backend = createBackend(options)
     
-    assert.ok(backend instanceof FilesystemBackend)
+    assert.ok(backend instanceof GitBackendFs)
     assert.strictEqual(BackendRegistry.isRegistered('filesystem'), true)
   })
 
@@ -123,11 +123,11 @@ test('createBackend', async (t) => {
     
     // First call should register
     const backend1 = createBackend(options)
-    assert.ok(backend1 instanceof FilesystemBackend)
+    assert.ok(backend1 instanceof GitBackendFs)
     
     // Second call should reuse existing registration
     const backend2 = createBackend(options)
-    assert.ok(backend2 instanceof FilesystemBackend)
+    assert.ok(backend2 instanceof GitBackendFs)
     
     // Both should work
     assert.strictEqual(backend1.getType(), 'filesystem')
@@ -152,8 +152,8 @@ test('createBackend', async (t) => {
     const backend1 = createBackend(options1)
     const backend2 = createBackend(options2)
     
-    assert.ok(backend1 instanceof FilesystemBackend)
-    assert.ok(backend2 instanceof FilesystemBackend)
+    assert.ok(backend1 instanceof GitBackendFs)
+    assert.ok(backend2 instanceof GitBackendFs)
   })
 
   await t.test('normalizes filesystem using createFileSystem', async () => {
@@ -167,7 +167,7 @@ test('createBackend', async (t) => {
     })
     
     // Verify backend works correctly (normalization happened)
-    assert.ok(backend instanceof FilesystemBackend)
+    assert.ok(backend instanceof GitBackendFs)
     
     // Verify we can use the backend
     await backend.initialize()
@@ -190,7 +190,7 @@ test('createBackend', async (t) => {
     })
     
     // Verify backend works correctly
-    assert.ok(backend instanceof FilesystemBackend)
+    assert.ok(backend instanceof GitBackendFs)
     await backend.initialize()
     await backend.writeHEAD('ref: refs/heads/main')
     const head = await backend.readHEAD()
@@ -214,8 +214,8 @@ test('createBackend', async (t) => {
     })
     
     // Both backends should work
-    assert.ok(backend1 instanceof FilesystemBackend)
-    assert.ok(backend2 instanceof FilesystemBackend)
+    assert.ok(backend1 instanceof GitBackendFs)
+    assert.ok(backend2 instanceof GitBackendFs)
     
     // Verify they can operate independently
     await backend1.initialize()
@@ -247,7 +247,7 @@ test('createBackend', async (t) => {
     })
     
     // Verify backend works correctly
-    assert.ok(backend instanceof FilesystemBackend)
+    assert.ok(backend instanceof GitBackendFs)
     await backend.initialize()
     await backend.writeHEAD('ref: refs/heads/main')
     const head = await backend.readHEAD()

@@ -3,13 +3,13 @@ import { join } from "../core-utils/GitPath.ts"
 import type { FileSystem, FileSystemProvider } from "../models/FileSystem.ts"
 import type { GitBackend } from './GitBackend.ts'
 import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
-import { FilesystemBackend } from './FilesystemBackend.ts'
+import { GitBackendFs } from './GitBackendFs/index.ts'
 
 /**
  * NativeGitBackend - Native Git CLI-based implementation of GitBackend
  * 
- * This backend uses the same implementations as FilesystemBackend but uses
- * node execSync for git operations. It wraps FilesystemBackend internally
+ * This backend uses the same implementations as GitBackendFs but uses
+ * node execSync for git operations. It wraps GitBackendFs internally
  * for file operations and uses native git CLI commands for git operations.
  * 
  * This backend is primarily intended for testing and comparison purposes,
@@ -17,7 +17,7 @@ import { FilesystemBackend } from './FilesystemBackend.ts'
  * Repository interface.
  */
 export class NativeGitBackend implements GitBackend {
-  private readonly fsBackend: FilesystemBackend
+  private readonly fsBackend: GitBackendFs
   private readonly gitdir: string
   private readonly workdir: string | null
 
@@ -26,7 +26,7 @@ export class NativeGitBackend implements GitBackend {
     gitdir: string,
     workdir?: string | null
   ) {
-    this.fsBackend = new FilesystemBackend(fs, gitdir)
+    this.fsBackend = new GitBackendFs(fs, gitdir)
     this.gitdir = gitdir
     // Workdir is needed for git commands that operate on the working directory
     this.workdir = workdir || null
@@ -739,7 +739,7 @@ export class NativeGitBackend implements GitBackend {
 
   /**
    * Get a config value (merged from system, global, and local config)
-   * Delegates to FilesystemBackend
+   * Delegates to GitBackendFs
    */
   async getConfig(path: string): Promise<unknown> {
     return this.fsBackend.getConfig(path)
@@ -747,7 +747,7 @@ export class NativeGitBackend implements GitBackend {
 
   /**
    * Set a config value
-   * Delegates to FilesystemBackend
+   * Delegates to GitBackendFs
    * Note: 'worktree' scope is handled by WorktreeBackend, not GitBackend
    */
   async setConfig(
@@ -761,7 +761,7 @@ export class NativeGitBackend implements GitBackend {
 
   /**
    * Get all values for a config path from all scopes (system, global, local)
-   * Delegates to FilesystemBackend
+   * Delegates to GitBackendFs
    */
   async getAllConfig(path: string): Promise<Array<{ value: unknown; scope: 'local' }>> {
     return this.fsBackend.getAllConfig(path)
@@ -769,7 +769,7 @@ export class NativeGitBackend implements GitBackend {
 
   /**
    * Get all subsections for a section
-   * Delegates to FilesystemBackend
+   * Delegates to GitBackendFs
    */
   async getConfigSubsections(section: string): Promise<(string | null)[]> {
     return this.fsBackend.getConfigSubsections(section)
@@ -777,7 +777,7 @@ export class NativeGitBackend implements GitBackend {
 
   /**
    * Get all section names
-   * Delegates to FilesystemBackend
+   * Delegates to GitBackendFs
    */
   async getConfigSections(): Promise<string[]> {
     return this.fsBackend.getConfigSections()
@@ -785,7 +785,7 @@ export class NativeGitBackend implements GitBackend {
 
   /**
    * Reload all configs (re-reads from filesystem/storage)
-   * Delegates to FilesystemBackend
+   * Delegates to GitBackendFs
    */
   async reloadConfig(): Promise<void> {
     return this.fsBackend.reloadConfig()

@@ -119,7 +119,7 @@ describe('merge', () => {
 
   it('param:allowUnrelatedHistories', async () => {
         const { repo } = await makeFixture('test-merge')
-        const dir = await repo.getDir()!
+        if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
         const gitdir = await repo.getGitdir()
 
         // Test that allowUnrelatedHistories parameter is accepted

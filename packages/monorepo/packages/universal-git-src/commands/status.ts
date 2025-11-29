@@ -70,6 +70,42 @@ export async function status({
   cache = {},
 }: StatusOptions): Promise<FileStatus> {
   try {
+    // If repo is provided with worktreeBackend, we don't need dir/fs/gitdir
+    // WorkdirManager will use repo.worktreeBackend directly
+    if (_repo && _repo.worktreeBackend) {
+      assertParameter('filepath', filepath)
+      
+      // Check if ignored - use repo.worktreeBackend methods
+      // TODO: Refactor IgnoreManager to use worktreeBackend instead of fs/dir/gitdir
+      // For now, get fs from worktreeBackend (temporary until IgnoreManager is refactored)
+      const worktreeBackend = _repo.worktreeBackend
+      const fs = (worktreeBackend as any).fs
+      const effectiveGitdir = await _repo.getGitdir()
+      // dir is not available from worktreeBackend (it's a black box)
+      // Use empty string as placeholder - IgnoreManager needs refactoring
+      const effectiveDir = ''
+      
+      if (fs && effectiveGitdir) {
+        const ignored = await IgnoreManager.checkIgnored({
+          fs,
+          gitdir: effectiveGitdir,
+          dir: effectiveDir,
+          filepath,
+        })
+        if (ignored) {
+          return 'ignored' as FileStatus
+        }
+      }
+
+      // Use WorkdirManager to get status - pass the Repository object directly
+      const statusResult = await WorkdirManager.getFileStatus({
+        repo: _repo,
+        filepath,
+      })
+      return statusResult as FileStatus
+    }
+    
+    // Legacy path: use normalizeCommandArgs for backward compatibility
     const { repo, fs, gitdir: effectiveGitdir, dir: effectiveDir } = await normalizeCommandArgs({
       repo: _repo,
       fs: _fs,

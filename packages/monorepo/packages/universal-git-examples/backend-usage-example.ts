@@ -1,7 +1,7 @@
 /**
  * Example usage of Git Backends
  * 
- * This file demonstrates how to use both FilesystemBackend and SQLiteBackend
+ * This file demonstrates how to use both GitBackendFs and SQLiteBackend
  * to store Git repository data using the factory pattern.
  * 
  * @example
@@ -30,11 +30,11 @@ import { readRef } from '@awesome-os/universal-git-src/git/refs/readRef.ts'
 import { writeRef } from '@awesome-os/universal-git-src/git/refs/writeRef.ts'
 
 // ============================================================================
-// Example 1: Using FilesystemBackend with Factory Pattern (Recommended)
+// Example 1: Using GitBackendFs with Factory Pattern (Recommended)
 // ============================================================================
 
 /**
- * Example showing the recommended way to create a FilesystemBackend
+ * Example showing the recommended way to create a GitBackendFs
  * using the factory pattern. The factory automatically normalizes the
  * filesystem instance.
  */
@@ -103,7 +103,7 @@ export async function exampleSQLiteBackend(dbPath: string) {
   // Initialize the database schema
   await backend.initialize()
 
-  // All operations are the same as FilesystemBackend
+  // All operations are the same as GitBackendFs
   await backend.writeHEAD('ref: refs/heads/main')
 
   const configData = Buffer.from('[core]\n\trepositoryformatversion = 0\n')

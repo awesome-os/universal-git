@@ -218,10 +218,10 @@ export async function lfsList({
     throw new Error('dir is required when repo is not provided')
   }
 
-  const { FilesystemBackend } = await import('../backends/FilesystemBackend.ts')
+  const { GitBackendFs } = await import('../backends/GitBackendFs/index.ts')
   const effectiveGitdir = await repo.getGitdir()
   if (!effectiveGitdir) throw new Error('gitdir is required')
-  const backend = new FilesystemBackend(fs, effectiveGitdir)
+  const backend = new GitBackendFs(fs, effectiveGitdir)
 
   // Get all files from the index
   const { GitIndex } = await import('../git/index/GitIndex.ts')

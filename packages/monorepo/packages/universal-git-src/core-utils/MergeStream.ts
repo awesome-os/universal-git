@@ -179,10 +179,12 @@ export class MergeStream extends ReadableStream<MergeStreamEvent> {
     const { createGitWorktreeBackend } = await import('../git/worktree/index.ts')
     
     // Create Repository with proper worktree backend if fs and dir are available
+    // Otherwise, use the worktreeBackend from the repo if it exists
     let worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend | undefined
     if (this.options.fs && this.options.dir) {
       worktreeBackend = createGitWorktreeBackend({ fs: this.options.fs, dir: this.options.dir })
     }
+    // Note: If fs/dir are not available, mergeTree should use the repo's worktreeBackend
     
     const repo = new Repository({
       gitBackend,

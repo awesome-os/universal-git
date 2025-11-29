@@ -334,7 +334,7 @@ export type GitBackend = {
   // High-Level Object Operations
   // ============================================================================
   // High-level object operations that handle both loose and packed objects.
-  // FilesystemBackend delegates to src/git/objects/ functions.
+  // GitBackendFs delegates to src/git/objects/ functions.
   // Other backends (SQLite, InMemory) implement these using their own storage.
 
   /**
@@ -449,7 +449,7 @@ export type GitBackend = {
   // References
   // ============================================================================
   // High-level ref operations that handle reflog, locking, validation, and state tracking.
-  // FilesystemBackend delegates to src/git/refs/ functions.
+  // GitBackendFs delegates to src/git/refs/ functions.
   // Other backends (SQLite, InMemory) implement these using their own storage.
 
   /**
@@ -1022,7 +1022,7 @@ export type GitBackend = {
    * Initializes a new Git repository (always creates a bare repository)
    * This is the main entry point for repository initialization.
    * Backend-specific implementations will:
-   * - Create necessary directory structure (FilesystemBackend)
+   * - Create necessary directory structure (GitBackendFs)
    * - Create database tables (SQL backend)
    * - Set initial config values (core.bare = true)
    * - Set HEAD to default branch

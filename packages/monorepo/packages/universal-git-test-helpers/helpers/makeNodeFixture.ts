@@ -67,11 +67,11 @@ export async function makeNodeFixture(fixture: string, options?: { init?: boolea
   const gitdir = await useTempDir(`${fixture}.git`)
 
   // Create backends explicitly
-  const { FilesystemBackend } = await import('@awesome-os/universal-git-src/backends/FilesystemBackend.ts')
+  const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
   const { createGitWorktreeBackend } = await import('@awesome-os/universal-git-src/git/worktree/index.ts')
   
-  // Create GitBackend (FilesystemBackend)
-  const gitBackend = new FilesystemBackend(fs, gitdir)
+  // Create GitBackend (GitBackendFs)
+  const gitBackend = new GitBackendFs(fs, gitdir)
   
   // Create WorktreeBackend (GitWorktreeFs)
   const worktreeBackend = createGitWorktreeBackend({ fs, dir })

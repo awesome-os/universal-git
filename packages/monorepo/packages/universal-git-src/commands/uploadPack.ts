@@ -40,15 +40,10 @@ export async function uploadPack({
       repo = normalized.repo
       fs = normalized.fs
       effectiveGitdir = normalized.gitdir
-    } catch (err: any) {
-      // Ensure caller is set even for errors from normalizeCommandArgs
-      const errorWithCaller = setErrorCaller(err, 'git.uploadPack')
-      // Double-check caller is set (in case setErrorCaller wrapped the error)
-      if (!errorWithCaller.caller) {
-        errorWithCaller.caller = 'git.uploadPack'
+      } catch (err: any) {
+        // Ensure caller is set even for errors from normalizeCommandArgs
+        throw setErrorCaller(err, 'git.uploadPack')
       }
-      throw errorWithCaller
-    }
 
     if (advertiseRefs) {
       // Send a refs advertisement
@@ -77,12 +72,14 @@ export async function uploadPack({
         }
       } catch (err: any) {
         // Ensure caller is set for listRefs errors
-        const errorWithCaller = setErrorCaller(err, 'git.uploadPack')
-        // Double-check caller is set (in case setErrorCaller wrapped the error)
-        if (!errorWithCaller.caller) {
-          errorWithCaller.caller = 'git.uploadPack'
+        if (err && typeof err === 'object') {
+          try {
+            ;(err as { caller?: string }).caller = 'git.uploadPack'
+          } catch {
+            // If we can't set the property, wrap the error
+          }
         }
-        throw errorWithCaller
+        throw setErrorCaller(err, 'git.uploadPack')
       }
       
       keys = keys.map(ref => `refs/${ref}`)
@@ -117,12 +114,7 @@ export async function uploadPack({
             continue
           }
           // Ensure caller is set before re-throwing
-          const errorWithCaller = setErrorCaller(err, 'git.uploadPack')
-          // Double-check caller is set (in case setErrorCaller wrapped the error)
-          if (!errorWithCaller.caller) {
-            errorWithCaller.caller = 'git.uploadPack'
-          }
-          throw errorWithCaller
+          throw setErrorCaller(err, 'git.uploadPack')
         }
       }
       const symrefs: Record<string, string> = {}
@@ -143,12 +135,7 @@ export async function uploadPack({
         }
       } catch (err: any) {
         // Ensure caller is set for HEAD readRef errors
-        const errorWithCaller = setErrorCaller(err, 'git.uploadPack')
-        // Double-check caller is set (in case setErrorCaller wrapped the error)
-        if (!errorWithCaller.caller) {
-          errorWithCaller.caller = 'git.uploadPack'
-        }
-        throw errorWithCaller
+        throw setErrorCaller(err, 'git.uploadPack')
       }
       return writeRefsAdResponse({
         capabilities,
@@ -158,12 +145,7 @@ export async function uploadPack({
     }
   } catch (err: any) {
     // Ensure caller is set on all error types
-    const errorWithCaller = setErrorCaller(err, 'git.uploadPack')
-    // Double-check caller is set (in case setErrorCaller wrapped the error)
-    if (!errorWithCaller.caller) {
-      errorWithCaller.caller = 'git.uploadPack'
-    }
-    throw errorWithCaller
+    throw setErrorCaller(err, 'git.uploadPack')
   }
 }
 

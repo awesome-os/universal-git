@@ -414,8 +414,8 @@ export const executeCheckout = async ({
         let fileContent = blobObject as UniversalBuffer
         try {
           const { applySmudgeFilter } = await import('../../git/lfs/filter.ts')
-          const { FilesystemBackend } = await import('../../backends/FilesystemBackend.ts')
-          const backend = new FilesystemBackend(normalizedFs, gitdir)
+          const { GitBackendFs } = await import('../../backends/GitBackendFs/index.ts')
+          const backend = new GitBackendFs(normalizedFs, gitdir)
           fileContent = await applySmudgeFilter({
             fs: normalizedFs,
             dir,
@@ -589,17 +589,18 @@ export const getFileStatus = async ({
   repo: import('../../core-utils/Repository.ts').Repository
   filepath: string
 }): Promise<string> => {
-  // CRITICAL: Normalize fs to ensure consistency with add() and other operations
-  const fs = createFileSystem(repo.fs)
-  const dir = repo.dir!
-  if (!dir) {
+  // worktreeBackend is required for file operations
+  if (!repo.worktreeBackend) {
     throw new Error('Cannot get file status in bare repository')
   }
-  // CRITICAL: Use repo.getGitdir() directly - this is the same gitdir used by checkout
-  // worktree.getGitdir() may return a different path for linked worktrees, but for the main
-  // worktree it should be the same. However, since checkout uses repo.getGitdir(), we should
-  // use the same to ensure consistency.
-  const gitdir = await repo.getGitdir()
+  const worktreeBackend = repo.worktreeBackend
+  
+  // gitBackend is required for object operations
+  if (!repo.gitBackend) {
+    throw new Error('gitBackend is required')
+  }
+  const gitBackend = repo.gitBackend
+  
   const cache = repo.cache
 
   // Get HEAD tree
@@ -607,8 +608,8 @@ export const getFileStatus = async ({
   try {
     // Use repo.resolveRef() to ensure we use the same gitdir as checkout
     const headOid = await repo.resolveRef('HEAD')
-    const { object: commitObject } = await readObject({ fs, cache, gitdir, oid: headOid })
-    const commit = parseCommit(commitObject as UniversalBuffer | string)
+    const commitResult = await gitBackend.readObject(headOid, 'content', cache)
+    const commit = parseCommit(commitResult.object as UniversalBuffer | string)
     headTreeOid = commit.tree
   } catch (err) {
     // No HEAD commit
@@ -623,16 +624,24 @@ export const getFileStatus = async ({
   if (headTreeOid) {
     try {
       // First try parseTree for root-level files (more efficient)
-      const { object: treeObject } = await readObject({ fs, cache, gitdir, oid: headTreeOid })
-      const treeEntries = parseTree(treeObject as UniversalBuffer)
+      const treeResult = await gitBackend.readObject(headTreeOid, 'content', cache)
+      const treeEntries = parseTree(treeResult.object as UniversalBuffer)
       const rootEntry = treeEntries.find(e => e.path === filepath)
       if (rootEntry) {
         headOid = rootEntry.oid
       } else {
         // File not in root, use resolveFilepath to search recursively
         const { resolveFilepath } = await import('../../utils/resolveFilepath.ts')
+        // resolveFilepath needs fs/gitdir - get them from backends temporarily
+        // TODO: Refactor resolveFilepath to use gitBackend
+        const gitdir = await repo.getGitdir()
+        const fs = (worktreeBackend as any).fs
+        if (!fs) {
+          throw new Error('worktreeBackend must provide fs for resolveFilepath')
+        }
+        const normalizedFs = createFileSystem(fs)
         // resolveFilepath returns the OID directly, not an object
-        headOid = await resolveFilepath({ fs, cache, gitdir, oid: headTreeOid, filepath })
+        headOid = await resolveFilepath({ fs: normalizedFs, cache, gitdir, oid: headTreeOid, filepath })
       }
     } catch (err) {
       // File doesn't exist in HEAD tree
@@ -643,38 +652,33 @@ export const getFileStatus = async ({
   // CRITICAL: Get the index directly from gitBackend
   // This ensures we see the same index state that was modified by add()
   const { GitIndex } = await import('../../git/index/GitIndex.ts')
-  const { detectObjectFormat } = await import('../../utils/detectObjectFormat.ts')
   
   let indexBuffer: UniversalBuffer
-  if (repo.gitBackend) {
-    try {
-      indexBuffer = await repo.gitBackend.readIndex()
-    } catch {
-      indexBuffer = UniversalBuffer.alloc(0)
-    }
-  } else {
-    throw new Error('gitBackend is required')
+  try {
+    indexBuffer = await gitBackend.readIndex()
+  } catch {
+    indexBuffer = UniversalBuffer.alloc(0)
   }
   
   let index: GitIndex
   if (indexBuffer.length === 0) {
     index = new GitIndex()
   } else {
-    const objectFormat = await detectObjectFormat(fs, gitdir, repo.cache, repo.gitBackend)
+    const { detectObjectFormat } = await import('../../utils/detectObjectFormat.ts')
+    const objectFormat = await detectObjectFormat(undefined, undefined, cache, gitBackend)
     index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
   }
   
   const indexEntry = index.entriesMap.get(filepath)
   const indexOid: string | null = indexEntry ? indexEntry.oid : null
 
-  // Get file from working directory
-  const workdirPath = join(dir, filepath)
+  // Get file from working directory using worktreeBackend
   let workdirExists = false
   let workdirOid: string | null = null
   try {
-    await fs.lstat(workdirPath)
+    await worktreeBackend.lstat(filepath)
     workdirExists = true
-    const content = await fs.read(workdirPath)
+    const content = await worktreeBackend.read(filepath)
     const { hashObject } = await import('../../core-utils/ShaHasher.ts')
     workdirOid = await hashObject({ type: 'blob', content: content as UniversalBuffer | Uint8Array })
   } catch {
