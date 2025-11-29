@@ -57,7 +57,7 @@ export async function sparseCheckout({
 }: SparseCheckoutOptions): Promise<string[] | void> {
   // When list is true, always return string[], never void
   try {
-    const { repo, fs, dir: effectiveDir, gitdir: effectiveGitdir, cache: effectiveCache } = await normalizeCommandArgs({
+    const { repo, fs, dir: effectiveDir, gitdir: effectiveGitdir, cache: effectiveCache, worktreeBackend } = await normalizeCommandArgs({
       repo: _repo,
       fs: _fs,
       dir,
@@ -69,19 +69,27 @@ export async function sparseCheckout({
       cone,
     })
 
-    // dir is required for checkout operations, which init and set perform
-    if ((init || set) && !effectiveDir) {
-      throw new Error('The "dir" argument is required for sparseCheckout init or set operations.')
+    // dir or worktreeBackend is required for checkout operations, which init and set perform
+    if ((init || set) && !effectiveDir && !worktreeBackend) {
+      throw new Error('The "dir" argument or a worktreeBackend is required for sparseCheckout init or set operations.')
     }
     
     // This function will re-apply the checkout based on the current sparse-checkout file
     const reapplyCheckout = async (patterns: string[], isCone: boolean) => {
-      if (!effectiveDir) {
-        throw new Error('The "dir" argument is required for sparseCheckout operations.')
+      if (!effectiveDir && !worktreeBackend) {
+        throw new Error('The "dir" argument or a worktreeBackend is required for sparseCheckout operations.')
       }
       try {
         const headOid = await repo.resolveRef('HEAD')
-        const { object: commitObject } = await readObject({ fs, cache: effectiveCache, gitdir: effectiveGitdir, oid: headOid })
+        // Use gitBackend if available for reading objects
+        let commitObject: any
+        if (repo.gitBackend) {
+           const result = await repo.gitBackend.readObject(headOid, 'content', effectiveCache)
+           commitObject = result.object
+        } else {
+           const result = await readObject({ fs, cache: effectiveCache, gitdir: effectiveGitdir, oid: headOid })
+           commitObject = result.object
+        }
         const commit = parseCommit(commitObject)
         
         // FIX: Use the correct low-level WorkdirManager.checkout which accepts a treeOid.
@@ -92,6 +100,8 @@ export async function sparseCheckout({
           fs,
           dir: effectiveDir,
           gitdir: effectiveGitdir,
+          gitBackend: repo.gitBackend,
+          worktreeBackend,
           treeOid: commit.tree,
           sparsePatterns: patterns,
           force: true,
@@ -110,17 +120,32 @@ export async function sparseCheckout({
 
     if (init) {
       const isCone = cone !== undefined ? cone : false
-      await SparseCheckoutManager.init({ fs, gitdir: effectiveGitdir, coneMode: isCone })
+      await repo.gitBackend.sparseCheckoutInit(worktreeBackend!, isCone)
       // After init, apply the default sparse patterns ("/*") to the workdir.
       await reapplyCheckout(['/*'], isCone)
     } else if (set) {
       // Determine if cone mode should be used. Prioritize the function argument, then config.
-      const isCone = cone !== undefined ? cone : await SparseCheckoutManager.isConeMode({ fs, gitdir: effectiveGitdir })
-      await SparseCheckoutManager.set({ fs, gitdir: effectiveGitdir, patterns: set, coneMode: isCone })
+      let isCone = cone
+      if (isCone === undefined) {
+          const coneConfig = await repo.gitBackend.getConfig('core.sparseCheckoutCone')
+          isCone = coneConfig === 'true' || coneConfig === true
+      }
+      
+      // Use backend method. We don't have the treeOid handy for this call, but 
+      // sparseCheckoutSet implementation in GitBackendFs doesn't strictly require it for setting patterns.
+      // We pass 'HEAD' as a placeholder or undefined if allowed? 
+      // GitBackend interface says treeOid is string.
+      // Let's resolve HEAD.
+      let headOid = '0000000000000000000000000000000000000000'
+      try {
+        headOid = await repo.resolveRef('HEAD')
+      } catch {}
+      
+      await repo.gitBackend.sparseCheckoutSet(worktreeBackend!, set, headOid, isCone)
       // After setting new patterns, re-apply the checkout.
       await reapplyCheckout(set, isCone)
     } else if (list) {
-      return await SparseCheckoutManager.list({ fs, gitdir: effectiveGitdir })
+      return await repo.gitBackend.sparseCheckoutList(worktreeBackend!)
     } else {
       throw new Error('Must specify one of: init, set, or list')
     }

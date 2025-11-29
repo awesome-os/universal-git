@@ -123,7 +123,19 @@ export class MultiWorkerSparseCheckout {
       
       // Load sparse checkout patterns if they exist
       try {
-        const patterns = await SparseCheckoutManager.loadPatterns({ fs: normalizedFs, gitdir })
+        let patterns: string[] = []
+        if (repo.gitBackend && repo.worktreeBackend) {
+             patterns = await repo.gitBackend.sparseCheckoutList(repo.worktreeBackend)
+        } else if (repo.gitBackend) {
+             // Try to use a temp worktree backend if possible or just skip?
+             // But MultiWorkerSparseCheckout has dir.
+             // We can assume repo has worktreeBackend if opened with dir?
+             // Repository.open creates worktreeBackend if dir provided.
+             if (repo.worktreeBackend) {
+                patterns = await repo.gitBackend.sparseCheckoutList(repo.worktreeBackend)
+             }
+        }
+        
         if (patterns.length > 0) {
           sparsePatterns.push(...patterns)
           debugLog(`Loaded ${patterns.length} sparse patterns from config`)

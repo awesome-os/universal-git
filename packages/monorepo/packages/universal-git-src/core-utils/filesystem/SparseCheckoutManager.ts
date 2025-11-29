@@ -1,48 +1,4 @@
 import ignore from 'ignore'
-import { join } from '../GitPath.ts'
-import { ConfigAccess } from "../../utils/configAccess.ts"
-import { createFileSystem } from '../../utils/createFileSystem.ts'
-import type { FileSystemProvider } from "../../models/FileSystem.ts"
-import type { GitBackend } from '../../backends/GitBackend.ts'
-
-/**
- * Loads sparse checkout patterns from .git/info/sparse-checkout
- */
-export const loadPatterns = async ({
-  fs,
-  gitdir,
-  gitBackend,
-}: {
-  fs?: FileSystemProvider
-  gitdir?: string
-  gitBackend?: GitBackend
-}): Promise<string[]> => {
-  try {
-    let content: string | null = null
-    
-    if (gitBackend) {
-      content = await gitBackend.readInfoFile('sparse-checkout')
-    } else if (fs && gitdir) {
-      const sparseCheckoutFile = join(gitdir, 'info', 'sparse-checkout')
-      content = await fs.read(sparseCheckoutFile, 'utf8') as string
-    } else {
-      throw new Error('loadPatterns requires gitBackend OR (fs and gitdir)')
-    }
-
-    if (!content) return []
-
-    const patterns = (content as string)
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0 && !line.startsWith('#'))
-    return patterns
-  } catch (err) {
-    if ((err as { code?: string }).code === 'NOENT') {
-      return []
-    }
-    throw err
-  }
-}
 
 /**
  * Determines if a filepath matches any of the sparse checkout patterns
@@ -60,6 +16,9 @@ export const match = ({
     // No patterns means everything is included
     return true
   }
+
+  // Normalize filepath to remove any leading './'
+  const normalizedPath = filepath.replace(/^\.\//, '').replace(/^\/+/, '')
 
   if (coneMode) {
     // Special case: `/*` or `*` pattern means everything is included at the root.
@@ -98,9 +57,6 @@ export const match = ({
     if (inclusionPatterns.length === 0) {
       return false
     }
-    
-    // Normalize filepath for comparison (remove leading slash if present)
-    const normalizedPath = filepath.replace(/^\/+/, '')
     
     // NOTE: In cone mode, root-level files are NOT included (they get stripped)
     // Only files matching the sparse patterns are included
@@ -189,7 +145,7 @@ export const match = ({
   } else {
     // Non-cone mode: use gitignore-style pattern matching
     // NATIVE GIT BEHAVIOR: Root-level files are always included in sparse checkout
-    const normalizedPath = filepath.replace(/^\/+/, '')
+    // Normalize filepath for comparison (remove leading slash or ./ if present)
     const isRootLevelFile = !normalizedPath.includes('/')
     if (isRootLevelFile) {
       // Root-level files are always included (unless explicitly excluded by negative pattern)
@@ -269,135 +225,8 @@ export const match = ({
 }
 
 /**
- * Sets sparse checkout patterns
- */
-export const set = async ({
-  fs,
-  gitdir,
-  patterns,
-  coneMode = false,
-}: {
-  fs: FileSystemProvider
-  gitdir: string
-  patterns: string[]
-  coneMode?: boolean
-}): Promise<void> => {
-  const sparseCheckoutFile = join(gitdir, 'info', 'sparse-checkout')
-  
-  // CRITICAL: Ensure the info directory exists before writing the file
-  const infoDir = join(gitdir, 'info')
-  const normalizedFs = createFileSystem(fs) // Normalize to ensure mkdir/write methods are available
-  try {
-    await normalizedFs.mkdir(infoDir, { recursive: true })
-  } catch {
-    // Directory might already exist, that's okay
-  }
-
-  // Format patterns according to Git v2.4+ format
-  // In cone mode, patterns are written as-is (directory paths)
-  // In non-cone mode, patterns use gitignore syntax
-  // Negative patterns with ! prefix are preserved in both modes
-  let content = '# This file is used by sparse checkout\n'
-  if (coneMode) {
-    content += '# Enable cone mode for better performance\n'
-    // In cone mode, Git v2.4+ expects patterns without leading slashes for root-level dirs
-    // and with leading slashes for nested dirs. We normalize them.
-    // Negative patterns (starting with !) are preserved as-is
-    const normalizedPatterns = patterns.map(p => {
-      // Preserve negative patterns (starting with !)
-      if (p.startsWith('!')) {
-        const patternWithoutExcl = p.substring(1)
-        // Normalize the pattern part (after !)
-        let normalized = patternWithoutExcl.replace(/^\/+/, '')
-        // Ensure trailing slash for directories in cone mode
-        if (!normalized.endsWith('/') && !normalized.includes('*')) {
-          normalized += '/'
-        }
-        return '!' + normalized
-      } else {
-        // Normal inclusion pattern
-        let normalized = p.replace(/^\/+/, '')
-        // Ensure trailing slash for directories in cone mode
-        if (!normalized.endsWith('/') && !normalized.includes('*')) {
-          normalized += '/'
-        }
-        return normalized
-      }
-    })
-    content += normalizedPatterns.join('\n') + '\n'
-  } else {
-    // In non-cone mode, patterns (including !) are written as-is
-    content += patterns.join('\n') + '\n'
-  }
-
-  await normalizedFs.write(sparseCheckoutFile, content, 'utf8')
-}
-
-/**
- * Initializes sparse checkout
- */
-export const init = async ({
-  fs,
-  gitdir,
-  coneMode = false,
-}: {
-  fs: FileSystemProvider
-  gitdir: string
-  coneMode?: boolean
-}): Promise<void> => {
-  // Enable sparse checkout in config
-  const configAccess = new ConfigAccess(fs, gitdir)
-  await configAccess.setConfigValue('core.sparseCheckout', 'true', 'local')
-  if (coneMode) {
-    await configAccess.setConfigValue('core.sparseCheckoutCone', 'true', 'local')
-  }
-  // Note: UnifiedConfigService.set() already reloads, so config should be available
-
-  // Create sparse-checkout file with default pattern (everything)
-  await set({ fs, gitdir, patterns: ['/*'], coneMode })
-}
-
-/**
- * Lists current sparse checkout patterns
- */
-export const list = async ({
-  fs,
-  gitdir,
-}: {
-  fs: FileSystemProvider
-  gitdir: string
-}): Promise<string[]> => {
-  return loadPatterns({ fs, gitdir })
-}
-
-/**
- * Checks if cone mode is enabled for sparse checkout
- */
-export const isConeMode = async ({
-  fs,
-  gitdir,
-}: {
-  fs: FileSystemProvider
-  gitdir: string
-}): Promise<boolean> => {
-  try {
-    const configAccess = new ConfigAccess(fs, gitdir)
-    const value = await configAccess.getConfigValue('core.sparseCheckoutCone')
-    return value === 'true' || value === true
-  } catch {
-    return false
-  }
-}
-
-/**
  * Namespace export for SparseCheckoutManager
  */
 export const SparseCheckoutManager = {
-  loadPatterns,
   match,
-  set,
-  init,
-  list,
-  isConeMode,
 }
-

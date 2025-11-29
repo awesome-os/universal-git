@@ -1,9 +1,7 @@
 import { describe, it, beforeEach } from 'node:test'
 import assert from 'node:assert'
 import { getStateMutationStream } from '@awesome-os/universal-git-src/core-utils/StateMutationStream.ts'
-import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { add, commit, setConfig } from '@awesome-os/universal-git-src/index.ts'
 import { normalize } from '@awesome-os/universal-git-src/core-utils/GitPath.ts'
 
 describe('StateMutationStream', () => {
@@ -14,20 +12,20 @@ describe('StateMutationStream', () => {
   })
 
   it('should record index-write mutations', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-stash')
+    const { repo } = await makeFixture('test-stash')
     
     // Set up user config
-    await setConfig({ fs, dir, gitdir, path: 'user.name', value: 'test user' })
-    await setConfig({ fs, dir, gitdir, path: 'user.email', value: 'test@example.com' })
+    await repo.gitBackend.setConfig('user.name', 'test user', 'local')
+    await repo.gitBackend.setConfig('user.email', 'test@example.com', 'local')
     
-    const cache = {}
     const mutationStream = getStateMutationStream()
     
     // Make and stage changes
-    await fs.write(`${dir}/test.txt`, 'test content')
-    await add({ fs, dir, gitdir, filepath: ['test.txt'], cache })
+    await repo.worktreeBackend!.write('test.txt', 'test content')
+    await repo.add(['test.txt'])
     
     // Check that index-write was recorded
+    const gitdir = await repo.getGitdir()
     const normalizedGitdir = normalize(gitdir)
     const latestWrite = mutationStream.getLatest('index-write', normalizedGitdir)
     
@@ -38,13 +36,11 @@ describe('StateMutationStream', () => {
   })
 
   it('should record index-read mutations', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-stash')
+    const { repo } = await makeFixture('test-stash')
     
-    const cache = {}
     const mutationStream = getStateMutationStream()
     
     // Read the index
-    const repo = await Repository.open({ fs, dir, cache, autoDetectConfig: true })
     let index
     try {
       index = await repo.readIndexDirect()
@@ -71,19 +67,19 @@ describe('StateMutationStream', () => {
   })
 
   it('should track multiple mutations and keep latest', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-stash')
+    const { repo } = await makeFixture('test-stash')
     
     // Set up user config
-    await setConfig({ fs, dir, gitdir, path: 'user.name', value: 'test user' })
-    await setConfig({ fs, dir, gitdir, path: 'user.email', value: 'test@example.com' })
+    await repo.gitBackend.setConfig('user.name', 'test user', 'local')
+    await repo.gitBackend.setConfig('user.email', 'test@example.com', 'local')
     
-    const cache = {}
     const mutationStream = getStateMutationStream()
+    const gitdir = await repo.getGitdir()
     const normalizedGitdir = normalize(gitdir)
     
     // Make multiple writes
-    await fs.write(`${dir}/file1.txt`, 'content 1')
-    await add({ fs, dir, gitdir, filepath: ['file1.txt'], cache })
+    await repo.worktreeBackend!.write('file1.txt', 'content 1')
+    await repo.add(['file1.txt'])
     
     const firstWrite = mutationStream.getLatest('index-write', normalizedGitdir)
     assert.notStrictEqual(firstWrite, undefined)
@@ -92,8 +88,8 @@ describe('StateMutationStream', () => {
     // Wait a bit to ensure different timestamp
     await new Promise(resolve => setTimeout(resolve, 10))
     
-    await fs.write(`${dir}/file2.txt`, 'content 2')
-    await add({ fs, dir, gitdir, filepath: ['file2.txt'], cache })
+    await repo.worktreeBackend!.write('file2.txt', 'content 2')
+    await repo.add(['file2.txt'])
     
     const secondWrite = mutationStream.getLatest('index-write', normalizedGitdir)
     assert.notStrictEqual(secondWrite, undefined)
@@ -106,17 +102,16 @@ describe('StateMutationStream', () => {
   })
 
   it('should track mutations for different gitdirs separately', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-stash')
+    const { repo } = await makeFixture('test-stash')
     
     // Set up user config
-    await setConfig({ fs, dir, gitdir, path: 'user.name', value: 'test user' })
-    await setConfig({ fs, dir, gitdir, path: 'user.email', value: 'test@example.com' })
+    await repo.gitBackend.setConfig('user.name', 'test user', 'local')
+    await repo.gitBackend.setConfig('user.email', 'test@example.com', 'local')
     
-    const cache1 = {}
-    const cache2 = {}
     const mutationStream = getStateMutationStream()
     
     // Create a second repository (simulated with different gitdir path)
+    const gitdir = await repo.getGitdir()
     const gitdir1 = normalize(gitdir)
     const gitdir2 = normalize(`${gitdir}-other`)
     
@@ -136,19 +131,19 @@ describe('StateMutationStream', () => {
   })
 
   it('should clear all mutations', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-stash')
+    const { repo } = await makeFixture('test-stash')
     
     // Set up user config
-    await setConfig({ fs, dir, gitdir, path: 'user.name', value: 'test user' })
-    await setConfig({ fs, dir, gitdir, path: 'user.email', value: 'test@example.com' })
+    await repo.gitBackend.setConfig('user.name', 'test user', 'local')
+    await repo.gitBackend.setConfig('user.email', 'test@example.com', 'local')
     
-    const cache = {}
     const mutationStream = getStateMutationStream()
     
     // Record some mutations
-    await fs.write(`${dir}/test.txt`, 'test content')
-    await add({ fs, dir, gitdir, filepath: ['test.txt'], cache })
+    await repo.worktreeBackend!.write('test.txt', 'test content')
+    await repo.add(['test.txt'])
     
+    const gitdir = await repo.getGitdir()
     const normalizedGitdir = normalize(gitdir)
     const latestBefore = mutationStream.getLatest('index-write', normalizedGitdir)
     assert.notStrictEqual(latestBefore, undefined)
@@ -183,24 +178,22 @@ describe('StateMutationStream', () => {
   })
 
   it('should handle getAll() returning all mutations', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-stash')
+    const { repo } = await makeFixture('test-stash')
     
     // Set up user config
-    await setConfig({ fs, dir, gitdir, path: 'user.name', value: 'test user' })
-    await setConfig({ fs, dir, gitdir, path: 'user.email', value: 'test@example.com' })
+    await repo.gitBackend.setConfig('user.name', 'test user', 'local')
+    await repo.gitBackend.setConfig('user.email', 'test@example.com', 'local')
     
-    const cache = {}
     const mutationStream = getStateMutationStream()
     
     // Record multiple mutations
-    await fs.write(`${dir}/file1.txt`, 'content 1')
-    await add({ fs, dir, gitdir, filepath: ['file1.txt'], cache })
+    await repo.worktreeBackend!.write('file1.txt', 'content 1')
+    await repo.add(['file1.txt'])
     
-    await fs.write(`${dir}/file2.txt`, 'content 2')
-    await add({ fs, dir, gitdir, filepath: ['file2.txt'], cache })
+    await repo.worktreeBackend!.write('file2.txt', 'content 2')
+    await repo.add(['file2.txt'])
     
     // Read index
-    const repo = await Repository.open({ fs, dir, cache, autoDetectConfig: true })
     let index
     try {
       index = await repo.readIndexDirect()

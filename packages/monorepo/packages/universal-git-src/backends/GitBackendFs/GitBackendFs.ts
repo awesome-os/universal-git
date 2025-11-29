@@ -22,6 +22,7 @@ import * as updateIndex from './updateIndex.ts'
 import * as readBlob from './readBlob.ts'
 import * as add from './add.ts'
 import * as commands from './commands.ts'
+import * as sparseCheckout from './sparseCheckout.ts'
 import { createFileSystem } from "@awesome-os/universal-git-src/utils/createFileSystem.ts"
 import fs from "node:fs"
 
@@ -257,9 +258,9 @@ export class GitBackendFs implements GitBackend {
   reset = commands.reset.bind(this)
   diff = commands.diff.bind(this)
   mergeTree = commands.mergeTree.bind(this)
-  sparseCheckoutInit = commands.sparseCheckoutInit.bind(this)
-  sparseCheckoutSet = commands.sparseCheckoutSet.bind(this)
-  sparseCheckoutList = commands.sparseCheckoutList.bind(this)
+  sparseCheckoutInit = sparseCheckout.sparseCheckoutInit.bind(this)
+  sparseCheckoutSet = sparseCheckout.sparseCheckoutSet.bind(this)
+  sparseCheckoutList = sparseCheckout.sparseCheckoutList.bind(this)
 
   // Worktree config (from worktrees module)
   getWorktreeConfig = worktrees.getWorktreeConfig.bind(this)

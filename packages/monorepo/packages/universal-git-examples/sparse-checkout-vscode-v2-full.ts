@@ -19,6 +19,9 @@ import { createFileSystem } from '@awesome-os/universal-git-src/utils/createFile
 import * as git from '@awesome-os/universal-git-src/index.ts'
 import { sparseCheckout } from '@awesome-os/universal-git-src/commands/sparseCheckout.ts'
 import http from '@awesome-os/universal-git-src/http/node/index.ts'
+import { GitBackendFs } from '@awesome-os/universal-git-src/backends/GitBackendFs/index.ts'
+import { GitWorktreeFs } from '@awesome-os/universal-git-src/git/worktree/fs/GitWorktreeFs.ts'
+import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 
 // Wrap Node.js fs in FileSystem instance (required for universal-git)
 const fs: FileSystem = createFileSystem(_fs as unknown as RawFileSystemProvider)
@@ -118,7 +121,7 @@ async function main() {
     }
   })
   
-  await runStep('Step 3: Clone repository (no checkout, full history)', async () => {
+    await runStep('Step 3: Clone repository (no checkout, full history)', async () => {
     logDetail('Using Git protocol v2 for full clone')
     logDetail('Downloading full repository history (no shallow clone)')
     logDetail('This will take longer but includes complete commit history')
@@ -126,10 +129,15 @@ async function main() {
     let clonePhase = 'Starting...'
     let cloneProgress = { loaded: 0, total: 0 }
     
+    // Create Repo
+    const gitdir = path.join(DUMP_DIR, '.git')
+    const gitBackend = new GitBackendFs(fs, gitdir)
+    const worktreeBackend = new GitWorktreeFs(fs, DUMP_DIR)
+    const repo = new Repository({ gitBackend, worktreeBackend })
+
     await git.clone({
-      fs,
+      repo,
       http,
-      dir: DUMP_DIR,
       url: VSCODE_REPO_URL,
       noCheckout: true,
       depth: 1,
@@ -156,9 +164,15 @@ async function main() {
   
   await runStep('Step 4: Initialize sparse checkout', async () => {
     logDetail('Creating sparse-checkout configuration files (cone mode)...')
+    
+    // Create Repo
+    const gitdir = path.join(DUMP_DIR, '.git')
+    const gitBackend = new GitBackendFs(fs, gitdir)
+    const worktreeBackend = new GitWorktreeFs(fs, DUMP_DIR)
+    const repo = new Repository({ gitBackend, worktreeBackend })
+
     await sparseCheckout({
-      fs,
-      dir: DUMP_DIR,
+      repo,
       init: true,
       cone: true
     })
@@ -168,15 +182,21 @@ async function main() {
   await runStep('Step 5: Configure sparse patterns & checkout', async () => {
     logDetail('Setting sparse checkout pattern to src/ (cone mode)')
     logDetail('Checkout will start automatically after updating patterns...')
+    
+    // Create Repo
+    const gitdir = path.join(DUMP_DIR, '.git')
+    const gitBackend = new GitBackendFs(fs, gitdir)
+    const worktreeBackend = new GitWorktreeFs(fs, DUMP_DIR)
+    const repo = new Repository({ gitBackend, worktreeBackend })
+
     await sparseCheckout({
-      fs,
-      dir: DUMP_DIR,
+      repo,
       set: ['src/'],
       cone: true
     })
     logDetail('✓ Sparse checkout pattern applied')
   })
-  
+
   await runStep('Step 6: Verify sparse checkout configuration', async () => {
     logDetail('Reading .git/info/sparse-checkout...')
     const sparseCheckoutFile = path.join(DUMP_DIR, '.git', 'info', 'sparse-checkout')
@@ -209,7 +229,14 @@ async function main() {
   let nonSrcFiles: string[] = []
   await runStep('Step 7: Verify working tree contents', async () => {
     logDetail('Gathering file list via git.listFiles...')
-    files = await git.listFiles({ fs, dir: DUMP_DIR })
+    
+    // Create Repo
+    const gitdir = path.join(DUMP_DIR, '.git')
+    const gitBackend = new GitBackendFs(fs, gitdir)
+    const worktreeBackend = new GitWorktreeFs(fs, DUMP_DIR)
+    const repo = new Repository({ gitBackend, worktreeBackend })
+
+    files = await git.listFiles({ repo })
     srcFiles = files.filter(f => f.startsWith('src/'))
     nonSrcFiles = files.filter(f => !f.startsWith('src/') && !f.startsWith('.git/'))
     logDetail(`Files discovered: total=${files.length}, src=${srcFiles.length}, outside src=${nonSrcFiles.length}`)

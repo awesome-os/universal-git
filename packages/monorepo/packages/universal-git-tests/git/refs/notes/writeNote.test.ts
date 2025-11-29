@@ -231,13 +231,12 @@ test('removeNote', async (t) => {
   })
 
   await t.test('ok:removes-fanout2-tree-when-empty', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-removeNote-fanout2')
-    const { repo } = await import('@awesome-os/universal-git-src/core-utils/createRepository.ts').then(m => ({ repo: m.createRepository({ fs, dir, gitdir }) }))
+    const { repo } = await makeFixture('test-removeNote-fanout2')
     await init({ repo })
     await setConfig({ repo, path: 'user.name', value: 'Test User' })
     await setConfig({ repo, path: 'user.email', value: 'test@example.com' })
     
-    await fs.write(`${dir}/test.txt`, 'content')
+    await repo.worktreeBackend?.write('test.txt', 'content')
     await add({ repo, filepath: 'test.txt' })
     const commitOid = await commit({ repo, message: 'test commit' })
     
@@ -253,13 +252,12 @@ test('removeNote', async (t) => {
   })
 
   await t.test('ok:removes-fanout1-tree-when-empty', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-removeNote-fanout1')
-    const { repo } = await import('@awesome-os/universal-git-src/core-utils/createRepository.ts').then(m => ({ repo: m.createRepository({ fs, dir, gitdir }) }))
+    const { repo } = await makeFixture('test-removeNote-fanout1')
     await init({ repo })
     await setConfig({ repo, path: 'user.name', value: 'Test User' })
     await setConfig({ repo, path: 'user.email', value: 'test@example.com' })
     
-    await fs.write(`${dir}/test.txt`, 'content')
+    await repo.worktreeBackend?.write('test.txt', 'content')
     await add({ repo, filepath: 'test.txt' })
     const commitOid = await commit({ repo, message: 'test commit' })
     
@@ -275,15 +273,14 @@ test('removeNote', async (t) => {
   })
 
   await t.test('ok:deletes-notes-ref-when-tree-is-empty', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-removeNote-empty-ref')
-    const { repo } = await import('@awesome-os/universal-git-src/core-utils/createRepository.ts').then(m => ({ repo: m.createRepository({ fs, dir, gitdir }) }))
+    const { repo } = await makeFixture('test-removeNote-empty-ref')
     await init({ repo })
     await setConfig({ repo, path: 'user.name', value: 'Test User' })
     await setConfig({ repo, path: 'user.email', value: 'test@example.com' })
     
-    await fs.write(`${dir}/test.txt`, 'content')
-    await add({ fs, dir, gitdir, filepath: 'test.txt' })
-    const commitOid = await commit({ fs, dir, gitdir, message: 'test commit' })
+    await repo.worktreeBackend?.write('test.txt', 'content')
+    await add({ repo, filepath: 'test.txt' })
+    const commitOid = await commit({ repo, message: 'test commit' })
     
     // Write a note
     await writeNote({ gitBackend: repo.gitBackend, oid: commitOid, note: 'Test note' })
@@ -297,12 +294,14 @@ test('removeNote', async (t) => {
   })
 
   await t.test('ok:removes-note-from-custom-namespace', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-removeNote-namespace')
-    await init({ fs, dir, gitdir })
+    const { repo } = await makeFixture('test-removeNote-namespace')
+    await init({ repo })
+    await setConfig({ repo, path: 'user.name', value: 'Test User' })
+    await setConfig({ repo, path: 'user.email', value: 'test@example.com' })
     
-    await fs.write(`${dir}/test.txt`, 'content')
-    await add({ fs, dir, gitdir, filepath: 'test.txt' })
-    const commitOid = await commit({ fs, dir, gitdir, message: 'test commit' })
+    await repo.worktreeBackend?.write('test.txt', 'content')
+    await add({ repo, filepath: 'test.txt' })
+    const commitOid = await commit({ repo, message: 'test commit' })
     
     // Write note in custom namespace
     await writeNote({ 

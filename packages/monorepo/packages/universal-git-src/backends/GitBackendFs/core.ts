@@ -45,7 +45,20 @@ export async function readIndex(this: GitBackendFs): Promise<UniversalBuffer> {
   const path = join(this.getGitdir(), 'index')
   try {
     const data = await this.getFs().read(path)
-    return UniversalBuffer.from(data as string | Uint8Array)
+    const buffer = UniversalBuffer.from(data as string | Uint8Array)
+    
+    // Record the mutation in StateMutationStream
+    const { getStateMutationStream } = await import('../../core-utils/StateMutationStream.ts')
+    const mutationStream = getStateMutationStream()
+    const { normalize } = await import('../../core-utils/GitPath.ts')
+    const normalizedGitdir = normalize(this.getGitdir())
+    mutationStream.record({
+      type: 'index-read',
+      gitdir: normalizedGitdir,
+      data: { size: buffer.length },
+    })
+    
+    return buffer
   } catch {
     return UniversalBuffer.alloc(0)
   }
@@ -54,6 +67,29 @@ export async function readIndex(this: GitBackendFs): Promise<UniversalBuffer> {
 export async function writeIndex(this: GitBackendFs, data: UniversalBuffer): Promise<void> {
   const path = join(this.getGitdir(), 'index')
   await this.getFs().write(path, data)
+  
+  // Record the mutation in StateMutationStream
+  const { getStateMutationStream } = await import('../../core-utils/StateMutationStream.ts')
+  const mutationStream = getStateMutationStream()
+  const { normalize } = await import('../../core-utils/GitPath.ts')
+  const normalizedGitdir = normalize(this.getGitdir())
+  
+  // Try to parse the index to get entry count (optional, don't fail if parsing fails)
+  let entryCount: number | undefined = undefined
+  try {
+    const { GitIndex } = await import('../../git/index/GitIndex.ts')
+    const objectFormat = await this.getObjectFormat()
+    const index = GitIndex.fromBuffer(data, objectFormat)
+    entryCount = index.entriesMap.size
+  } catch {
+    // Ignore parsing errors - we'll just record without entry count
+  }
+  
+  mutationStream.record({
+    type: 'index-write',
+    gitdir: normalizedGitdir,
+    data: { size: data.length, entryCount },
+  })
 }
 
 export async function hasIndex(this: GitBackendFs): Promise<boolean> {
