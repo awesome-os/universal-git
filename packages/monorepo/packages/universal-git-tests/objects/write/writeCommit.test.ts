@@ -7,7 +7,7 @@ import { computeCommitOid } from '@awesome-os/universal-git-test-helpers/helpers
 test('writeCommit', async (t) => {
   await t.test('ok:parsed', async () => {
     // Setup
-    const { repo } = await makeFixture('test-writeCommit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeCommit')
     // Test - Using helper function for OID computation only
     const oid = await computeCommitOid(repo, {
       commit: {
@@ -68,7 +68,7 @@ Qixh2bmPgr3h9nxq2Dmn
   })
 
   await t.test('param:commit-missing', async () => {
-    const { repo } = await makeFixture('test-writeCommit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeCommit')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await writeCommit({
@@ -82,7 +82,7 @@ Qixh2bmPgr3h9nxq2Dmn
   })
 
   await t.test('param:dryRun', async () => {
-    const { repo } = await makeFixture('test-writeCommit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeCommit')
     const oid = await writeCommit({
       repo,
       commit: {
@@ -107,7 +107,7 @@ Qixh2bmPgr3h9nxq2Dmn
   })
 
   await t.test('param:repo-provided', async () => {
-    const { repo } = await makeFixture('test-writeCommit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeCommit')
     const oid = await writeCommit({
       repo,
       commit: {
@@ -123,7 +123,7 @@ Qixh2bmPgr3h9nxq2Dmn
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-writeCommit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeCommit')
     // Using helper function for OID computation only
     const oid = await computeCommitOid(repo, {
       commit: {
@@ -138,7 +138,7 @@ Qixh2bmPgr3h9nxq2Dmn
   })
 
   await t.test('error:caller-property', async () => {
-    const { repo } = await makeFixture('test-writeCommit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeCommit')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await writeCommit({
@@ -152,7 +152,7 @@ Qixh2bmPgr3h9nxq2Dmn
   })
 
   await t.test('ok:commit-multiple-parents', async () => {
-    const { repo } = await makeFixture('test-writeCommit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeCommit')
     // Using helper function for OID computation only
     const oid = await computeCommitOid(repo, {
       commit: {
@@ -168,7 +168,7 @@ Qixh2bmPgr3h9nxq2Dmn
   })
 
   await t.test('ok:commit-no-parent', async () => {
-    const { repo } = await makeFixture('test-writeCommit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeCommit')
     // Using helper function for OID computation only
     const oid = await computeCommitOid(repo, {
       commit: {

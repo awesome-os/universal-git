@@ -1,7 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { bundle, verifyBundle, unbundle, add, commit, branch, tag, readObject, resolveRef } from '@awesome-os/universal-git-src/index.ts'
-import { readRef } from '@awesome-os/universal-git-src/git/refs/readRef.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { join } from '@awesome-os/universal-git-src/utils/join.ts'
 import * as os from 'os'
@@ -11,10 +10,7 @@ import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBu
 
 test('bundle', async (t) => {
   await t.test('creates bundle with specific refs', async () => {
-    const { repo } = await makeFixture('test-bundle', { init: true })
-    const dir = (await repo.getDir())!
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-bundle', { init: true })
     // Create some commits and branches
     await nodeFs.writeFile(join(dir, 'file1.txt'), 'content1')
     await add({ repo, filepath: 'file1.txt' })
@@ -58,12 +54,12 @@ test('bundle', async (t) => {
       assert.ok(result.objectCount > 0, 'Should have objects')
       
       // Verify bundle file exists
-      if (!repo.fs) throw new Error('Filesystem not available')
-      const exists = await repo.fs.exists(bundlePath)
+      if (!fs) throw new Error('Filesystem not available')
+      const exists = await fs.exists(bundlePath)
       assert.strictEqual(exists, true, 'Bundle file should exist')
       
       // Verify bundle file is not empty
-      const bundleData = await repo.fs.read(bundlePath)
+      const bundleData = await fs.read(bundlePath)
       assert.ok(bundleData, 'Bundle file should have content')
       assert.ok(UniversalBuffer.isBuffer(bundleData) ? bundleData.length > 0 : (bundleData as string).length > 0, 'Bundle file should not be empty')
     } finally {
@@ -77,10 +73,7 @@ test('bundle', async (t) => {
   })
   
   await t.test('creates bundle with all refs', async () => {
-    const { repo } = await makeFixture('test-bundle', { init: true })
-    const dir = (await repo.getDir())!
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-bundle', { init: true })
     // Create commits and branches
     await nodeFs.writeFile(join(dir, 'file1.txt'), 'content1')
     await add({ repo, filepath: 'file1.txt' })
@@ -119,10 +112,7 @@ test('bundle', async (t) => {
   })
   
   await t.test('creates bundle with default HEAD', async () => {
-    const { repo } = await makeFixture('test-bundle', { init: true })
-    const dir = (await repo.getDir())!
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-bundle', { init: true })
     // Create a commit
     await nodeFs.writeFile(join(dir, 'file1.txt'), 'content1')
     await add({ repo, filepath: 'file1.txt' })
@@ -168,9 +158,7 @@ test('bundle', async (t) => {
   })
   
   await t.test('throws error when no refs found', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const bundlePath = join(os.tmpdir(), `bundle-empty-${Date.now()}.bundle`)
     try {
       await assert.rejects(
@@ -197,10 +185,7 @@ test('bundle', async (t) => {
 
 test('verifyBundle', async (t) => {
   await t.test('verifies valid bundle', async () => {
-    const { repo } = await makeFixture('test-bundle', { init: true })
-    const dir = (await repo.getDir())!
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-bundle', { init: true })
     // Create a commit
     await nodeFs.writeFile(join(dir, 'file1.txt'), 'content1')
     await add({ repo, filepath: 'file1.txt' })
@@ -219,9 +204,9 @@ test('verifyBundle', async (t) => {
       })
       
       // Verify bundle
-      if (!repo.fs) throw new Error('Filesystem not available')
+      if (!fs) throw new Error('Filesystem not available')
       const result = await verifyBundle({
-        fs: repo.fs,
+        fs: fs,
         filepath: bundlePath,
       })
       
@@ -238,16 +223,16 @@ test('verifyBundle', async (t) => {
   })
   
   await t.test('rejects invalid bundle format', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     
     // Create invalid bundle file
     const bundlePath = join(os.tmpdir(), `bundle-invalid-${Date.now()}.bundle`)
     try {
       await nodeFs.writeFile(bundlePath, 'invalid bundle content')
       
-      if (!repo.fs) throw new Error('Filesystem not available')
+      if (!fs) throw new Error('Filesystem not available')
       const result = await verifyBundle({
-        fs: repo.fs,
+        fs: fs,
         filepath: bundlePath,
       })
       
@@ -263,13 +248,13 @@ test('verifyBundle', async (t) => {
   })
   
   await t.test('rejects non-existent bundle file', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     
     const bundlePath = join(os.tmpdir(), `bundle-nonexistent-${Date.now()}.bundle`)
     
-    if (!repo.fs) throw new Error('Filesystem not available')
+    if (!fs) throw new Error('Filesystem not available')
     const result = await verifyBundle({
-      fs: repo.fs,
+      fs: fs,
       filepath: bundlePath,
     })
     
@@ -281,7 +266,7 @@ test('verifyBundle', async (t) => {
 test('unbundle', async (t) => {
   await t.test('unbundles bundle into repository', async () => {
     const { repo: sourceRepo } = await makeFixture('test-bundle', { init: true })
-    const sourceDir = (await sourceRepo.getDir())!
+    const sourceDir = sourceRepo.dir!
     const sourceGitdir = await sourceRepo.getGitdir()
     
     // Create commits and branches in source repo
@@ -382,7 +367,7 @@ test('unbundle', async (t) => {
   
   await t.test('unbundles specific refs only', async () => {
     const { repo: sourceRepo } = await makeFixture('test-bundle', { init: true })
-    const sourceDir = (await sourceRepo.getDir())!
+    const sourceDir = sourceRepo.dir!
     const sourceGitdir = await sourceRepo.getGitdir()
     
     // Create commits
@@ -448,7 +433,7 @@ test('unbundle', async (t) => {
   
   await t.test('rejects refs that already exist with different OID', async () => {
     const { repo: sourceRepo } = await makeFixture('test-bundle', { init: true })
-    const sourceDir = (await sourceRepo.getDir())!
+    const sourceDir = sourceRepo.dir!
     const sourceGitdir = await sourceRepo.getGitdir()
     
     // Create commit in source
@@ -517,9 +502,7 @@ test('unbundle', async (t) => {
   })
   
   await t.test('throws error when bundle file does not exist', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const bundlePath = join(os.tmpdir(), `bundle-nonexistent-${Date.now()}.bundle`)
     
     await assert.rejects(
@@ -538,10 +521,7 @@ test('unbundle', async (t) => {
 
 test('bundle format parsing', async (t) => {
   await t.test('parses bundle header correctly', async () => {
-    const { repo } = await makeFixture('test-bundle', { init: true })
-    const dir = (await repo.getDir())!
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-bundle', { init: true })
     // Create a commit
     await nodeFs.writeFile(join(dir, 'file1.txt'), 'content1')
     await add({ repo, filepath: 'file1.txt' })
@@ -560,8 +540,8 @@ test('bundle format parsing', async (t) => {
       })
       
       // Read and parse bundle
-      if (!repo.fs) throw new Error('Filesystem not available')
-      const bundleData = await repo.fs.read(bundlePath)
+      if (!fs) throw new Error('Filesystem not available')
+      const bundleData = await fs.read(bundlePath)
       const buffer = UniversalBuffer.isBuffer(bundleData) ? bundleData : UniversalBuffer.from(bundleData)
       
       const { parseBundleHeader, extractPackfileFromBundle } = await import('@awesome-os/universal-git-src/git/bundle/parseBundle.ts')

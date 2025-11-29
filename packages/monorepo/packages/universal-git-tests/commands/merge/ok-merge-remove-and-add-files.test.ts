@@ -132,7 +132,7 @@ describe('merge', () => {
 
         if (!isGitAvailable()) {
         // Fallback to fixture-based test if git is not available
-        const { repo } = await makeFixture('test-merge')
+        const { repo, fs, dir, gitdir } = await makeFixture('test-merge')
         const commit = (
         await log({
         repo,

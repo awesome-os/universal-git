@@ -6,7 +6,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 describe('readTag', () => {
   it('ok:annotated-tag', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readTag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readTag')
     // Test
     const tag = await readTag({
       repo,
@@ -37,7 +37,7 @@ describe('readTag', () => {
   })
 
   it('param:oid-missing', async () => {
-    const { repo } = await makeFixture('test-readTag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readTag')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await readTag({
@@ -51,7 +51,7 @@ describe('readTag', () => {
   })
 
   it('param:repo-provided', async () => {
-    const { repo } = await makeFixture('test-readTag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readTag')
     // Provide gitdir explicitly to avoid default parameter evaluation issue
     const tag = await readTag({
       repo,
@@ -62,7 +62,7 @@ describe('readTag', () => {
   })
 
   it('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-readTag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readTag')
     const tag = await readTag({
       repo,
       oid: '587d3f8290b513e2ee85ecd317e6efecd545aee6',
@@ -72,7 +72,7 @@ describe('readTag', () => {
   })
 
   it('error:caller-property', async () => {
-    const { repo } = await makeFixture('test-readTag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readTag')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await readTag({
@@ -86,7 +86,7 @@ describe('readTag', () => {
   })
 
   it('edge:tag-points-to-tree', async () => {
-    const { repo } = await makeFixture('test-readTag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readTag')
     // Try to read a tag - if it points to a tree, it should still work
     try {
       const tag = await readTag({
@@ -102,7 +102,7 @@ describe('readTag', () => {
   })
 
   it('edge:tag-no-message', async () => {
-    const { repo } = await makeFixture('test-readTag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readTag')
     const tag = await readTag({
       repo,
       oid: '587d3f8290b513e2ee85ecd317e6efecd545aee6',

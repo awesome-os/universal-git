@@ -31,9 +31,7 @@ const clearUserConfig = async (repo: any) => {
 }
 
 const reopenRepoWithoutSystemConfig = async (repo: any) => {
-  const fs = repo.fs
-  const gitdir = await repo.getGitdir()
-  const dir = (await repo.getDir()) || undefined
+  || undefined
   return Repository.open({
     fs,
     dir,
@@ -52,9 +50,6 @@ const stashChanges = async (
 ) => {
   // add user to config
   await addUserConfig(repo)
-
-  const dir = await repo.getDir()
-  const fs = repo.fs
 
   const aContent = await fs.read(`${dir}/a.txt`)
   const bContent = await fs.read(`${dir}/b.js`)
@@ -115,11 +110,11 @@ describe('stash', () => {
 
   describe('abort stash', () => {
     it('error:stash-without-user', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       const isolatedRepo = await reopenRepoWithoutSystemConfig(repo)
       await clearUserConfig(isolatedRepo)
       // Note: repo from makeFixture already has proper config isolation
-      const dir = await isolatedRepo.getDir()
+      const dir = isolatedRepo.dir
       await isolatedRepo.fs.write(`${dir}/temp.txt`, 'temp')
       await add({ repo: isolatedRepo, filepath: ['temp.txt'] })
 
@@ -137,7 +132,7 @@ describe('stash', () => {
     })
 
     it('error:stash-no-changes', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
 
       // add user to config
       await addUserConfig(repo)
@@ -162,28 +157,28 @@ describe('stash', () => {
 
   describe('stash push', () => {
     it('ok:stash-staged-changes', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await stashChanges(repo, false, false) // no unstaged changes
     })
 
     it('ok:stash-staged-and-unstaged', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await stashChanges(repo, true, false) // with unstaged changes
     })
 
     it('ok:stash-staged-unstaged-same-file', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await stashChanges(repo, true, true) // with unstaged changes
     })
   })
 
   describe('stash create', () => {
     it('error:stash-create-without-user', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       const isolatedRepo = await reopenRepoWithoutSystemConfig(repo)
       await clearUserConfig(isolatedRepo)
       // Note: repo from makeFixture already has proper config isolation
-      const dir = await isolatedRepo.getDir()
+      const dir = isolatedRepo.dir
       await isolatedRepo.fs.write(`${dir}/temp.txt`, 'temp')
       await add({ repo: isolatedRepo, filepath: ['temp.txt'] })
 
@@ -201,15 +196,14 @@ describe('stash', () => {
     })
 
     it('ok:stash-create-returns-commit', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
-      const dir = await repo.getDir()!
       const aOriginalContent = 'staged changes - a'
       const bOriginalContent = 'staged changes - b'
 
-      await repo.fs.write(`${dir}/a.txt`, aOriginalContent)
-      await repo.fs.write(`${dir}/b.js`, bOriginalContent)
+      await fs.write(`${dir}/a.txt`, aOriginalContent)
+      await fs.write(`${dir}/b.js`, bOriginalContent)
       await add({ repo, filepath: ['a.txt', 'b.js'] })
 
       const aStatusBefore = await status({ repo, filepath: 'a.txt' })
@@ -231,9 +225,9 @@ describe('stash', () => {
       assert.strictEqual(stashCommitHash!.length, 40) // SHA-1 hash length
 
       // Verify working directory is NOT modified
-      const aContent = await repo.fs.read(`${dir}/a.txt`)
+      const aContent = await fs.read(`${dir}/a.txt`)
       assert.strictEqual(aContent.toString(), aOriginalContent)
-      const bContent = await repo.fs.read(`${dir}/b.js`)
+      const bContent = await fs.read(`${dir}/b.js`)
       assert.strictEqual(bContent.toString(), bOriginalContent)
 
       // Verify status is still modified
@@ -251,7 +245,7 @@ describe('stash', () => {
 
   describe('stash apply', () => {
     it('ok:stash-apply-staged-changes', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
 
       await stashChanges(repo, false, false) // no unstaged changes
 
@@ -262,10 +256,9 @@ describe('stash', () => {
         error = e
       }
 
-      const dir = await repo.getDir()!
-      const aContent = await repo.fs.read(`${dir}/a.txt`)
+      const aContent = await fs.read(`${dir}/a.txt`)
       assert.strictEqual(aContent.toString(), 'staged changes - a') // make sure the staged changes are applied
-      const bContent = await repo.fs.read(`${dir}/b.js`)
+      const bContent = await fs.read(`${dir}/b.js`)
       assert.strictEqual(bContent.toString(), 'staged changes - b') // make sure the staged changes are applied
 
       assert.strictEqual(error, null)
@@ -345,7 +338,7 @@ describe('stash', () => {
 
   describe('stash drop', () => {
     it('error:stash-drop-no-stash', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
 
       let error: unknown = null
       try {
@@ -358,7 +351,7 @@ describe('stash', () => {
     })
 
     it('ok:stash-drop', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
 
       await stashChanges(repo, true, false) // staged and non-unstaged changes
 
@@ -378,7 +371,7 @@ describe('stash', () => {
 
   describe('stash pop', () => {
     it('error:stash-pop-no-stash', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
 
       let error: unknown = null
       try {
@@ -391,7 +384,7 @@ describe('stash', () => {
     })
 
     it('ok:stash-pop', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
 
       await stashChanges(repo, true, false) // staged and non-unstaged changes
 
@@ -411,7 +404,7 @@ describe('stash', () => {
 
   describe('stash clear', () => {
     it('ok:stash-clear-empty', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
 
       let error: unknown = null
       try {
@@ -462,7 +455,7 @@ describe('stash', () => {
 
   describe('stash edge cases', () => {
     it('error:invalid-refIdx-negative', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
 
       let error: unknown = null
       try {
@@ -510,12 +503,11 @@ describe('stash', () => {
     })
 
     it('ok:stash-only-index-changes', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
-      const dir = await repo.getDir()!
       // Only stage changes, no worktree changes
-      await repo.fs.write(`${dir}/a.txt`, 'staged changes - a')
+      await fs.write(`${dir}/a.txt`, 'staged changes - a')
       await add({ repo, filepath: ['a.txt'] })
 
       let error: unknown = null
@@ -531,12 +523,11 @@ describe('stash', () => {
     })
 
     it('ok:stash-only-worktree-changes', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
-      const dir = await repo.getDir()!
       // Only worktree changes, no staged changes
-      await repo.fs.write(`${dir}/a.txt`, 'worktree changes - a')
+      await fs.write(`${dir}/a.txt`, 'worktree changes - a')
 
       let error: unknown = null
       try {
@@ -551,11 +542,10 @@ describe('stash', () => {
     })
 
     it('param:custom-message', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
-      const dir = await repo.getDir()!
-      await repo.fs.write(`${dir}/a.txt`, 'staged changes - a')
+      await fs.write(`${dir}/a.txt`, 'staged changes - a')
       await add({ repo, filepath: ['a.txt'] })
 
       const stashCommit = await stash({ repo, message: 'Custom stash message' })
@@ -572,11 +562,10 @@ describe('stash', () => {
     })
 
     it('param:stash-create-custom-message', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
-      const dir = await repo.getDir()!
-      await repo.fs.write(`${dir}/a.txt`, 'staged changes - a')
+      await fs.write(`${dir}/a.txt`, 'staged changes - a')
       await add({ repo, filepath: ['a.txt'] })
 
       const stashCommitHash = await stash({ repo, op: 'create', message: 'Custom create message' })
@@ -585,16 +574,15 @@ describe('stash', () => {
       assert.strictEqual(stashCommitHash.length, 40)
 
       // Verify working directory is NOT modified
-      const aContent = await repo.fs.read(`${dir}/a.txt`)
+      const aContent = await fs.read(`${dir}/a.txt`)
       assert.strictEqual(aContent.toString(), 'staged changes - a')
     })
 
     it('param:dir', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
-      const dir = await repo.getDir()!
-      await repo.fs.write(`${dir}/a.txt`, 'staged changes - a')
+      await fs.write(`${dir}/a.txt`, 'staged changes - a')
       await add({ repo, filepath: ['a.txt'] })
 
       // Test with explicit dir parameter
@@ -605,11 +593,10 @@ describe('stash', () => {
     })
 
     it('param:cache', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
-      const dir = await repo.getDir()!
-      await repo.fs.write(`${dir}/a.txt`, 'staged changes - a')
+      await fs.write(`${dir}/a.txt`, 'staged changes - a')
       await add({ repo, filepath: ['a.txt'] })
 
       // Use same cache for stash
@@ -621,11 +608,10 @@ describe('stash', () => {
     })
 
     it('param:autoDetectConfig', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       // Don't set user config manually, rely on autoDetectConfig
 
-      const dir = await repo.getDir()!
-      await repo.fs.write(`${dir}/a.txt`, 'staged changes - a')
+      await fs.write(`${dir}/a.txt`, 'staged changes - a')
       await add({ repo, filepath: ['a.txt'] })
 
       // Should work with autoDetectConfig (if config exists in fixture)
@@ -646,13 +632,12 @@ describe('stash', () => {
     })
 
     it('edge:empty-repo-no-HEAD', async () => {
-      const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+      const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
       
       await addUserConfig(repo)
 
-      const dir = await repo.getDir()!
       // Create a file but don't commit
-      await repo.fs.write(`${dir}/file.txt`, 'content')
+      await fs.write(`${dir}/file.txt`, 'content')
 
       let error: unknown = null
       try {
@@ -668,7 +653,7 @@ describe('stash', () => {
     })
 
     it('ok:stash-apply-index-commit', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
       // Create stash with both index and worktree changes
@@ -717,7 +702,7 @@ describe('stash', () => {
     })
 
     it('error:caller-property', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
 
       try {
         await stash({ repo, op: 'apply', refIdx: -1 })
@@ -729,7 +714,7 @@ describe('stash', () => {
     })
 
     it('error:unknown-operation', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
       let error: unknown = null
@@ -745,12 +730,11 @@ describe('stash', () => {
     })
 
     it('ok:stash-create-operation', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
-      const dir = await repo.getDir()!
       // Create changes
-      await repo.fs.write(`${dir}/a.txt`, 'staged changes - a')
+      await fs.write(`${dir}/a.txt`, 'staged changes - a')
       await add({ repo, filepath: ['a.txt'] })
 
       // Create stash commit without modifying working directory
@@ -769,7 +753,7 @@ describe('stash', () => {
     })
 
     it('error:stash-create-no-changes', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
       let error: unknown = null
@@ -785,7 +769,7 @@ describe('stash', () => {
     })
 
     it('ok:stash-clear-operation', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
       // Create and stash changes - first stash
@@ -824,7 +808,7 @@ describe('stash', () => {
     })
 
     it('ok:stash-clear-no-stashes', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
       // Clear when no stashes exist - should not throw error
@@ -837,7 +821,7 @@ describe('stash', () => {
     })
 
     it('error:stash-drop-invalid-refIdx-negative', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
       let error: unknown = null
@@ -853,7 +837,7 @@ describe('stash', () => {
     })
 
     it('error:stash-drop-refIdx-out-of-range', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
       // Create one stash
@@ -873,7 +857,7 @@ describe('stash', () => {
     })
 
     it('ok:stash-pop-operation', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
       // Create stash
@@ -898,12 +882,11 @@ describe('stash', () => {
     })
 
     it('handles stash with only worktree changes (no index changes)', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
-      const dir = await repo.getDir()!
       // Create only worktree changes (not staged)
-      await repo.fs.write(`${dir}/a.txt`, 'unstaged changes - a')
+      await fs.write(`${dir}/a.txt`, 'unstaged changes - a')
 
       await stash({ repo })
 
@@ -913,12 +896,11 @@ describe('stash', () => {
     })
 
     it('handles stash with only index changes (no worktree changes)', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
-      const dir = await repo.getDir()!
       // Create only staged changes
-      await repo.fs.write(`${dir}/a.txt`, 'staged changes - a')
+      await fs.write(`${dir}/a.txt`, 'staged changes - a')
       await add({ repo, filepath: ['a.txt'] })
 
       await stash({ repo })
@@ -929,7 +911,7 @@ describe('stash', () => {
     })
 
     it('error:invalid-stash-operation', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
       let error: unknown = null
@@ -946,7 +928,7 @@ describe('stash', () => {
     })
 
     it('error:stash-apply-invalid-stash', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
       // Try to apply stash when none exists
@@ -962,7 +944,7 @@ describe('stash', () => {
     })
 
     it('ok:stash-apply-index-commit-2', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
       // Create stash with both staged and unstaged changes
@@ -977,12 +959,11 @@ describe('stash', () => {
     })
 
     it('ok:stash-apply-no-index-commit', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
-      const dir = await repo.getDir()!
       // Create only worktree changes (not staged)
-      await repo.fs.write(`${dir}/a.txt`, 'unstaged changes - a')
+      await fs.write(`${dir}/a.txt`, 'unstaged changes - a')
       await stash({ repo })
 
       // Apply stash
@@ -994,7 +975,7 @@ describe('stash', () => {
     })
 
     it('error:stash-drop-ref-not-exist', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
       // Try to drop when no stash exists
@@ -1010,7 +991,7 @@ describe('stash', () => {
     })
 
     it('error:stash-drop-empty-reflog', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
       // Try to drop when reflog is empty
@@ -1026,7 +1007,7 @@ describe('stash', () => {
     })
 
     it('ok:stash-clear-paths-not-exist', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
       // Clear when stash files don't exist
@@ -1042,7 +1023,7 @@ describe('stash', () => {
     })
 
     it('error:Repository-open-failure', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
       // Create stash
@@ -1054,12 +1035,11 @@ describe('stash', () => {
     })
 
     it('error:getGitdir-failure', async () => {
-      const { repo } = await makeFixture('test-stash')
+      const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
       await addUserConfig(repo)
 
-      const dir = await repo.getDir()!
       // Create changes
-      await repo.fs.write(`${dir}/a.txt`, 'changes')
+      await fs.write(`${dir}/a.txt`, 'changes')
       await add({ repo, filepath: ['a.txt'] })
 
       // Should work even if getGitdir fails (falls back to provided gitdir)
@@ -1073,11 +1053,10 @@ describe('stash', () => {
   it('error:getStashAuthor-repo-missing', async () => {
     // Test - lines 58-59: throw error when repo is missing
     const { getStashAuthor } = await import('@awesome-os/universal-git-src/git/refs/stash.ts')
-    const { repo } = await makeFixture('test-stash')
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     let error: unknown = null
     try {
-      await getStashAuthor({ fs: repo.fs, gitdir })
+      await getStashAuthor({ fs: fs, gitdir })
     } catch (err) {
       error = err
     }
@@ -1089,11 +1068,10 @@ describe('stash', () => {
   it('error:getStashAuthor-NotFoundError-config', async () => {
     // Test - lines 77-87: handle NotFoundError and throw MissingNameError
     const { getStashAuthor } = await import('@awesome-os/universal-git-src/git/refs/stash.ts')
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     let error: unknown = null
     try {
-      await getStashAuthor({ fs: repo.fs, gitdir, repo })
+      await getStashAuthor({ fs: fs, gitdir, repo })
     } catch (err) {
       error = err
     }
@@ -1108,39 +1086,35 @@ describe('stash', () => {
   it('edge:getStashSHA-ref-not-exist', async () => {
     // Test - lines 119-120: return null when refIdx >= entries.length
     const { getStashSHA } = await import('@awesome-os/universal-git-src/git/refs/stash.ts')
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
-    const result = await getStashSHA({ fs: repo.fs, gitdir, refIdx: 0 })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
+    const result = await getStashSHA({ fs: fs, gitdir, refIdx: 0 })
     assert.strictEqual(result, null)
   })
 
   it('edge:getStashSHA-entry-not-string', async () => {
     // Test - line 125: return null when entry is not a string
     const { getStashSHA } = await import('@awesome-os/universal-git-src/git/refs/stash.ts')
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Pass invalid entries array
-    const result = await getStashSHA({ fs: repo.fs, gitdir, refIdx: 0, stashEntries: [null as any] })
+    const result = await getStashSHA({ fs: fs, gitdir, refIdx: 0, stashEntries: [null as any] })
     assert.strictEqual(result, null)
   })
 
   it('edge:readStashReflogs-file-not-exist', async () => {
     // Test - lines 316-317: return empty array when reflog doesn't exist
     const { readStashReflogs } = await import('@awesome-os/universal-git-src/git/refs/stash.ts')
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
-    const result = await readStashReflogs({ fs: repo.fs, gitdir })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
+    const result = await readStashReflogs({ fs: fs, gitdir })
     assert.deepStrictEqual(result, [])
   })
 
   it('edge:readStashReflogs-content-not-string', async () => {
     // Test - lines 316-317: return empty array when content is not string
     const { readStashReflogs } = await import('@awesome-os/universal-git-src/git/refs/stash.ts')
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Mock fs to return non-string
     const mockFs = {
-      ...repo.fs,
+      ...fs,
       read: async () => Buffer.from('test'),
       exists: async () => true,
     }
@@ -1151,14 +1125,13 @@ describe('stash', () => {
   it('edge:readStashReflogs-empty-whitespace', async () => {
     // Test - lines 321-322: return empty array when reflog is empty
     const { readStashReflogs } = await import('@awesome-os/universal-git-src/git/refs/stash.ts')
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Create empty reflog file
     const { getStashReflogsPath } = await import('@awesome-os/universal-git-src/git/refs/stash.ts')
     const reflogPath = getStashReflogsPath(gitdir)
-    await repo.fs.mkdir(reflogPath.substring(0, reflogPath.lastIndexOf('/')), { recursive: true })
-    await repo.fs.write(reflogPath, '   \n  ', 'utf8')
-    const result = await readStashReflogs({ fs: repo.fs, gitdir })
+    await fs.mkdir(reflogPath.substring(0, reflogPath.lastIndexOf('/')), { recursive: true })
+    await fs.write(reflogPath, '   \n  ', 'utf8')
+    const result = await readStashReflogs({ fs: fs, gitdir })
     assert.deepStrictEqual(result, [])
   })
 })

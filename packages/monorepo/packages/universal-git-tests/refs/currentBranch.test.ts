@@ -6,7 +6,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('currentBranch', async (t) => {
   await t.test('ok:resolve-HEAD-master', async () => {
     // Setup
-    const { repo } = await makeFixture('test-resolveRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resolveRef')
     // Test
     const branch = await currentBranch({ repo })
     assert.strictEqual(branch, 'master')
@@ -14,7 +14,7 @@ test('currentBranch', async (t) => {
 
   await t.test('param:fullname-true', async () => {
     // Setup
-    const { repo } = await makeFixture('test-resolveRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resolveRef')
     // Test
     const branch = await currentBranch({
       repo,
@@ -25,7 +25,11 @@ test('currentBranch', async (t) => {
 
   await t.test('edge:detached-HEAD', async () => {
     // Setup
-    const { repo } = await makeFixture('test-detachedHead')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-detachedHead')
+    // Ensure HEAD is detached
+    const oid = await repo.resolveRef('HEAD')
+    await repo.writeRef('HEAD', oid, true)
+    
     // Test
     const branch = await currentBranch({ repo })
     assert.strictEqual(branch, undefined)
@@ -45,20 +49,19 @@ test('currentBranch', async (t) => {
   })
 
   await t.test('param:repo-provided', async () => {
-    const { repo } = await makeFixture('test-resolveRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resolveRef')
     const branch = await currentBranch({ repo })
     assert.strictEqual(branch, 'master')
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-resolveRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resolveRef')
     const branch = await currentBranch({ repo })
     assert.strictEqual(branch, 'master')
   })
 
   await t.test('error:caller-property', async () => {
-    const { repo } = await makeFixture('test-resolveRef')
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resolveRef')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await currentBranch({
@@ -72,7 +75,7 @@ test('currentBranch', async (t) => {
   })
 
   await t.test('edge:empty-repository', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const branch = await currentBranch({ repo })
     // Empty repo might not have a branch yet
     assert.ok(branch === undefined || typeof branch === 'string')

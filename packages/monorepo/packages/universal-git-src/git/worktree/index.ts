@@ -59,6 +59,8 @@ export function createGitWorktreeBackend(options: {
 }): GitWorktreeBackend {
   // Normalize filesystem using factory pattern to ensure consistent caching and normalization
   const normalizedFs = createFileSystem(options.fs)
+  // TypeScript might complain if GitWorktreeFs doesn't fully match GitWorktreeBackend due to optional methods
+  // But GitWorktreeFs implements GitWorktreeBackend, so casting is safe or implicit
   return new GitWorktreeFs(normalizedFs, options.dir, options.name)
 }
 

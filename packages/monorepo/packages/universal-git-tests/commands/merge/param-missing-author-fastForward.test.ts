@@ -126,7 +126,7 @@ describe('merge', () => {
   })
 
   it('param:missing-author-fastForward', async () => {
-        const { repo } = await makeFixture('test-merge')
+        const { repo, fs, dir, gitdir } = await makeFixture('test-merge')
 
         const originalOid = await resolveRef({ repo, ref: 'main' })
         const desiredOid = await resolveRef({ repo, ref: 'newest' })
@@ -152,7 +152,7 @@ describe('merge', () => {
         })
 
   it('param:missing-author-fastForward-with-author-and-dryRun', async () => {
-        const { repo } = await makeFixture('test-merge')
+        const { repo, fs, dir, gitdir } = await makeFixture('test-merge')
 
         const originalOid = await resolveRef({ repo, ref: 'main' })
         const desiredOid = await resolveRef({ repo, ref: 'newest' })

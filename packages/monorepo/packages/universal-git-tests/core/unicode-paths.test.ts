@@ -16,8 +16,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 describe('unicode filepath support', () => {
   it('write/read index 日本語', async () => {
     // Setup
-    const { repo } = await makeFixture('test-unicode-paths')
-    const dir = await repo.getDir()!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-unicode-paths')
     await init({ repo })
     // Use a shared cache to ensure add() and listFiles() see the same index state
     const cache = {}
@@ -25,10 +24,10 @@ describe('unicode filepath support', () => {
     // Test - create the file first, then add it
     const filepath = '日本語'
     const fullPath = path.join(dir, filepath)
-    await repo.fs.write(fullPath, 'test content')
+    await fs.write(fullPath, 'test content')
     
     // Verify file exists before adding
-    const stats = await repo.fs.lstat(fullPath)
+    const stats = await fs.lstat(fullPath)
     assert.ok(stats, 'File should exist before adding')
     
     // Get initial file list (should be empty for fresh repo)
@@ -50,15 +49,14 @@ describe('unicode filepath support', () => {
   
   it('write/read index docs/日本語', async () => {
     // Setup
-    const { repo } = await makeFixture('test-unicode-paths')
-    const dir = await repo.getDir()!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-unicode-paths')
     await init({ repo })
     // Use a shared cache to ensure add() and listFiles() see the same index state
     const cache = {}
     // Test
     const filepath = 'docs/日本語'
-    await repo.fs.mkdir(path.join(dir, 'docs'))
-    await repo.fs.write(path.join(dir, filepath), 'test content')
+    await fs.mkdir(path.join(dir, 'docs'))
+    await fs.write(path.join(dir, filepath), 'test content')
     
     // Get initial file list
     const filesBefore = await listFiles({ repo, cache })
@@ -77,14 +75,13 @@ describe('unicode filepath support', () => {
   
   it('write/read commit 日本語', async () => {
     // Setup
-    const { repo } = await makeFixture('test-unicode-paths')
-    const dir = await repo.getDir()!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-unicode-paths')
     await init({ repo })
     // Use a shared cache for consistency
     const cache = {}
     // Create the file first, then add it
     const filepath = '日本語'
-    await repo.fs.write(path.join(dir, filepath), 'test content')
+    await fs.write(path.join(dir, filepath), 'test content')
     await add({ repo, filepath, cache })
     // Test
     const sha = await commit({
@@ -107,14 +104,13 @@ describe('unicode filepath support', () => {
   
   it('write/read tree 日本語', async () => {
     // Setup
-    const { repo } = await makeFixture('test-unicode-paths')
-    const dir = await repo.getDir()!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-unicode-paths')
     await init({ repo })
     // Use a shared cache for consistency
     const cache = {}
     // Create the file first, then add it
     const filepath = '日本語'
-    await repo.fs.write(path.join(dir, filepath), 'test content')
+    await fs.write(path.join(dir, filepath), 'test content')
     await add({ repo, filepath, cache })
     const sha = await commit({
       repo,
@@ -143,14 +139,13 @@ describe('unicode filepath support', () => {
   
   it('checkout 日本語', async () => {
     // Setup
-    const { repo } = await makeFixture('test-unicode-paths')
-    const dir = await repo.getDir()!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-unicode-paths')
     await init({ repo })
     // Use a shared cache for consistency
     const cache = {}
     // Create the file first, then add it
     const filepath = '日本語'
-    await repo.fs.write(path.join(dir, filepath), 'test content')
+    await fs.write(path.join(dir, filepath), 'test content')
     await add({ repo, filepath, cache })
     await commit({
       repo,
@@ -174,15 +169,14 @@ describe('unicode filepath support', () => {
   
   it('checkout docs/日本語', async () => {
     // Setup
-    const { repo } = await makeFixture('test-unicode-paths')
-    const dir = await repo.getDir()!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-unicode-paths')
     await init({ repo })
     // Use a shared cache for consistency
     const cache = {}
     // Create the file first, then add it
     const filepath = 'docs/日本語'
-    await repo.fs.mkdir(path.join(dir, 'docs'))
-    await repo.fs.write(path.join(dir, filepath), 'test content')
+    await fs.mkdir(path.join(dir, 'docs'))
+    await fs.write(path.join(dir, filepath), 'test content')
     await add({ repo, filepath, cache })
     await commit({
       repo,

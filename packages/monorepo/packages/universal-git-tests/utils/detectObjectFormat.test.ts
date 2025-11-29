@@ -6,64 +6,63 @@ import { setConfig } from '@awesome-os/universal-git-src/index.ts'
 
 test('detectObjectFormat', async (t) => {
   await t.test('ok:detects-SHA1-default', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
-    const format = await detectObjectFormat(repo.fs, gitdir)
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const format = await detectObjectFormat(fs, gitdir)
     assert.strictEqual(format, 'sha1')
   })
 
   await t.test('ok:detects-SHA256-configured', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Set objectformat to sha256
-    await setConfig({ repo, path: 'extensions.objectformat', value: 'sha256' })
+    await repo.gitBackend.setConfig('extensions.objectformat', 'sha256', 'local')
     
-    const format = await detectObjectFormat(repo.fs, gitdir)
+    // Debug: Print config content
+    const normalizedFs = (repo as any).fs || fs
+    try {
+      const configContent = await normalizedFs.read(`${gitdir}/config`, 'utf8')
+      console.log('Config content:', configContent)
+    } catch (e) {
+      console.log('Could not read config:', e)
+    }
+
+    const format = await detectObjectFormat(fs, gitdir)
     assert.strictEqual(format, 'sha256')
   })
 
   await t.test('edge:missing-config-file', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Use a non-existent gitdir
-    const format = await detectObjectFormat(repo.fs, '/nonexistent/gitdir')
+    const format = await detectObjectFormat(fs, '/nonexistent/gitdir')
     // Should default to SHA-1
     assert.strictEqual(format, 'sha1')
   })
 
   await t.test('edge:config-no-extensions', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Config exists but no extensions section
-    const format = await detectObjectFormat(repo.fs, gitdir)
+    const format = await detectObjectFormat(fs, gitdir)
     assert.strictEqual(format, 'sha1')
   })
 
   await t.test('edge:config-extensions-no-objectformat', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Add extensions section without objectformat
     await setConfig({ repo, path: 'extensions.worktreeconfig', value: 'true' })
     
-    const format = await detectObjectFormat(repo.fs, gitdir)
+    const format = await detectObjectFormat(fs, gitdir)
     assert.strictEqual(format, 'sha1')
   })
 
   await t.test('ok:handles-case-insensitive', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Write config directly with different case
     const configPath = `${gitdir}/config`
     const configContent = `[extensions]
 objectformat = SHA256
 `
-    await repo.fs.write(configPath, configContent, 'utf8')
+    await fs.write(configPath, configContent, 'utf8')
     
-    const format = await detectObjectFormat(repo.fs, gitdir)
+    const format = await detectObjectFormat(fs, gitdir)
     assert.strictEqual(format, 'sha256')
   })
 })

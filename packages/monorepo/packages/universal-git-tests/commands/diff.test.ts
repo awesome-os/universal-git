@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { diff, commit, add, writeRef } from '@awesome-os/universal-git-src/index.ts'
+import { diff, commit, add } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { MissingParameterError } from '@awesome-os/universal-git-src/errors/MissingParameterError.ts'
 
@@ -18,10 +18,10 @@ test('diff', async (t) => {
   })
 
   await t.test('param:gitdir-or-dir-missing', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     try {
       await diff({
-        fs: repo.fs,
+        fs: fs,
       } as any)
       assert.fail('Should have thrown MissingParameterError')
     } catch (error) {
@@ -32,11 +32,9 @@ test('diff', async (t) => {
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Write file to filesystem
-    await repo.fs.write(`${dir}/file1.txt`, 'content1')
+    await fs.write(`${dir}/file1.txt`, 'content1')
     
     // Create initial commit
     await add({ repo, filepath: 'file1.txt' })
@@ -52,11 +50,9 @@ test('diff', async (t) => {
   })
 
   await t.test('ok:empty-diff', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Write file to filesystem
-    await repo.fs.write(`${dir}/file.txt`, 'content')
+    await fs.write(`${dir}/file.txt`, 'content')
     
     // Create initial commit
     await add({ repo, filepath: 'file.txt' })
@@ -73,18 +69,16 @@ test('diff', async (t) => {
   })
 
   await t.test('ok:detects-added', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Write files to filesystem
-    await repo.fs.write(`${dir}/file1.txt`, 'content1')
+    await fs.write(`${dir}/file1.txt`, 'content1')
     
     // Create initial commit
     await add({ repo, filepath: 'file1.txt' })
     const commit1 = await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Add a new file
-    await repo.fs.write(`${dir}/file2.txt`, 'content2')
+    await fs.write(`${dir}/file2.txt`, 'content2')
     await add({ repo, filepath: 'file2.txt' })
     const commit2 = await commit({ repo, message: 'Add file2', author: { name: 'Test', email: 'test@example.com' } })
     
@@ -103,12 +97,10 @@ test('diff', async (t) => {
   })
 
   await t.test('ok:detects-deleted', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Write files to filesystem
-    await repo.fs.write(`${dir}/file1.txt`, 'content1')
-    await repo.fs.write(`${dir}/file2.txt`, 'content2')
+    await fs.write(`${dir}/file1.txt`, 'content1')
+    await fs.write(`${dir}/file2.txt`, 'content2')
     
     // Create initial commit with two files
     await add({ repo, filepath: 'file1.txt' })
@@ -116,7 +108,7 @@ test('diff', async (t) => {
     const commit1 = await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Remove a file from index - use remove command
-    await repo.fs.rm(`${dir}/file2.txt`)
+    await fs.rm(`${dir}/file2.txt`)
     const { remove } = await import('@awesome-os/universal-git-src/index.ts')
     await remove({ repo, filepath: 'file2.txt' })
     const commit2 = await commit({ repo, message: 'Remove file2', author: { name: 'Test', email: 'test@example.com' } })
@@ -135,18 +127,16 @@ test('diff', async (t) => {
   })
 
   await t.test('ok:detects-modified', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Write files to filesystem
-    await repo.fs.write(`${dir}/file.txt`, 'content1')
+    await fs.write(`${dir}/file.txt`, 'content1')
     
     // Create initial commit
     await add({ repo, filepath: 'file.txt' })
     const commit1 = await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Modify the file
-    await repo.fs.write(`${dir}/file.txt`, 'content2')
+    await fs.write(`${dir}/file.txt`, 'content2')
     await add({ repo, filepath: 'file.txt' })
     const commit2 = await commit({ repo, message: 'Modify file', author: { name: 'Test', email: 'test@example.com' } })
     
@@ -165,18 +155,16 @@ test('diff', async (t) => {
   })
 
   await t.test('behavior:compares-workdir-HEAD', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Write files to filesystem
-    await repo.fs.write(`${dir}/file1.txt`, 'content1')
+    await fs.write(`${dir}/file1.txt`, 'content1')
     
     // Create initial commit
     await add({ repo, filepath: 'file1.txt' })
     await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Add a new file in working directory (not committed)
-    await repo.fs.write(`${dir}/file2.txt`, 'content2')
+    await fs.write(`${dir}/file2.txt`, 'content2')
     await add({ repo, filepath: 'file2.txt' })
     
     // Diff working directory vs HEAD
@@ -191,18 +179,16 @@ test('diff', async (t) => {
   })
 
   await t.test('param:staged-true', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Write files to filesystem
-    await repo.fs.write(`${dir}/file1.txt`, 'content1')
+    await fs.write(`${dir}/file1.txt`, 'content1')
     
     // Create initial commit
     await add({ repo, filepath: 'file1.txt' })
     await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Stage a new file
-    await repo.fs.write(`${dir}/file2.txt`, 'content2')
+    await fs.write(`${dir}/file2.txt`, 'content2')
     await add({ repo, filepath: 'file2.txt' })
     
     // Diff staged changes
@@ -216,12 +202,10 @@ test('diff', async (t) => {
   })
 
   await t.test('param:filepath-filter', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Write files to filesystem
-    await repo.fs.write(`${dir}/dir1/file1.txt`, 'content1')
-    await repo.fs.write(`${dir}/dir2/file2.txt`, 'content2')
+    await fs.write(`${dir}/dir1/file1.txt`, 'content1')
+    await fs.write(`${dir}/dir2/file2.txt`, 'content2')
     
     // Create initial commit with multiple files
     await add({ repo, filepath: 'dir1/file1.txt' })
@@ -229,8 +213,8 @@ test('diff', async (t) => {
     const commit1 = await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Modify both files
-    await repo.fs.write(`${dir}/dir1/file1.txt`, 'content1-modified')
-    await repo.fs.write(`${dir}/dir2/file2.txt`, 'content2-modified')
+    await fs.write(`${dir}/dir1/file1.txt`, 'content1-modified')
+    await fs.write(`${dir}/dir2/file2.txt`, 'content2-modified')
     await add({ repo, filepath: 'dir1/file1.txt' })
     await add({ repo, filepath: 'dir2/file2.txt' })
     const commit2 = await commit({ repo, message: 'Modify files', author: { name: 'Test', email: 'test@example.com' } })
@@ -250,7 +234,7 @@ test('diff', async (t) => {
   })
 
   await t.test('edge:empty-repo-no-HEAD', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     
     // Diff in empty repo (no commits yet) - should handle gracefully
     try {
@@ -268,18 +252,16 @@ test('diff', async (t) => {
   })
 
   await t.test('param:refA-only', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Write files to filesystem
-    await repo.fs.write(`${dir}/file1.txt`, 'content1')
+    await fs.write(`${dir}/file1.txt`, 'content1')
     
     // Create initial commit
     await add({ repo, filepath: 'file1.txt' })
     const commit1 = await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Add a new file
-    await repo.fs.write(`${dir}/file2.txt`, 'content2')
+    await fs.write(`${dir}/file2.txt`, 'content2')
     await add({ repo, filepath: 'file2.txt' })
     
     // Diff with only refA
@@ -293,24 +275,21 @@ test('diff', async (t) => {
   })
 
   await t.test('param:refB-only', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Write files to filesystem
-    await repo.fs.write(`${dir}/file1.txt`, 'content1')
+    await fs.write(`${dir}/file1.txt`, 'content1')
     
     // Create initial commit
     await add({ repo, filepath: 'file1.txt' })
     const commit1 = await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Create another commit
-    await repo.fs.write(`${dir}/file2.txt`, 'content2')
+    await fs.write(`${dir}/file2.txt`, 'content2')
     await add({ repo, filepath: 'file2.txt' })
     const commit2 = await commit({ repo, message: 'Second', author: { name: 'Test', email: 'test@example.com' } })
     
     // Reset to first commit
-    await writeRef({ repo, ref: 'HEAD', value: commit1 })
+    await repo.gitBackend.writeRef('HEAD', commit1, false, repo.cache)
     
     // Diff with only refB
     const result = await diff({
@@ -323,18 +302,16 @@ test('diff', async (t) => {
   })
 
   await t.test('ok:both-refA-refB', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Write files to filesystem
-    await repo.fs.write(`${dir}/file1.txt`, 'content1')
+    await fs.write(`${dir}/file1.txt`, 'content1')
     
     // Create initial commit
     await add({ repo, filepath: 'file1.txt' })
     const commit1 = await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Create another commit
-    await repo.fs.write(`${dir}/file2.txt`, 'content2')
+    await fs.write(`${dir}/file2.txt`, 'content2')
     await add({ repo, filepath: 'file2.txt' })
     const commit2 = await commit({ repo, message: 'Second', author: { name: 'Test', email: 'test@example.com' } })
     
@@ -351,18 +328,16 @@ test('diff', async (t) => {
   })
 
   await t.test('behavior:mode-changes', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Write file to filesystem
-    await repo.fs.write(`${dir}/file.txt`, 'content1')
+    await fs.write(`${dir}/file.txt`, 'content1')
     
     // Create initial commit
     await add({ repo, filepath: 'file.txt' })
     const commit1 = await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Modify file (this might change mode depending on implementation)
-    await repo.fs.write(`${dir}/file.txt`, 'content2')
+    await fs.write(`${dir}/file.txt`, 'content2')
     await add({ repo, filepath: 'file.txt' })
     const commit2 = await commit({ repo, message: 'Modify', author: { name: 'Test', email: 'test@example.com' } })
     
@@ -383,7 +358,7 @@ test('diff', async (t) => {
   })
 
   await t.test('edge:no-trees-available', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     
     // Try to diff with non-existent refs
     try {
@@ -402,13 +377,11 @@ test('diff', async (t) => {
   })
 
   await t.test('param:filepath-subdirectories', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Write files to filesystem
-    await repo.fs.write(`${dir}/a/b/file1.txt`, 'content1')
-    await repo.fs.write(`${dir}/a/c/file2.txt`, 'content2')
-    await repo.fs.write(`${dir}/x/y/file3.txt`, 'content3')
+    await fs.write(`${dir}/a/b/file1.txt`, 'content1')
+    await fs.write(`${dir}/a/c/file2.txt`, 'content2')
+    await fs.write(`${dir}/x/y/file3.txt`, 'content3')
     
     // Create initial commit with nested structure
     await add({ repo, filepath: 'a/b/file1.txt' })
@@ -417,9 +390,9 @@ test('diff', async (t) => {
     const commit1 = await commit({ repo, message: 'Initial', author: { name: 'Test', email: 'test@example.com' } })
     
     // Modify files
-    await repo.fs.write(`${dir}/a/b/file1.txt`, 'content1-modified')
-    await repo.fs.write(`${dir}/a/c/file2.txt`, 'content2-modified')
-    await repo.fs.write(`${dir}/x/y/file3.txt`, 'content3-modified')
+    await fs.write(`${dir}/a/b/file1.txt`, 'content1-modified')
+    await fs.write(`${dir}/a/c/file2.txt`, 'content2-modified')
+    await fs.write(`${dir}/x/y/file3.txt`, 'content3-modified')
     await add({ repo, filepath: 'a/b/file1.txt' })
     await add({ repo, filepath: 'a/c/file2.txt' })
     await add({ repo, filepath: 'x/y/file3.txt' })

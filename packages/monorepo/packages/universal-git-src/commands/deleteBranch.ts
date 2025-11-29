@@ -122,5 +122,10 @@ export async function _deleteBranch({
   config.deleteSection('branch', abbrevRef)
   const updatedConfig = serializeConfig(config)
   await fs.write(join(gitdir, 'config'), updatedConfig)
+  
+  // If repo is available, force config reload to update cache
+  if (repo) {
+    await repo.gitBackend.reloadConfig()
+  }
 }
 

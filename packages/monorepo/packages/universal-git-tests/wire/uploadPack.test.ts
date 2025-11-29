@@ -7,7 +7,7 @@ import { commit, add } from '@awesome-os/universal-git-src/index.ts'
 import fs from 'node:fs';
 test('uploadPack', async (t) => {
   await t.test('advertiseRefs: true', async () => {
-    const { repo } = await makeFixture('test-uploadPack')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-uploadPack')
     const res = await uploadPack({ repo, advertiseRefs: true })
     
     assert.ok(res, 'uploadPack should return a buffer when advertiseRefs is true')
@@ -30,21 +30,21 @@ test('uploadPack', async (t) => {
   })
 
   await t.test('advertiseRefs: false', async () => {
-    const { repo } = await makeFixture('test-uploadPack')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-uploadPack')
     const res = await uploadPack({ repo, advertiseRefs: false })
     
     assert.strictEqual(res, undefined, 'uploadPack should return undefined when advertiseRefs is false')
   })
 
   await t.test('advertiseRefs: default (false)', async () => {
-    const { repo } = await makeFixture('test-uploadPack')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-uploadPack')
     const res = await uploadPack({ repo })
     
     assert.strictEqual(res, undefined, 'uploadPack should return undefined by default')
   })
 
   await t.test('empty repository', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     
     // Create an initial commit so HEAD exists
     if (!repo.worktreeBackend) {
@@ -69,7 +69,7 @@ test('uploadPack', async (t) => {
   })
 
   await t.test('repository with multiple branches', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     
     // Create initial commit
     if (!repo.worktreeBackend) {
@@ -113,7 +113,7 @@ test('uploadPack', async (t) => {
   })
 
   await t.test('repository with tags', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     
     // Create initial commit
     if (!repo.worktreeBackend) {
@@ -140,7 +140,7 @@ test('uploadPack', async (t) => {
   })
 
   await t.test('uses gitdir parameter when provided', async () => {
-    const { repo } = await makeFixture('test-uploadPack')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-uploadPack')
     // Use the repo parameter
     const res = await uploadPack({ repo, advertiseRefs: true })
     
@@ -149,7 +149,7 @@ test('uploadPack', async (t) => {
 
   await t.test('uses dir parameter to compute gitdir', async () => {
     // Create a repository
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     
     // Create an initial commit so HEAD exists
     if (!repo.worktreeBackend) {
@@ -175,7 +175,7 @@ test('uploadPack', async (t) => {
   })
 
   await t.test('HEAD is first in refs list', async () => {
-    const { repo } = await makeFixture('test-uploadPack')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-uploadPack')
     const res = await uploadPack({ repo, advertiseRefs: true })
     
     assert.ok(res, 'uploadPack should return a buffer')
@@ -191,7 +191,7 @@ test('uploadPack', async (t) => {
   })
 
   await t.test('includes all required capabilities', async () => {
-    const { repo } = await makeFixture('test-uploadPack')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-uploadPack')
     const res = await uploadPack({ repo, advertiseRefs: true })
     
     assert.ok(res, 'uploadPack should return a buffer')
@@ -215,7 +215,7 @@ test('uploadPack', async (t) => {
   })
 
   await t.test('error handling - sets caller property', async () => {
-    const { repo } = await makeFixture('test-empty')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty')
     // Use repo but with invalid gitdir - this will cause an error when uploadPack tries to list refs
     // Create a new repo with invalid gitdir by modifying the backend
 

@@ -6,7 +6,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('writeRef', async (t) => {
   await t.test('ok:write-tag', async () => {
     // Setup
-    const { repo } = await makeFixture('test-writeRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeRef')
     // Test
     await writeRef({
       repo,
@@ -19,7 +19,7 @@ test('writeRef', async (t) => {
 
   await t.test('behavior:set-current-branch', async () => {
     // Setup
-    const { repo } = await makeFixture('test-writeRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeRef')
     // Test
     await writeRef({
       repo,
@@ -56,7 +56,7 @@ test('writeRef', async (t) => {
   })
 
   await t.test('param:ref-missing', async () => {
-    const { repo } = await makeFixture('test-writeRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeRef')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await writeRef({
@@ -71,7 +71,7 @@ test('writeRef', async (t) => {
   })
 
   await t.test('param:value-missing', async () => {
-    const { repo } = await makeFixture('test-writeRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeRef')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await writeRef({
@@ -86,7 +86,7 @@ test('writeRef', async (t) => {
   })
 
   await t.test('param:repo-provided', async () => {
-    const { repo } = await makeFixture('test-writeRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeRef')
     await writeRef({
       repo,
       ref: 'refs/tags/test-tag',
@@ -97,7 +97,7 @@ test('writeRef', async (t) => {
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-writeRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeRef')
     await writeRef({
       repo,
       ref: 'refs/tags/test-tag',
@@ -109,7 +109,7 @@ test('writeRef', async (t) => {
   })
 
   await t.test('error:caller-property', async () => {
-    const { repo } = await makeFixture('test-writeRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeRef')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await writeRef({
@@ -124,7 +124,7 @@ test('writeRef', async (t) => {
   })
 
   await t.test('param:force', async () => {
-    const { repo } = await makeFixture('test-writeRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeRef')
     // Write initial ref
     await writeRef({
       repo,
@@ -143,7 +143,7 @@ test('writeRef', async (t) => {
   })
 
   await t.test('behavior:symbolic-ref', async () => {
-    const { repo } = await makeFixture('test-writeRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeRef')
     // Create a branch first
     await writeRef({
       repo,

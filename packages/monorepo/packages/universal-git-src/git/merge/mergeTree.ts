@@ -109,7 +109,9 @@ export async function mergeTree({
   let walkError: Error | null = null
   try {
     results = await _walk({
-      repo,
+      gitBackend: repo.gitBackend,
+      worktreeBackend: repo.worktreeBackend || undefined,
+      cache: repo.cache,
       trees: [ourTree, baseTree, theirTree],
       map: WalkerMapWithNulls(async function (filepath: string, [ours, base, theirs]: (WalkerEntry | null)[]): Promise<TreeEntry | undefined> {
       const path = basename(filepath)
@@ -274,22 +276,11 @@ export async function mergeTree({
           }
 
           // Modifications - both are blobs
-          if (filepath === 'a' || filepath === 'b') {
-            const ourType = ours ? await ours.type() : 'null'
-            const theirType = theirs ? await theirs.type() : 'null'
-            console.log(`[mergeTree] File ${filepath} types: ours=${ourType}, theirs=${theirType}, ours exists=${!!ours}, theirs exists=${!!theirs}`)
-          }
           const ourType = ours ? await ours.type() : null
           const theirType = theirs ? await theirs.type() : null
           const isBlobMerge = ours && theirs && ourType === 'blob' && theirType === 'blob'
-          if (filepath === 'a' || filepath === 'b') {
-            console.log(`[mergeTree] File ${filepath} blob check: isBlobMerge=${isBlobMerge}, ourType=${ourType}, theirType=${theirType}`)
-          }
           if (isBlobMerge) {
             // mergeBlobs now uses GitBackend instead of fs/gitdir
-            if (filepath === 'a' || filepath === 'b') {
-              console.log(`[mergeTree] Calling mergeBlobs for ${filepath}`)
-            }
             const r = await mergeBlobs({
               gitBackend,
               repo,
@@ -510,6 +501,7 @@ export async function mergeTree({
     }),
   })
   } catch (error) {
+    console.error('[mergeTree] Walk failed:', error)
     // Store the error but don't throw yet - we need to check for conflicts first
     walkError = error as Error
     
@@ -549,11 +541,14 @@ export async function mergeTree({
   // Even if the walk failed due to missing objects (NotFoundError), we should still check for conflicts
   // because conflicts might have been detected before the walk failed
   if (unmergedFiles.length > 0) {
+    console.log('[mergeTree] Conflicts detected:', unmergedFiles)
     // Write workdir files from the merged tree (excluding conflicted files)
     // Only if we have a valid tree OID and worktree backend is available
     if (repo.worktreeBackend && results && typeof results === 'object' && 'oid' in results && results.oid) {
       await _walk({
-        repo, // CRITICAL: Pass repo to _walk, not fs/cache/dir/gitdir
+        gitBackend: repo.gitBackend,
+        worktreeBackend: repo.worktreeBackend || undefined,
+        cache: repo.cache,
         trees: [WalkerFactory.tree({ ref: results.oid as string })],
         map: WalkerMapWithNulls(async function (filepath: string, [entry]: (WalkerEntry | null)[]): Promise<boolean> {
           if (!entry) return false
@@ -605,6 +600,13 @@ export async function mergeTree({
     )
   }
 
+  // If we get here and there are no conflicts, but also no results,
+  // the walk must have failed. Throw the walk error if we have one.
+  // This handles NotFoundError and other walk errors when there are no conflicts
+  if (walkError) {
+    throw walkError
+  }
+
   // No conflicts - return the merged tree OID
   // The reduce function returns a TreeEntry (with oid) or undefined
   // If results is a TreeEntry, extract the oid
@@ -615,20 +617,13 @@ export async function mergeTree({
   }
   
   if (results && typeof results === 'object' && 'oid' in results) {
-    const oid = results.oid as string
+    const oid = (results as any).oid as string
     // If oid is undefined, it means the tree has no entries (empty tree)
     // This can happen when the reduce function didn't write a tree because entries.length === 0
     if (!oid) {
       return '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
     }
     return oid
-  }
-  
-  // If we get here and there are no conflicts, but also no results,
-  // the walk must have failed. Throw the walk error if we have one.
-  // This handles NotFoundError and other walk errors when there are no conflicts
-  if (walkError) {
-    throw walkError
   }
   
   // If we get here, something unexpected happened

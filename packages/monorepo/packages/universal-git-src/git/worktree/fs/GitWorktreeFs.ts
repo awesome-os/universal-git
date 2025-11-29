@@ -74,8 +74,13 @@ export class GitWorktreeFs implements GitWorktreeBackend {
    * @returns FileSystemProvider instance
    */
 
-  // getDirectory() removed - worktreeBackend is a black box
-  // Only the creator knows the directory it operates on
+  /**
+   * Gets the working directory path if this backend has a directory
+   * @returns Directory path if available, null otherwise
+   */
+  getDirectory(): string | null {
+    return this.dir
+  }
 
   // ============================================================================
   // Git Directory Discovery Operations

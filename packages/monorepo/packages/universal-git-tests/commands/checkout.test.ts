@@ -19,10 +19,8 @@ test('checkout', async (t) => {
   await t.test('ok:checkout-branch', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
     const onPostCheckout: any[] = []
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
-    const gitdir = await repo.getGitdir()
     
     await checkout({
       repo,
@@ -53,7 +51,7 @@ test('checkout', async (t) => {
     
     // Verify HEAD reflog entry was created
     await verifyReflogEntry({
-      fs: repo.fs,
+      fs: fs,
       gitdir,
       ref: 'HEAD',
       expectedOldOid: '0f55956cbd50de80c2f86e6e565f00c92ce86631',
@@ -66,8 +64,7 @@ test('checkout', async (t) => {
   await t.test('ok:checkout-tag', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
     
     await checkout({
       repo,
@@ -87,8 +84,7 @@ test('checkout', async (t) => {
   await t.test('ok:checkout-sha', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
     
     await checkout({
       repo,
@@ -108,7 +104,7 @@ test('checkout', async (t) => {
   await t.test('error:unfetched-branch', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
     
     let error: unknown = null
     try {
@@ -133,15 +129,13 @@ test('checkout', async (t) => {
   await t.test('behavior:file-permissions', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
     // Create branch without checking it out (we'll use worktree instead)
     await branch({ repo, ref: 'other', checkout: false })
     
     // Verify branch creation reflog
     await verifyReflogEntry({
-      fs: repo.fs,
+      fs: fs,
       gitdir,
       ref: 'refs/heads/other',
       expectedMessage: 'branch',
@@ -173,9 +167,9 @@ test('checkout', async (t) => {
       // Stage files in worktree
       // Create worktree backend for the worktree path
       const { createGitWorktreeBackend } = await import('@awesome-os/universal-git-src/git/worktree/index.ts')
-      const worktreeBackend = createGitWorktreeBackend({ fs: repo.fs, dir: testBranchWorktreePath })
+      const worktreeBackend = createGitWorktreeBackend({ fs: fs, dir: testBranchWorktreePath })
       const { createBackend } = await import('@awesome-os/universal-git-src/backends/index.ts')
-      const gitBackend = createBackend({ type: 'filesystem', fs: repo.fs, gitdir })
+      const gitBackend = createBackend({ type: 'filesystem', fs: fs, gitdir })
       
       await add({ gitBackend, worktree: worktreeBackend, filepath: 'regular-file.txt' })
       await add({ gitBackend, worktree: worktreeBackend, filepath: 'executable-file.sh' })
@@ -216,15 +210,14 @@ test('checkout', async (t) => {
       assert.strictEqual(actualRegularFileMode, expectedRegularFileMode, 'Regular file mode should be preserved')
       assert.strictEqual(actualExecutableFileMode, expectedExecutableFileMode, 'Executable file mode should be preserved')
     } finally {
-      await cleanupWorktrees(repo.fs, dir, gitdir)
+      await cleanupWorktrees(fs, dir, gitdir)
     }
   })
 
   await t.test('behavior:changing-file-permissions', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
 
     if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
     await repo.worktreeBackend.write('regular-file.txt', 'regular file', { mode: 0o666 })
@@ -265,8 +258,7 @@ test('checkout', async (t) => {
   await t.test('ok:directories-filepaths', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
 
     await checkout({
       repo,
@@ -289,8 +281,7 @@ test('checkout', async (t) => {
   await t.test('ok:files-filepaths', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
 
     await checkout({
       repo,
@@ -312,8 +303,7 @@ test('checkout', async (t) => {
   await t.test('error:detects-conflicts', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
 
     if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
     await repo.worktreeBackend.write('README.md', 'Hello world', 'utf8')
@@ -338,8 +328,7 @@ test('checkout', async (t) => {
   await t.test('behavior:ignore-conflicts-dryRun', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
 
     if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
     await repo.worktreeBackend.write('README.md', 'Hello world', 'utf8')
@@ -365,8 +354,7 @@ test('checkout', async (t) => {
   await t.test('param:force-ignore-conflicts', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
 
     if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
     await repo.worktreeBackend.write('README.md', 'Hello world', 'utf8')
@@ -391,8 +379,7 @@ test('checkout', async (t) => {
   await t.test('behavior:restore-to-HEAD', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
 
     await checkout({
       repo,
@@ -421,8 +408,7 @@ test('checkout', async (t) => {
   await t.test('behavior:no-delete-other-files', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
 
     await checkout({
       repo,
@@ -445,7 +431,7 @@ test('checkout', async (t) => {
   await t.test('behavior:onPostCheckout-dryRun', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
     const onPostCheckout: any[] = []
     
     await checkout({
@@ -466,7 +452,7 @@ test('checkout', async (t) => {
   await t.test('behavior:onPostCheckout-filepaths', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
 
     await checkout({
       repo,
@@ -494,8 +480,7 @@ test('checkout', async (t) => {
   await t.test('behavior:no-delete-ignored-files', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
     // Checkout the test-branch
     await checkout({
       repo,
@@ -545,9 +530,8 @@ test('checkout', async (t) => {
   await t.test('param:repo-provided', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
+
     await repo.checkout('test-branch', {})
     
     if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
@@ -563,9 +547,7 @@ test('checkout', async (t) => {
   await t.test('param:repo-or-fs-missing', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     
     await assert.rejects(
@@ -586,8 +568,7 @@ test('checkout', async (t) => {
   await t.test('param:dir-missing', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     
     await assert.rejects(
@@ -595,7 +576,7 @@ test('checkout', async (t) => {
         // @ts-ignore - testing error case (dir is intentionally missing)
         // When dir is missing and repo is not provided, checkout requires dir parameter
         await checkout({
-          fs: repo.fs,
+          fs: fs,
           gitdir,
           ref: 'test-branch',
         } as any)
@@ -612,8 +593,7 @@ test('checkout', async (t) => {
   await t.test('param:noUpdateHead-default', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
     
     // First checkout a branch to set up state
     await checkout({
@@ -644,8 +624,7 @@ test('checkout', async (t) => {
   await t.test('param:noUpdateHead-false', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
     // First checkout a branch to set up state
     await checkout({
       repo,
@@ -673,8 +652,7 @@ test('checkout', async (t) => {
   await t.test('param:ref-defaults-HEAD', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
     // First checkout a branch to set up state
     await checkout({
       repo,
@@ -701,7 +679,7 @@ test('checkout', async (t) => {
   await t.test('error:caller-property', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
 
     let error: any = null
     try {
@@ -720,8 +698,7 @@ test('checkout', async (t) => {
   await t.test('param:repo-and-filepaths', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
     
     await checkout({
       repo,
@@ -738,10 +715,9 @@ test('checkout', async (t) => {
   await t.test('param:repo-uses-dir', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
     
-    // Checkout without providing dir (should use repo.dir)
+    // Checkout without providing dir (should use dir)
     await checkout({
       repo,
       ref: 'v1.0.0',
@@ -757,8 +733,7 @@ test('checkout', async (t) => {
   await t.test('param:nonBlocking-batchSize', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
 
     await checkout({
       repo,
@@ -775,8 +750,7 @@ test('checkout', async (t) => {
   await t.test('param:track-false', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
 
     await checkout({
       repo,
@@ -793,8 +767,7 @@ test('checkout', async (t) => {
   await t.test('param:noCheckout-true', async () => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
-    const { repo } = await makeFixture('test-checkout')
-    const dir = repo.worktreeBackend?.getDir?.() || repo.worktreeBackend?.getDirectory?.() || ''!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
     // Get initial state
     if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
     const initialFiles = await repo.worktreeBackend.readdir('.') || []

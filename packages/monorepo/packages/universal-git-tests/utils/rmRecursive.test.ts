@@ -7,9 +7,8 @@ import { createFileSystem } from '@awesome-os/universal-git-src/utils/createFile
 
 test('rmRecursive', async (t) => {
   await t.test('ok:removes-single-file', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const normalizedFs = createFileSystem(repo.fs)
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
+    const normalizedFs = createFileSystem(fs)
     
     const filepath = join(dir, 'file.txt')
     await normalizedFs.write(filepath, 'content', 'utf8')
@@ -17,16 +16,15 @@ test('rmRecursive', async (t) => {
     // Verify file exists
     assert.ok(await normalizedFs.exists(filepath))
     
-    await rmRecursive(repo.fs, filepath)
+    await rmRecursive(fs, filepath)
     
     // Verify file is removed
     assert.ok(!(await normalizedFs.exists(filepath)))
   })
 
   await t.test('ok:removes-empty-directory', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const normalizedFs = createFileSystem(repo.fs)
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
+    const normalizedFs = createFileSystem(fs)
     
     const dirpath = join(dir, 'emptydir')
     await normalizedFs.mkdir(dirpath, { recursive: true })
@@ -34,16 +32,15 @@ test('rmRecursive', async (t) => {
     // Verify directory exists
     assert.ok(await normalizedFs.exists(dirpath))
     
-    await rmRecursive(repo.fs, dirpath)
+    await rmRecursive(fs, dirpath)
     
     // Verify directory is removed
     assert.ok(!(await normalizedFs.exists(dirpath)))
   })
 
   await t.test('ok:removes-directory-with-files', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const normalizedFs = createFileSystem(repo.fs)
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
+    const normalizedFs = createFileSystem(fs)
     
     const dirpath = join(dir, 'dir')
     await normalizedFs.mkdir(dirpath, { recursive: true })
@@ -55,7 +52,7 @@ test('rmRecursive', async (t) => {
     assert.ok(await normalizedFs.exists(join(dirpath, 'file1.txt')))
     assert.ok(await normalizedFs.exists(join(dirpath, 'file2.txt')))
     
-    await rmRecursive(repo.fs, dirpath)
+    await rmRecursive(fs, dirpath)
     
     // Verify directory and files are removed
     assert.ok(!(await normalizedFs.exists(dirpath)))
@@ -64,9 +61,8 @@ test('rmRecursive', async (t) => {
   })
 
   await t.test('ok:removes-nested-directory', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const normalizedFs = createFileSystem(repo.fs)
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
+    const normalizedFs = createFileSystem(fs)
     
     const rootDir = join(dir, 'root')
     const subDir1 = join(rootDir, 'sub1')
@@ -89,7 +85,7 @@ test('rmRecursive', async (t) => {
     assert.ok(await normalizedFs.exists(deepDir))
     assert.ok(await normalizedFs.exists(join(deepDir, 'deep.txt')))
     
-    await rmRecursive(repo.fs, rootDir)
+    await rmRecursive(fs, rootDir)
     
     // Verify everything is removed
     assert.ok(!(await normalizedFs.exists(rootDir)))
@@ -99,9 +95,8 @@ test('rmRecursive', async (t) => {
   })
 
   await t.test('ok:directory-only-subdirectories', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const normalizedFs = createFileSystem(repo.fs)
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
+    const normalizedFs = createFileSystem(fs)
     
     const rootDir = join(dir, 'root')
     const subDir1 = join(rootDir, 'sub1')
@@ -117,7 +112,7 @@ test('rmRecursive', async (t) => {
     assert.ok(await normalizedFs.exists(subDir1))
     assert.ok(await normalizedFs.exists(subDir2))
     
-    await rmRecursive(repo.fs, rootDir)
+    await rmRecursive(fs, rootDir)
     
     // Verify all directories are removed
     assert.ok(!(await normalizedFs.exists(rootDir)))
@@ -126,9 +121,8 @@ test('rmRecursive', async (t) => {
   })
 
   await t.test('edge:readdir-returns-null', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const normalizedFs = createFileSystem(repo.fs)
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
+    const normalizedFs = createFileSystem(fs)
     
     const filepath = join(dir, 'file.txt')
     await normalizedFs.write(filepath, 'content', 'utf8')
@@ -141,9 +135,8 @@ test('rmRecursive', async (t) => {
   })
 
   await t.test('ok:directory-mixed-files-subdirs', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const normalizedFs = createFileSystem(repo.fs)
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
+    const normalizedFs = createFileSystem(fs)
     
     const rootDir = join(dir, 'root')
     const subDir = join(rootDir, 'subdir')
@@ -161,7 +154,7 @@ test('rmRecursive', async (t) => {
     assert.ok(await normalizedFs.exists(subDir))
     assert.ok(await normalizedFs.exists(join(subDir, 'subfile.txt')))
     
-    await rmRecursive(repo.fs, rootDir)
+    await rmRecursive(fs, rootDir)
     
     // Verify everything is removed
     assert.ok(!(await normalizedFs.exists(rootDir)))
@@ -171,9 +164,8 @@ test('rmRecursive', async (t) => {
   })
 
   await t.test('edge:lstat-returns-null', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const normalizedFs = createFileSystem(repo.fs)
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
+    const normalizedFs = createFileSystem(fs)
     
     const dirpath = join(dir, 'dir')
     await normalizedFs.mkdir(dirpath, { recursive: true })
@@ -187,9 +179,8 @@ test('rmRecursive', async (t) => {
   })
 
   await t.test('ok:deeply-nested-many-files', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const normalizedFs = createFileSystem(repo.fs)
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
+    const normalizedFs = createFileSystem(fs)
     
     const rootDir = join(dir, 'root')
     const level1 = join(rootDir, 'level1')
@@ -215,7 +206,7 @@ test('rmRecursive', async (t) => {
     assert.ok(await normalizedFs.exists(level3))
     assert.ok(await normalizedFs.exists(join(level3, 'file0.txt')))
     
-    await rmRecursive(repo.fs, rootDir)
+    await rmRecursive(fs, rootDir)
     
     // Verify everything is removed
     assert.ok(!(await normalizedFs.exists(rootDir)))

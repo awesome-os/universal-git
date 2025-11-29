@@ -9,7 +9,7 @@ import { join } from '@awesome-os/universal-git-src/utils/join.ts'
 describe('findMergeBase', () => {
   it('silly edge cases', async () => {
     // Setup
-    const { repo } = await makeFixture('test-findMergeBase')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-findMergeBase')
     let base
     // Test
     base = await findMergeBase({
@@ -30,7 +30,7 @@ describe('findMergeBase', () => {
   
   it('no common ancestor scenarios', async () => {
     // Setup
-    const { repo } = await makeFixture('test-findMergeBase')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-findMergeBase')
     // Test
     const base = await findMergeBase({
       repo,
@@ -44,7 +44,7 @@ describe('findMergeBase', () => {
   
   it('fast-forward scenarios', async () => {
     // Setup
-    const { repo } = await makeFixture('test-findMergeBase')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-findMergeBase')
     let base
     // Test
     // Note: These tests may fail if fixture doesn't have complete commit graph
@@ -94,7 +94,7 @@ describe('findMergeBase', () => {
   
   it('diverging scenarios', async () => {
     // Setup
-    const { repo } = await makeFixture('test-findMergeBase')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-findMergeBase')
     let base
     // Test
     // Note: These tests may fail if fixture doesn't have complete commit graph
@@ -163,7 +163,7 @@ describe('findMergeBase', () => {
   
   it('merge commit scenarios', async () => {
     // Setup
-    const { repo } = await makeFixture('test-findMergeBase')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-findMergeBase')
     let base
     // Test
     // Note: These tests may fail if fixture doesn't have complete commit graph
@@ -221,7 +221,7 @@ describe('findMergeBase', () => {
   
   it('recursive merge base scenarios', async () => {
     // Setup
-    const { repo } = await makeFixture('test-findMergeBase')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-findMergeBase')
     // Test
     const base = await findMergeBase({
       repo,
@@ -236,7 +236,7 @@ describe('findMergeBase', () => {
 
   it('fork & rejoin in one branch base scenarios', async () => {
     // Setup
-    const { repo } = await makeFixture('test-findMergeBase')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-findMergeBase')
     // Test
     const base = await findMergeBase({
       repo,

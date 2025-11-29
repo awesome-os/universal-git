@@ -1,12 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { parseGitmodules } from '@awesome-os/universal-git-src/core-utils/filesystem/SubmoduleManager.ts'
 import { makeNodeFixture } from '../../helpers/makeNodeFixture.ts'
 import { join } from '@awesome-os/universal-git-src/utils/join.ts'
 
 test('parseGitmodules', async (t) => {
   await t.test('ok:parses-.gitmodules-file', async () => {
-    const { fs, dir } = await makeNodeFixture('test-submodule-parse')
+    const { repo, fs, dir } = await makeNodeFixture('test-submodule-parse')
     
     // Create .gitmodules file
     const gitmodulesContent = `[submodule "lib"]
@@ -21,7 +20,7 @@ test('parseGitmodules', async (t) => {
     await fs.write(join(dir, '.gitmodules'), gitmodulesContent)
     
     // Parse
-    const submodules = await parseGitmodules({ fs, dir })
+    const submodules = await repo.gitBackend.parseGitmodules(repo.worktreeBackend)
     
     // Assert
     assert.strictEqual(submodules.size, 2)
@@ -42,17 +41,17 @@ test('parseGitmodules', async (t) => {
   })
 
   await t.test('ok:returns-empty-map-when-.gitmodules-does-not-exist', async () => {
-    const { fs, dir } = await makeNodeFixture('test-submodule-empty')
+    const { repo, fs, dir } = await makeNodeFixture('test-submodule-empty')
     
     // Parse (no .gitmodules file)
-    const submodules = await parseGitmodules({ fs, dir })
+    const submodules = await repo.gitBackend.parseGitmodules(repo.worktreeBackend)
     
     // Assert
     assert.strictEqual(submodules.size, 0)
   })
 
   await t.test('ok:handles-missing-path-or-url', async () => {
-    const { fs, dir } = await makeNodeFixture('test-submodule-incomplete')
+    const { repo, fs, dir } = await makeNodeFixture('test-submodule-incomplete')
     
     // Create .gitmodules file with incomplete entries
     const gitmodulesContent = `[submodule "incomplete1"]
@@ -70,7 +69,7 @@ test('parseGitmodules', async (t) => {
     await fs.write(join(dir, '.gitmodules'), gitmodulesContent)
     
     // Parse
-    const submodules = await parseGitmodules({ fs, dir })
+    const submodules = await repo.gitBackend.parseGitmodules(repo.worktreeBackend)
     
     // Assert - only complete entry should be included
     assert.strictEqual(submodules.size, 1)
@@ -80,20 +79,20 @@ test('parseGitmodules', async (t) => {
   })
 
   await t.test('ok:handles-empty-.gitmodules-file', async () => {
-    const { fs, dir } = await makeNodeFixture('test-submodule-empty-file')
+    const { repo, fs, dir } = await makeNodeFixture('test-submodule-empty-file')
     
     // Create empty .gitmodules file
     await fs.write(join(dir, '.gitmodules'), '')
     
     // Parse
-    const submodules = await parseGitmodules({ fs, dir })
+    const submodules = await repo.gitBackend.parseGitmodules(repo.worktreeBackend)
     
     // Assert
     assert.strictEqual(submodules.size, 0)
   })
 
   await t.test('ok:handles-.gitmodules-with-only-comments', async () => {
-    const { fs, dir } = await makeNodeFixture('test-submodule-comments')
+    const { repo, fs, dir } = await makeNodeFixture('test-submodule-comments')
     
     // Create .gitmodules file with only comments
     const gitmodulesContent = `# This is a comment
@@ -102,14 +101,14 @@ test('parseGitmodules', async (t) => {
     await fs.write(join(dir, '.gitmodules'), gitmodulesContent)
     
     // Parse
-    const submodules = await parseGitmodules({ fs, dir })
+    const submodules = await repo.gitBackend.parseGitmodules(repo.worktreeBackend)
     
     // Assert
     assert.strictEqual(submodules.size, 0)
   })
 
   await t.test('ok:handles-multiple-submodules-with-same-path', async () => {
-    const { fs, dir } = await makeNodeFixture('test-submodule-duplicate-path')
+    const { repo, fs, dir } = await makeNodeFixture('test-submodule-duplicate-path')
     
     // Create .gitmodules file with duplicate paths (should use last one)
     const gitmodulesContent = `[submodule "lib1"]
@@ -123,7 +122,7 @@ test('parseGitmodules', async (t) => {
     await fs.write(join(dir, '.gitmodules'), gitmodulesContent)
     
     // Parse
-    const submodules = await parseGitmodules({ fs, dir })
+    const submodules = await repo.gitBackend.parseGitmodules(repo.worktreeBackend)
     
     // Assert - both should be parsed, but getSubmoduleByPath will return the last one
     assert.strictEqual(submodules.size, 2)

@@ -3,7 +3,7 @@ import assert from 'node:assert'
 import { TREE, WORKDIR, STAGE } from '@awesome-os/universal-git-src/index.ts'
 import { GitWalkSymbol } from '@awesome-os/universal-git-src/utils/symbols.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
+import { createRepository } from '@awesome-os/universal-git-src/core-utils/createRepository.ts'
 import type { Walker, WalkerEntry } from '@awesome-os/universal-git-src/models/Walker.ts'
 import { 
   WalkerFactory,
@@ -26,7 +26,8 @@ test('Walker types', async (t) => {
     
     // Walker should be frozen
     assert.throws(() => {
-      ;(walker as any).newProp = 'test'
+      const w = walker as any;
+      w.newProp = 'test';
     }, /Cannot add property|Cannot define property/)
   })
 
@@ -38,7 +39,8 @@ test('Walker types', async (t) => {
     
     // Walker should be frozen
     assert.throws(() => {
-      ;(walker as any).newProp = 'test'
+      const w = walker as any;
+      w.newProp = 'test';
     }, /Cannot add property|Cannot define property/)
   })
 
@@ -50,16 +52,16 @@ test('Walker types', async (t) => {
     
     // Walker should be frozen
     assert.throws(() => {
-      ;(walker as any).newProp = 'test'
+      const w = walker as any;
+      w.newProp = 'test';
     }, /Cannot add property|Cannot define property/)
   })
 
   await t.test('ok:TREE-resolves-GitWalkerRepo', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
+    const { repo } = await makeFixture('test-walk')
     
     const walker = TREE({ ref: 'HEAD' })
-    const instance = await walker[GitWalkSymbol]({ repo })
+    const instance = await walker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
     
     // Should return an instance with readdir method
     assert.ok(instance, 'Should return an instance')
@@ -73,11 +75,10 @@ test('Walker types', async (t) => {
   })
 
   await t.test('ok:WORKDIR-resolves-GitWalkerFs', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
+    const { repo } = await makeFixture('test-walk')
     
     const walker = WORKDIR()
-    const instance = await walker[GitWalkSymbol]({ repo })
+    const instance = await walker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
     
     // Should return an instance with readdir method
     assert.ok(instance, 'Should return an instance')
@@ -91,11 +92,10 @@ test('Walker types', async (t) => {
   })
 
   await t.test('ok:STAGE-resolves-GitWalkerIndex', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
+    const { repo } = await makeFixture('test-walk')
     
     const walker = STAGE()
-    const instance = await walker[GitWalkSymbol]({ repo })
+    const instance = await walker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
     
     // Should return an instance with readdir method
     assert.ok(instance, 'Should return an instance')
@@ -111,46 +111,44 @@ test('Walker types', async (t) => {
   await t.test('error:WORKDIR-bare-repository', async () => {
     const { fs, gitdir } = await makeFixture('test-walk')
     // Create a bare repository (no dir)
-    const repo = await Repository.open({ fs, dir: undefined, gitdir, cache: {}, autoDetectConfig: true })
+    const repo = await createRepository({ fs, dir: undefined, gitdir, cache: {}, autoDetectConfig: true })
     
     const walker = WORKDIR()
     
     await assert.rejects(
       async () => {
-        await walker[GitWalkSymbol]({ repo })
+        await walker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
       },
       /Cannot create WORKDIR walker for bare repository/
     )
   })
 
   await t.test('ok:TREE-different-refs', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
+    const { repo } = await makeFixture('test-walk')
     
     // Test with HEAD
     const headWalker = TREE({ ref: 'HEAD' })
-    const headInstance = await headWalker[GitWalkSymbol]({ repo })
+    const headInstance = await headWalker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
     assert.ok(headInstance, 'Should return instance for HEAD')
     
     // Test with explicit HEAD
     const explicitHeadWalker = TREE({ ref: 'HEAD' })
-    const explicitHeadInstance = await explicitHeadWalker[GitWalkSymbol]({ repo })
+    const explicitHeadInstance = await explicitHeadWalker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
     assert.ok(explicitHeadInstance, 'Should return instance for explicit HEAD')
     
     // Test with default (should default to HEAD)
     const defaultWalker = TREE()
-    const defaultInstance = await defaultWalker[GitWalkSymbol]({ repo })
+    const defaultInstance = await defaultWalker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
     assert.ok(defaultInstance, 'Should return instance for default ref')
   })
 })
 
 test('WalkerEntry interface', async (t) => {
   await t.test('ok:WalkerEntry-TREE-required-methods', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
+    const { repo } = await makeFixture('test-walk')
     
     const walker = TREE({ ref: 'HEAD' })
-    const instance = await walker[GitWalkSymbol]({ repo })
+    const instance = await walker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
     const EntryClass = (instance as any).ConstructEntry
     
     const entry = new EntryClass('.')
@@ -180,11 +178,10 @@ test('WalkerEntry interface', async (t) => {
   })
 
   await t.test('ok:WalkerEntry-WORKDIR-required-methods', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
+    const { repo } = await makeFixture('test-walk')
     
     const walker = WORKDIR()
-    const instance = await walker[GitWalkSymbol]({ repo })
+    const instance = await walker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
     const EntryClass = (instance as any).ConstructEntry
     
     const entry = new EntryClass('.')
@@ -214,11 +211,10 @@ test('WalkerEntry interface', async (t) => {
   })
 
   await t.test('ok:WalkerEntry-STAGE-required-methods', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
+    const { repo } = await makeFixture('test-walk')
     
     const walker = STAGE()
-    const instance = await walker[GitWalkSymbol]({ repo })
+    const instance = await walker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
     const EntryClass = (instance as any).ConstructEntry
     
     const entry = new EntryClass('.')
@@ -248,11 +244,10 @@ test('WalkerEntry interface', async (t) => {
   })
 
   await t.test('ok:WalkerEntry-type-returns-valid', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
+    const { repo } = await makeFixture('test-walk')
     
     const walker = TREE({ ref: 'HEAD' })
-    const instance = await walker[GitWalkSymbol]({ repo })
+    const instance = await walker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
     const EntryClass = (instance as any).ConstructEntry
     
     const rootEntry = new EntryClass('.')
@@ -263,11 +258,10 @@ test('WalkerEntry interface', async (t) => {
   })
 
   await t.test('ok:WalkerEntry-oid-returns-valid-tree', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
+    const { repo } = await makeFixture('test-walk')
     
     const walker = TREE({ ref: 'HEAD' })
-    const instance = await walker[GitWalkSymbol]({ repo })
+    const instance = await walker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
     const EntryClass = (instance as any).ConstructEntry
     
     const rootEntry = new EntryClass('.')
@@ -280,11 +274,10 @@ test('WalkerEntry interface', async (t) => {
   })
 
   await t.test('ok:WalkerEntry-readdir-returns-children', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
+    const { repo } = await makeFixture('test-walk')
     
     const walker = TREE({ ref: 'HEAD' })
-    const instance = await walker[GitWalkSymbol]({ repo })
+    const instance = await walker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
     const EntryClass = (instance as any).ConstructEntry
     
     const rootEntry = new EntryClass('.')
@@ -301,11 +294,10 @@ test('WalkerEntry interface', async (t) => {
   })
 
   await t.test('ok:WalkerEntry-readdir-returns-null-blob', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
+    const { repo } = await makeFixture('test-walk')
     
     const walker = TREE({ ref: 'HEAD' })
-    const instance = await walker[GitWalkSymbol]({ repo })
+    const instance = await walker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
     const EntryClass = (instance as any).ConstructEntry
     
     // Find a blob entry
@@ -329,17 +321,25 @@ test('WalkerEntry interface', async (t) => {
 
 test('WalkerFactory', async (t) => {
   await t.test('ok:WalkerFactory-from-creates-Walker', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
+    const { repo } = await makeFixture('test-walk')
     
-    const walker = WalkerFactory.from(async ({ repo }) => {
-      const { GitWalkerRepo } = await import('@awesome-os/universal-git-src/models/GitWalkerRepo.ts')
-      const gitdir = await repo.getGitdir()
-      return new GitWalkerRepo({ fs: repo.fs, gitdir, ref: 'HEAD', cache: repo.cache })
+    const walker = WalkerFactory.from(async ({ gitBackend }) => {
+      // Just test that we can create a custom walker from backends
+      // We don't need to actually implement a working walker here, 
+      // just verify the factory passes the backends correctly
+      assert.ok(gitBackend, 'gitBackend should be passed to factory')
+      return {
+        readdir: async () => [],
+        type: async () => 'tree',
+        mode: async () => 0o40000,
+        oid: async () => '0000000000000000000000000000000000000000',
+        content: async () => undefined,
+        stat: async () => ({})
+      }
     })
     
     assert.ok(GitWalkSymbol in walker, 'Should have GitWalkSymbol')
-    const instance = await walker[GitWalkSymbol]({ repo })
+    const instance = await walker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
     assert.ok(instance, 'Should return an instance')
   })
 
@@ -347,9 +347,8 @@ test('WalkerFactory', async (t) => {
     const walker = WalkerFactory.tree({ ref: 'HEAD' })
     assert.ok(GitWalkSymbol in walker, 'Should have GitWalkSymbol')
     
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
-    const instance = await walker[GitWalkSymbol]({ repo })
+    const { repo } = await makeFixture('test-walk')
+    const instance = await walker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
     assert.ok(instance, 'Should return an instance')
   })
 
@@ -357,9 +356,8 @@ test('WalkerFactory', async (t) => {
     const walker = WalkerFactory.workdir()
     assert.ok(GitWalkSymbol in walker, 'Should have GitWalkSymbol')
     
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
-    const instance = await walker[GitWalkSymbol]({ repo })
+    const { repo } = await makeFixture('test-walk')
+    const instance = await walker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
     assert.ok(instance, 'Should return an instance')
   })
 
@@ -367,17 +365,32 @@ test('WalkerFactory', async (t) => {
     const walker = WalkerFactory.stage()
     assert.ok(GitWalkSymbol in walker, 'Should have GitWalkSymbol')
     
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
-    const instance = await walker[GitWalkSymbol]({ repo })
+    const { repo } = await makeFixture('test-walk')
+    const instance = await walker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
     assert.ok(instance, 'Should return an instance')
+  })
+
+  await t.test('ok:TREE-uses-backend-createTreeWalker', async () => {
+    const { repo } = await makeFixture('test-walk')
+    
+    // Spy on gitBackend.createTreeWalker
+    const originalCreateTreeWalker = repo.gitBackend.createTreeWalker
+    let called = false
+    repo.gitBackend.createTreeWalker = async (...args) => {
+      called = true
+      return originalCreateTreeWalker.apply(repo.gitBackend, args)
+    }
+    
+    const walker = TREE({ ref: 'HEAD' })
+    await walker[GitWalkSymbol]({ gitBackend: repo.gitBackend, worktreeBackend: repo.worktreeBackend || undefined, cache: repo.cache })
+    
+    assert.ok(called, 'Should have called gitBackend.createTreeWalker')
   })
 })
 
 test('Walker wrapper functions', async (t) => {
   await t.test('WalkerMapWithNulls handles null entries', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
+    const { repo } = await makeFixture('test-walk')
     
     const map = WalkerMapWithNulls(async (filepath: string, [head, stage]: (WalkerEntry | null)[]): Promise<string | undefined> => {
       if (!head && !stage) return undefined
@@ -394,8 +407,7 @@ test('Walker wrapper functions', async (t) => {
   })
 
   await t.test('WalkerMapFiltered filters undefined results', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
+    const { repo } = await makeFixture('test-walk')
     
     const map = WalkerMapFiltered(async (filepath: string, entries: WalkerEntry[]): Promise<string | undefined> => {
       // Return undefined for some files
@@ -413,8 +425,7 @@ test('Walker wrapper functions', async (t) => {
   })
 
   await t.test('WalkerReduceTree filters undefined children', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
+    const { repo } = await makeFixture('test-walk')
     
     const reduce = WalkerReduceTree(async (parent: string | undefined, children: string[]): Promise<string | undefined> => {
       if (!parent && children.length === 0) return undefined
@@ -432,8 +443,7 @@ test('Walker wrapper functions', async (t) => {
   })
 
   await t.test('WalkerReduceFlat flattens results', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
+    const { repo } = await makeFixture('test-walk')
     
     const reduce = WalkerReduceFlat()
     
@@ -449,8 +459,7 @@ test('Walker wrapper functions', async (t) => {
   })
 
   await t.test('WalkerIterate wraps iteration function', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-walk')
-    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
+    const { repo } = await makeFixture('test-walk')
     
     const iterate = WalkerIterate(async (walk, children) => {
       return Promise.all([...children].map(walk))

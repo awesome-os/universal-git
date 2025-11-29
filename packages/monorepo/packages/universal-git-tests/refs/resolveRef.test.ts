@@ -6,7 +6,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('resolveRef', async (t) => {
   await t.test('ok:resolve-full-oid', async () => {
     // Setup
-    const { repo } = await makeFixture('test-resolveRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resolveRef')
     // Test
     const ref = await resolveRef({
       repo,
@@ -17,7 +17,7 @@ test('resolveRef', async (t) => {
 
   await t.test('ok:resolve-remote-branch', async () => {
     // Setup
-    const { repo } = await makeFixture('test-resolveRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resolveRef')
     // Test
     const ref = await resolveRef({
       repo,
@@ -28,7 +28,7 @@ test('resolveRef', async (t) => {
 
   await t.test('ok:resolve-config-ref', async () => {
     // Setup
-    const { repo } = await makeFixture('test-resolveRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resolveRef')
     // Test
     const ref = await resolveRef({
       repo,
@@ -39,7 +39,7 @@ test('resolveRef', async (t) => {
 
   await t.test('ok:resolve-tag', async () => {
     // Setup
-    const { repo } = await makeFixture('test-resolveRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resolveRef')
     // Test
     const ref = await resolveRef({
       repo,
@@ -50,7 +50,7 @@ test('resolveRef', async (t) => {
 
   await t.test('ok:resolve-HEAD', async () => {
     // Setup
-    const { repo } = await makeFixture('test-resolveRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resolveRef')
     // Test
     const ref = await resolveRef({
       repo,
@@ -61,7 +61,7 @@ test('resolveRef', async (t) => {
 
   await t.test('param:depth', async () => {
     // Setup
-    const { repo } = await makeFixture('test-resolveRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resolveRef')
     // Test
     const ref = await resolveRef({
       repo,
@@ -73,7 +73,7 @@ test('resolveRef', async (t) => {
 
   await t.test('ok:resolve-packed-refs', async () => {
     // Setup
-    const { repo } = await makeFixture('test-resolveRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resolveRef')
     // Test
     // Note: This test may fail if the fixture doesn't have v0.0.1 in packed-refs
     // Skipping for now as it may be a fixture issue
@@ -96,7 +96,7 @@ test('resolveRef', async (t) => {
 
   await t.test('error:ref-not-exist', async () => {
     // Setup
-    const { repo } = await makeFixture('test-resolveRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resolveRef')
     // Test
     let error: Error | {} = {}
     try {

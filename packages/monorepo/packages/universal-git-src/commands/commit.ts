@@ -172,11 +172,22 @@ export async function _commit({
   const cache = repo?.cache || _cache || {}
   let gitdir = _gitdir || (repo ? await repo.getGitdir() : undefined)
   
+  // Ensure we have a filesystem if possible
+  // We need to import createFileSystem if we use it
+  let fs: FileSystem | undefined
+  if (repo && repo.fs) {
+    const { createFileSystem } = await import('../utils/createFileSystem.ts')
+    fs = createFileSystem(repo.fs)
+  } else if (_fs) {
+    const { createFileSystem } = await import('../utils/createFileSystem.ts')
+    fs = createFileSystem(_fs)
+  }
+
   if (!gitdir) throw new MissingParameterError('gitdir')
   
   // If Repository is provided, use worktree's gitdir to ensure we're using the correct index
   if (repo) {
-    const worktree = repo.getWorktree()
+    const worktree = await repo.getWorktree()
     if (worktree) {
       gitdir = await worktree.getGitdir()
     }
@@ -715,10 +726,6 @@ export async function _commit({
       } else {
         // Normal commit - just update the ref
         // Use Repository.writeRef() or direct writeRef() for consistency
-        // DEBUG: Log ref and OID being written for native git compatibility debugging
-        if (process.env.DEBUG_COMMIT_REFS === 'true') {
-          console.log(`[DEBUG] Writing ref: ${ref} -> ${oid}`)
-        }
         if (repo) {
           await repo.writeRef(ref, oid, true) // skipReflog=true: commit will create its own reflog entry
         } else {

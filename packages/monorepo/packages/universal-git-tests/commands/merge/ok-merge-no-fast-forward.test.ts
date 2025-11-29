@@ -74,7 +74,7 @@ async function verifyAndLogConfig(repo: TestRepo, label: string = 'Before merge'
       // Last resort: use old getConfig API (only reads local config)
       for (const key of mergeConfigKeys) {
         try {
-          ugitConfig[key] = await getConfig({ fs: repo.fs, gitdir: repo.gitdir, path: key })
+          ugitConfig[key] = await getConfig({ fs: fs, gitdir: repo.gitdir, path: key })
         } catch {
           ugitConfig[key] = undefined
         }
@@ -119,7 +119,7 @@ describe('merge', () => {
 
   it('ok:merge-no-fast-forward', async () => {
         // Setup
-        const { repo } = await makeFixture('test-merge-no-ff')
+        const { repo, fs, dir, gitdir } = await makeFixture('test-merge-no-ff')
         const originalOid = await resolveRef({
         repo,
         ref: 'main',

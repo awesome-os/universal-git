@@ -20,10 +20,10 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('param:gitdir-or-dir-missing', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     try {
       await resetIndex({
-        fs: repo.fs,
+        fs: fs,
         filepath: 'test.txt',
       } as any)
       assert.fail('Should have thrown MissingParameterError')
@@ -37,7 +37,7 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('param:filepath-missing', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     try {
       await resetIndex({
         repo,
@@ -50,7 +50,7 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // gitdir is derived from dir, so when repo is provided, gitdir should be derived
     try {
       await resetIndex({
@@ -67,7 +67,7 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('edge:missing-ref-new-repo', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // In a new repository without commits, resetIndex should not throw when ref is not provided
     try {
       await resetIndex({
@@ -84,7 +84,7 @@ test('resetIndex', async (t) => {
   })
   await t.test('ok:modified-file', async () => {
     // Setup
-    const { repo } = await makeFixture('test-resetIndex', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex', { init: true })
     // Test
     const before = await listFiles({ repo })
     assert.ok(Array.isArray(before))
@@ -102,7 +102,7 @@ test('resetIndex', async (t) => {
 
   await t.test('ok:new-file', async () => {
     // Setup
-    const { repo } = await makeFixture('test-resetIndex', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex', { init: true })
     // Test
     const before = await listFiles({ repo })
     assert.ok(Array.isArray(before))
@@ -120,7 +120,7 @@ test('resetIndex', async (t) => {
 
   await t.test('ok:new-repository', async () => {
     // Setup
-    const { repo } = await makeFixture('test-resetIndex-new', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex-new', { init: true })
     // Test
     const before = await listFiles({ repo })
     assert.ok(Array.isArray(before))
@@ -136,7 +136,7 @@ test('resetIndex', async (t) => {
 
   await t.test('ok:reset-to-oid', async () => {
     // Setup
-    const { repo } = await makeFixture('test-resetIndex-oid', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex-oid', { init: true })
     // Test
     const before = await statusMatrix({ repo })
     assert.ok(Array.isArray(before))
@@ -165,7 +165,7 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('error:ref-cannot-be-resolved', async () => {
-    const { repo } = await makeFixture('test-resetIndex', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex', { init: true })
     
     // Try to reset with invalid ref
     await assert.rejects(
@@ -184,7 +184,7 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('edge:file-not-in-tree', async () => {
-    const { repo } = await makeFixture('test-resetIndex', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex', { init: true })
     
     // Reset a file that doesn't exist in HEAD (should remove from index)
     await resetIndex({
@@ -198,11 +198,9 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('behavior:workdir-stats-match', async () => {
-    const { repo } = await makeFixture('test-resetIndex', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex', { init: true })
     // Get file stats before reset
-    const beforeStats = await repo.fs.lstat(join(dir, 'a.txt'))
+    const beforeStats = await fs.lstat(join(dir, 'a.txt'))
     
     // Reset file (should use workdir stats if hash matches)
     await resetIndex({
@@ -215,16 +213,14 @@ test('resetIndex', async (t) => {
     assert.ok(files.includes('a.txt'))
     
     // The stats should match workdir stats (implementation detail, but we can verify file is still there)
-    const afterStats = await repo.fs.lstat(join(dir, 'a.txt'))
+    const afterStats = await fs.lstat(join(dir, 'a.txt'))
     assert.ok(afterStats)
   })
 
   await t.test('behavior:default-stats-no-match', async () => {
-    const { repo } = await makeFixture('test-resetIndex', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex', { init: true })
     // Modify file in workdir so hash doesn't match
-    await repo.fs.write(join(dir, 'a.txt'), 'modified content')
+    await fs.write(join(dir, 'a.txt'), 'modified content')
     
     // Reset file (should use default stats since hash doesn't match)
     await resetIndex({
@@ -238,7 +234,7 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('param:dir-not-provided', async () => {
-    const { repo } = await makeFixture('test-resetIndex', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex', { init: true })
     
     // Reset without dir (should skip workdir check)
     await resetIndex({
@@ -252,11 +248,9 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('behavior:remove-when-oid-null', async () => {
-    const { repo } = await makeFixture('test-resetIndex', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex', { init: true })
     // Add a new file to index first
-    await repo.fs.write(join(dir, 'newfile.txt'), 'new content')
+    await fs.write(join(dir, 'newfile.txt'), 'new content')
     const { add } = await import('@awesome-os/universal-git-src/index.ts')
     await add({ repo, filepath: 'newfile.txt' })
     
@@ -276,7 +270,7 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('error:caller-property', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     
     // Try to reset with invalid ref (should set caller property)
     try {
@@ -292,7 +286,7 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('param:custom-ref', async () => {
-    const { repo } = await makeFixture('test-resetIndex', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex', { init: true })
     
     // Get a valid commit OID from the repository
     const { readCommit } = await import('@awesome-os/universal-git-src/index.ts')
@@ -312,11 +306,9 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('edge:file-in-workdir-not-in-ref', async () => {
-    const { repo } = await makeFixture('test-resetIndex', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex', { init: true })
     // Create a new file in workdir
-    await repo.fs.write(join(dir, 'workdir-only.txt'), 'workdir content')
+    await fs.write(join(dir, 'workdir-only.txt'), 'workdir content')
     
     // Add to index
     const { add } = await import('@awesome-os/universal-git-src/index.ts')
@@ -334,12 +326,10 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('edge:nested-paths', async () => {
-    const { repo } = await makeFixture('test-resetIndex', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex', { init: true })
     // Create a nested file
-    await repo.fs.mkdir(join(dir, 'subdir'), { recursive: true })
-    await repo.fs.write(join(dir, 'subdir', 'nested.txt'), 'nested content')
+    await fs.mkdir(join(dir, 'subdir'), { recursive: true })
+    await fs.write(join(dir, 'subdir', 'nested.txt'), 'nested content')
     
     // Add to index
     const { add } = await import('@awesome-os/universal-git-src/index.ts')
@@ -361,11 +351,9 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('edge:special-chars', async () => {
-    const { repo } = await makeFixture('test-resetIndex', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex', { init: true })
     // Create a file with special characters in name
-    await repo.fs.write(join(dir, 'file with spaces.txt'), 'content')
+    await fs.write(join(dir, 'file with spaces.txt'), 'content')
     
     // Add to index
     const { add } = await import('@awesome-os/universal-git-src/index.ts')
@@ -387,7 +375,7 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('error:resolveFilepath-non-NotFoundError', async () => {
-    const { repo } = await makeFixture('test-resetIndex', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex', { init: true })
     
     // This test verifies that errors from resolveFilepath are caught and handled
     // by setting oid to null (deleted state)
@@ -404,7 +392,7 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('edge:file-in-index-not-in-workdir', async () => {
-    const { repo } = await makeFixture('test-resetIndex', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex', { init: true })
     
     // File exists in index and HEAD, but not in workdir
     // Reset should still work (uses default stats)
@@ -419,7 +407,7 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('edge:empty-filepath', async () => {
-    const { repo } = await makeFixture('test-resetIndex', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex', { init: true })
     
     // Empty filepath might be accepted (empty string is truthy in JavaScript)
     // The operation might succeed or fail depending on implementation
@@ -437,14 +425,14 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('error:Repository-open-fails', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     
     // Try to reset with invalid gitdir
     // Repository.open might not fail immediately, but operations later might fail
     // Let's verify that an error is thrown and has the caller property
     try {
       await resetIndex({
-        fs: repo.fs,
+        fs: fs,
         gitdir: '/nonexistent/gitdir',
         filepath: 'test.txt',
       })
@@ -458,7 +446,7 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('error:index-operations-fail', async () => {
-    const { repo } = await makeFixture('test-resetIndex', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex', { init: true })
     
     // This test verifies error handling in index operations
     // We can't easily simulate index operation failures, but we can verify
@@ -474,26 +462,24 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('edge:forward-slashes', async () => {
-    const { repo } = await makeFixture('test-resetIndex', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex', { init: true })
     // Create nested file - ensure parent directories exist
     const nestedPath = join(dir, 'dir1', 'dir2')
     const filePath = join(nestedPath, 'deep.txt')
     
     // Create parent directories first if they don't exist
     try {
-      await repo.fs.mkdir(nestedPath, { recursive: true })
+      await fs.mkdir(nestedPath, { recursive: true })
     } catch (err: any) {
       // If mkdir fails, try creating parent directories one by one
       if (err.code === 'ENOENT') {
-        await repo.fs.mkdir(join(dir, 'dir1'), { recursive: true })
-        await repo.fs.mkdir(nestedPath, { recursive: true })
+        await fs.mkdir(join(dir, 'dir1'), { recursive: true })
+        await fs.mkdir(nestedPath, { recursive: true })
       } else {
         throw err
       }
     }
-    await repo.fs.write(filePath, 'deep content')
+    await fs.write(filePath, 'deep content')
     
     // Add to index
     const { add } = await import('@awesome-os/universal-git-src/index.ts')
@@ -511,7 +497,7 @@ test('resetIndex', async (t) => {
   })
 
   await t.test('edge:workdir-read-null', async () => {
-    const { repo } = await makeFixture('test-resetIndex', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-resetIndex', { init: true })
     
     // When dir is provided but file doesn't exist, fs.read returns null
     // This should be handled gracefully (uses default stats)

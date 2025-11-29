@@ -517,7 +517,9 @@ export async function writeTreeChanges({
   }
 
   const entries = await _walk({
-    repo,
+    gitBackend: repo.gitBackend,
+    worktreeBackend: repo.worktreeBackend || undefined,
+    cache: repo.cache,
     trees,
     map,
     reduce: customReduce as WalkerReduce,
@@ -623,7 +625,7 @@ export async function writeTreeChanges({
       // Get the HEAD tree OID from the TREE walker
       const headTree = treePair[0] as Walker
       const { GitWalkSymbol } = await import('./symbols.ts')
-      const headWalker = await headTree[GitWalkSymbol]({ repo })
+      const headWalker = await headTree[GitWalkSymbol]({ gitBackend: repo.gitBackend, cache: repo.cache })
       const headTreeOid = await headWalker.oid({ _fullpath: '.' } as any)
       
       if (finalTreeOid === headTreeOid) {
@@ -642,7 +644,7 @@ export async function writeTreeChanges({
       // Get the base tree OID from the TREE/STAGE walker
       const baseTree = treePair[0] as Walker
       const { GitWalkSymbol } = await import('./symbols.ts')
-      const baseWalker = await baseTree[GitWalkSymbol]({ repo })
+      const baseWalker = await baseTree[GitWalkSymbol]({ gitBackend: repo.gitBackend, cache: repo.cache })
       const baseTreeOid = await baseWalker.oid({ _fullpath: '.' } as any)
       
       if (finalTreeOid === baseTreeOid) {
@@ -742,8 +744,15 @@ export async function applyTreeChanges({
     return flattenedChildren
   }
 
+  const fs = (worktreeBackend as any).fs
+  if (!fs) throw new Error('worktreeBackend must provide fs for applyTreeChanges')
+  const gitdir = await repo.getGitdir()
+  const dir = ''
+
   const ops = await _walk({
-    repo,
+    gitBackend: repo.gitBackend,
+    worktreeBackend: repo.worktreeBackend || undefined,
+    cache: repo.cache,
     trees: [WalkerFactory.tree({ ref: parentCommit }), WalkerFactory.tree({ ref: stashCommit })],
     reduce: customReduce as WalkerReduce,
     map: WalkerMapWithNulls(async (filepath: string, [parent, stash]: (WalkerEntry | null)[]): Promise<{ method: string; filepath: string; oid?: string } | undefined> => {
@@ -756,23 +765,20 @@ export async function applyTreeChanges({
       // Helper function to resolve entry from a commit's tree directly
       const resolveEntryFromCommit = async (commitRef: string, filepath: string): Promise<{ type: 'tree' | 'blob' | 'special' | 'commit', oid: string } | null> => {
         try {
-          const { readObject } = await import('../git/objects/readObject.ts')
-          const { resolveRef } = await import('../git/refs/readRef.ts')
           const commitParser = await import('../core-utils/parsers/Commit.ts')
           const treeParser = await import('../core-utils/parsers/Tree.ts')
           const parseCommit = commitParser.parse
           const parseTree = treeParser.parse
-          const commitOid = await resolveRef({ fs, gitdir, ref: commitRef })
-          const commitResult = await readObject({ fs, cache, gitdir, oid: commitOid, format: 'content' })
-          if (commitResult.type !== 'commit') {
-            return null
-          }
-          const commit = parseCommit(commitResult.object)
-          const treeResult = await readObject({ fs, cache, gitdir, oid: commit.tree, format: 'content' })
-          if (treeResult.type !== 'tree') {
-            return null
-          }
-          const treeEntries = parseTree(treeResult.object)
+          
+          const commitOid = await repo.gitBackend.expandRef(commitRef)
+          const { object: commitBuffer, type: commitType } = await repo.gitBackend.readObject(commitOid, 'content', repo.cache)
+          if (commitType !== 'commit') return null
+          
+          const commit = parseCommit(commitBuffer)
+          const { object: treeBuffer, type: treeType } = await repo.gitBackend.readObject(commit.tree, 'content', repo.cache)
+          if (treeType !== 'tree') return null
+          
+          const treeEntries = parseTree(treeBuffer)
           const pathParts = filepath.split('/').filter(p => p)
           let currentEntries = treeEntries
           for (let i = 0; i < pathParts.length - 1; i++) {
@@ -780,8 +786,8 @@ export async function applyTreeChanges({
             if (!entry || entry.type !== 'tree') {
               return null
             }
-            const subTreeResult = await readObject({ fs, cache, gitdir, oid: entry.oid, format: 'content' })
-            currentEntries = parseTree(subTreeResult.object)
+            const { object: subTreeBuffer } = await repo.gitBackend.readObject(entry.oid, 'content', repo.cache)
+            currentEntries = parseTree(subTreeBuffer)
           }
           const entry = currentEntries.find(e => e.path === pathParts[pathParts.length - 1])
           if (entry) {
@@ -1035,7 +1041,7 @@ export async function applyTreeChanges({
               if (!repo.gitBackend) {
                 throw new Error('gitBackend is required for applyTreeChanges')
               }
-              const result = await repo.gitBackend.readObject({ oid: op.oid })
+              const result = await repo.gitBackend.readObject(op.oid, 'content', repo.cache)
               if (result.type !== 'blob') {
                 throw new Error(`Expected blob object, got ${result.type}`)
               }
@@ -1118,7 +1124,8 @@ export async function applyTreeChanges({
         currentIndex.insert({ filepath, stats: finalStats, oid })
       }
     }
-    await repo.writeIndexDirect(currentIndex)
+    const objectFormat = await detectObjectFormat(undefined, undefined, repo.cache, repo.gitBackend)
+    await repo.writeIndexDirect(await currentIndex.toBuffer(objectFormat))
   }
 }
 

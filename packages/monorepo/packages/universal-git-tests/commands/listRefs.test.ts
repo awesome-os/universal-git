@@ -6,7 +6,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 describe('listRefs', () => {
   it('ok:basic', async () => {
     // Setup
-    const { repo } = await makeFixture('test-listRefs')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-listRefs')
     // Test
     const refs = await listRefs({
       repo,
@@ -33,14 +33,14 @@ describe('listRefs', () => {
   })
 
   it('param:repo-provided', async () => {
-    const { repo } = await makeFixture('test-listRefs')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-listRefs')
     const refs = await listRefs({ repo, filepath: 'refs/tags' })
     assert.ok(Array.isArray(refs))
     assert.ok(refs.length >= 0)
   })
 
   it('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-listRefs')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-listRefs')
     const refs = await listRefs({ repo, filepath: 'refs/tags' })
     assert.ok(Array.isArray(refs))
     assert.ok(refs.length >= 0)
@@ -48,7 +48,7 @@ describe('listRefs', () => {
 
   it('edge:missing-packed-refs', async () => {
     // Test - lines 72-73: catch block when packed-refs doesn't exist
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const refs = await listRefs({
       repo,
       filepath: 'refs/heads',
@@ -58,7 +58,7 @@ describe('listRefs', () => {
   })
 
   it('error:caller-property', async () => {
-    const { repo } = await makeFixture('test-listRefs')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-listRefs')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await listRefs({
@@ -73,21 +73,21 @@ describe('listRefs', () => {
   })
 
   it('param:empty-filepath', async () => {
-    const { repo } = await makeFixture('test-listRefs')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-listRefs')
     const refs = await listRefs({ repo, filepath: '' })
     assert.ok(Array.isArray(refs))
     assert.ok(refs.length >= 0)
   })
 
   it('edge:non-existent-ref-path', async () => {
-    const { repo } = await makeFixture('test-listRefs')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-listRefs')
     const refs = await listRefs({ repo, filepath: 'refs/nonexistent' })
     assert.ok(Array.isArray(refs))
     assert.strictEqual(refs.length, 0)
   })
 
   it('ok:refs-heads-path', async () => {
-    const { repo } = await makeFixture('test-listRefs')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-listRefs')
     const refs = await listRefs({ repo, filepath: 'refs/heads' })
     assert.ok(Array.isArray(refs))
     assert.ok(refs.length >= 0)

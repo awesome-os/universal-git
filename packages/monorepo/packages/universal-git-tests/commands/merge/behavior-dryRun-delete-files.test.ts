@@ -74,7 +74,7 @@ async function verifyAndLogConfig(repo: TestRepo, label: string = 'Before merge'
       // Last resort: use old getConfig API (only reads local config)
       for (const key of mergeConfigKeys) {
         try {
-          ugitConfig[key] = await getConfig({ fs: repo.fs, gitdir: repo.gitdir, path: key })
+          ugitConfig[key] = await getConfig({ fs: fs, gitdir: repo.gitdir, path: key })
         } catch {
           ugitConfig[key] = undefined
         }
@@ -124,7 +124,7 @@ describe('merge', () => {
 
         if (!isGitAvailable()) {
         // Fallback to fixture-based test if git is not available
-        const { repo } = await makeFixture('test-merge')
+        const { repo, fs, dir, gitdir } = await makeFixture('test-merge')
         const commit = (
         await log({
         repo,
@@ -161,9 +161,8 @@ describe('merge', () => {
         )[0]
         assert.strictEqual(notMergeCommit.oid, originalCommit.oid)
         if (!report.oid) throw new Error('type error')
-        const gitdir = await repo.getGitdir()
         assert.strictEqual(
-        await repo.fs!.exists(
+        await fs!.exists(
         `${gitdir}/objects/${report.oid.slice(0, 2)}/${report.oid.slice(2)}`
         ),
         false

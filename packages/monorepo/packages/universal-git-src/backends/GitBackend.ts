@@ -113,6 +113,12 @@ export type GitBackend = {
    */
   reloadConfig(): Promise<void>
 
+  /**
+   * Returns the configuration as a plain JavaScript object
+   * This provides a unified view of the configuration
+   */
+  getConfigFile(): Promise<any>
+
   // ============================================================================
   // Worktree Config Operations (require worktreeBackend to determine worktree gitdir)
   // ============================================================================
@@ -642,6 +648,50 @@ export type GitBackend = {
   getSubmoduleByPath(worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend, path: string): Promise<{ name: string; path: string; url: string; branch?: string } | null>
 
   /**
+   * Initializes a submodule (creates the submodule directory structure and copies URL to config)
+   * @param worktreeBackend - Worktree backend
+   * @param name - Submodule name
+   */
+  initSubmodule(worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend, name: string): Promise<void>
+
+  /**
+   * Updates a submodule (clones and checks out the correct commit)
+   * @param worktreeBackend - Worktree backend
+   * @param name - Submodule name
+   * @param commitOid - Commit OID to checkout
+   */
+  updateSubmodule(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    name: string,
+    commitOid: string
+  ): Promise<void>
+
+  /**
+   * Updates a submodule URL in .gitmodules
+   * @param worktreeBackend - Worktree backend
+   * @param name - Submodule name
+   * @param url - New URL
+   */
+  updateSubmoduleUrl(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    name: string,
+    url: string
+  ): Promise<void>
+
+  /**
+   * Checks if a path is a submodule
+   * @param worktreeBackend - Worktree backend
+   * @param path - Path to check
+   */
+  isSubmodule(worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend, path: string): Promise<boolean>
+
+  /**
+   * Gets the gitdir for a submodule
+   * @param path - Submodule path
+   */
+  getSubmoduleGitdir(path: string): Promise<string>
+
+  /**
    * Reads a submodule config file
    */
   readSubmoduleConfig(path: string): Promise<string | null>
@@ -827,6 +877,25 @@ export type GitBackend = {
       remote?: string
       track?: boolean
       oldOid?: string
+    }
+  ): Promise<void>
+
+  /**
+   * Checkout a specific tree to the working directory
+   * @param worktreeBackend - Worktree backend for file access
+   * @param treeOid - The tree OID to checkout
+   * @param options - Checkout options
+   */
+  checkoutTree(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    treeOid: string,
+    options?: {
+      filepaths?: string[]
+      force?: boolean
+      dryRun?: boolean
+      sparsePatterns?: string[]
+      onProgress?: import('../git/remote/types.ts').ProgressCallback
+      index?: import('../git/index/GitIndex.ts').GitIndex
     }
   ): Promise<void>
 

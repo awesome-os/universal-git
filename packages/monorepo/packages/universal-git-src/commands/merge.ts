@@ -91,6 +91,7 @@ export async function merge({
   repo: Repository
   autoDetectConfig?: boolean
 }): Promise<MergeResult> {
+  console.log(`[merge] Entry args:`, { ours: _ours, theirs: _theirs, fastForward, dryRun, noUpdateBranch })
   try {
     // Support both new signature (two GitBackends) and legacy signature (Repository)
     let oursBackend: import('../backends/GitBackend.ts').GitBackend
@@ -352,8 +353,32 @@ export async function _merge({
       }
       
       if (indexBuffer.length > 0) {
-        // Get object format from config via Repository
-        const objectFormat = await repo.getObjectFormat()
+        // Get object format from config
+        const hasConfig = await gitBackend.hasConfig()
+        if (!hasConfig) {
+          throw new NotFoundError('repository (not initialized)')
+        }
+        const configBuffer = await gitBackend.readConfig()
+        let objectFormat: 'sha1' | 'sha256' = 'sha1'
+        if (configBuffer.length > 0) {
+          const configContent = configBuffer.toString('utf8')
+          const lines = configContent.split('\n')
+          let inExtensions = false
+          for (const line of lines) {
+            const trimmed = line.trim()
+            if (trimmed === '[extensions]') {
+              inExtensions = true
+            } else if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+              inExtensions = false
+            } else if (inExtensions && trimmed.startsWith('objectformat')) {
+              const match = trimmed.match(/objectformat\s*=\s*(\w+)/i)
+              if (match && match[1].toLowerCase() === 'sha256') {
+                objectFormat = 'sha256'
+                break
+              }
+            }
+          }
+        }
         const index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
         
         // Check for unmerged paths
@@ -470,8 +495,32 @@ export async function _merge({
     }
     // 4b825…  == the empty tree used by git for unrelated histories (SHA-1)
     // For SHA-256, use the empty tree OID for that format
-    // Get object format from config via Repository
-    const objectFormat = await repo.getObjectFormat()
+    // Get object format from config
+    const hasConfig = await gitBackend.hasConfig()
+    if (!hasConfig) {
+      throw new NotFoundError('repository (not initialized)')
+    }
+    const configBuffer = await gitBackend.readConfig()
+    let objectFormat: 'sha1' | 'sha256' = 'sha1'
+    if (configBuffer.length > 0) {
+      const configContent = configBuffer.toString('utf8')
+      const lines = configContent.split('\n')
+      let inExtensions = false
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (trimmed === '[extensions]') {
+          inExtensions = true
+        } else if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+          inExtensions = false
+        } else if (inExtensions && trimmed.startsWith('objectformat')) {
+          const match = trimmed.match(/objectformat\s*=\s*(\w+)/i)
+          if (match && match[1].toLowerCase() === 'sha256') {
+            objectFormat = 'sha256'
+            break
+          }
+        }
+      }
+    }
     const emptyTreeOid = objectFormat === 'sha256'
       ? '0'.repeat(64) // SHA-256 empty tree (all zeros)
       : '4b825dc642cb6eb9a060e54bf8d69288fbee4904' // SHA-1 empty tree
@@ -500,7 +549,9 @@ export async function _merge({
   }
 
   if (fastForward && baseOid === ourOid) {
+    console.log(`[_merge] Fast-forward path: baseOid=${baseOid}, ourOid=${ourOid}, theirOid=${theirOid}`)
     if (!dryRun && !noUpdateBranch) {
+      console.log('[_merge] Fast-forward: updating ref')
       // Read old branch OID for reflog before updating
       let oldBranchOid: string | undefined
       try {
@@ -636,8 +687,32 @@ export async function _merge({
     }
     
     let index: GitIndex
-    // Get object format from config via Repository
-    const objectFormat = await repo.getObjectFormat()
+    // Get object format from config
+    const hasConfig = await gitBackend.hasConfig()
+    if (!hasConfig) {
+      throw new NotFoundError('repository (not initialized)')
+    }
+    const configBuffer = await gitBackend.readConfig()
+    let objectFormat: 'sha1' | 'sha256' = 'sha1'
+    if (configBuffer.length > 0) {
+      const configContent = configBuffer.toString('utf8')
+      const lines = configContent.split('\n')
+      let inExtensions = false
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (trimmed === '[extensions]') {
+          inExtensions = true
+        } else if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+          inExtensions = false
+        } else if (inExtensions && trimmed.startsWith('objectformat')) {
+          const match = trimmed.match(/objectformat\s*=\s*(\w+)/i)
+          if (match && match[1].toLowerCase() === 'sha256') {
+            objectFormat = 'sha256'
+            break
+          }
+        }
+      }
+    }
     if (indexBuffer.length === 0) {
       index = new GitIndex(null, undefined, 2)
     } else {

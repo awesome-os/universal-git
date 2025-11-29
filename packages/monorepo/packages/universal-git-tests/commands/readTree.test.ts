@@ -6,7 +6,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 describe('readTree', () => {
   it('ok:read-a-tree-directly', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readTree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readTree')
     // Test
     const { oid, tree } = await readTree({
       repo,
@@ -26,7 +26,7 @@ describe('readTree', () => {
 
   it('ok:peels-tags', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readTree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readTree')
     // Test
     const { oid, tree } = await readTree({
       repo,
@@ -40,7 +40,7 @@ describe('readTree', () => {
 
   it('ok:with-simple-filepath-to-tree', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readTree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readTree')
     // Test
     const { oid, tree } = await readTree({
       repo,
@@ -55,7 +55,7 @@ describe('readTree', () => {
 
   it('ok:with-deep-filepath-to-tree', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readTree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readTree')
     // Test
     const { oid, tree } = await readTree({
       repo,
@@ -72,7 +72,7 @@ describe('readTree', () => {
 
   it('error:with-erroneous-filepath-directory-is-a-file', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readTree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readTree')
     // Test
     let error: unknown = null
     try {
@@ -90,7 +90,7 @@ describe('readTree', () => {
 
   it('error:with-erroneous-filepath-no-such-directory', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readTree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readTree')
     // Test
     let error: unknown = null
     try {
@@ -108,7 +108,7 @@ describe('readTree', () => {
 
   it('error:with-erroneous-filepath-leading-slash', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readTree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readTree')
     // Test
     let error: unknown = null
     try {
@@ -129,7 +129,7 @@ describe('readTree', () => {
 
   it('error:with-erroneous-filepath-trailing-slash', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readTree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readTree')
     // Test
     let error: unknown = null
     try {

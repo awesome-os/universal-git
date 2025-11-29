@@ -9,9 +9,7 @@ import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBu
 
 test('resolveCommit', async (t) => {
   await t.test('ok:resolves-commit', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const treeOid = await writeTree({
@@ -33,7 +31,7 @@ test('resolveCommit', async (t) => {
     })
     
     const result = await resolveCommit({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: commitOid,
@@ -49,9 +47,7 @@ test('resolveCommit', async (t) => {
   })
 
   await t.test('ok:peels-tag-to-commit', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const treeOid = await writeTree({
@@ -85,7 +81,7 @@ test('resolveCommit', async (t) => {
     })
     
     const result = await resolveCommit({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: tagOid,
@@ -97,9 +93,7 @@ test('resolveCommit', async (t) => {
   })
 
   await t.test('error:ObjectTypeError-non-commit', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const blobOid = await writeBlob({
@@ -111,7 +105,7 @@ test('resolveCommit', async (t) => {
     await assert.rejects(
       async () => {
         await resolveCommit({
-          fs: repo.fs,
+          fs: fs,
           cache,
           gitdir,
           oid: blobOid,
@@ -124,8 +118,7 @@ test('resolveCommit', async (t) => {
   })
 
   await t.test('error:NotFoundError-non-existent', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const nonExistentOid = 'a'.repeat(40)
@@ -133,7 +126,7 @@ test('resolveCommit', async (t) => {
     await assert.rejects(
       async () => {
         await resolveCommit({
-          fs: repo.fs,
+          fs: fs,
           cache,
           gitdir,
           oid: nonExistentOid,
@@ -146,9 +139,7 @@ test('resolveCommit', async (t) => {
   })
 
   await t.test('ok:commit-with-parent', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const treeOid = await writeTree({
@@ -182,7 +173,7 @@ test('resolveCommit', async (t) => {
     })
     
     const result = await resolveCommit({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: commitOid,
@@ -195,9 +186,7 @@ test('resolveCommit', async (t) => {
   })
 
   await t.test('ok:commit-multiple-parents', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const treeOid = await writeTree({
@@ -243,7 +232,7 @@ test('resolveCommit', async (t) => {
     })
     
     const result = await resolveCommit({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: commitOid,
@@ -258,9 +247,7 @@ test('resolveCommit', async (t) => {
   })
 
   await t.test('ok:commit-different-committer', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const treeOid = await writeTree({
@@ -282,7 +269,7 @@ test('resolveCommit', async (t) => {
     })
     
     const result = await resolveCommit({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: commitOid,

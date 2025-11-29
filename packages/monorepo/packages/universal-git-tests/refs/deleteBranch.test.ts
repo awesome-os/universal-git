@@ -13,7 +13,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('deleteBranch', async (t) => {
   await t.test('ok:delete-branch', async () => {
     // Setup
-    const { repo } = await makeFixture('test-deleteBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteBranch')
     // Test
     await deleteBranch({ repo, ref: 'test' })
     const branches = await listBranches({ repo })
@@ -22,7 +22,7 @@ test('deleteBranch', async (t) => {
 
   await t.test('edge:branch-tag-name-collision', async () => {
     // Setup
-    const { repo } = await makeFixture('test-deleteBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteBranch')
     // Test
     await deleteBranch({ repo, ref: 'collision' })
     const branches = await listBranches({ repo })
@@ -33,7 +33,7 @@ test('deleteBranch', async (t) => {
 
   await t.test('error:branch-not-exist', async () => {
     // Setup
-    const { repo } = await makeFixture('test-deleteBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteBranch')
     let error: unknown = null
     // Test
     try {
@@ -47,7 +47,7 @@ test('deleteBranch', async (t) => {
 
   await t.test('param:ref-missing', async () => {
     // Setup
-    const { repo } = await makeFixture('test-deleteBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteBranch')
     let error: unknown = null
     // Test
     try {
@@ -61,7 +61,7 @@ test('deleteBranch', async (t) => {
 
   await t.test('ok:checked-out-branch', async () => {
     // Setup
-    const { repo } = await makeFixture('test-deleteBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteBranch')
     // Test
     await deleteBranch({ repo, ref: 'master' })
     const head = await currentBranch({ repo })
@@ -72,7 +72,7 @@ test('deleteBranch', async (t) => {
 
   await t.test('ok:delete-branch-and-config', async () => {
     // Setup
-    const { repo } = await makeFixture('test-deleteBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteBranch')
     // Test
     await deleteBranch({ repo, ref: 'remote' })
     const branches = await listBranches({ repo })
@@ -102,21 +102,21 @@ test('deleteBranch', async (t) => {
   })
 
   await t.test('param:repo-provided', async () => {
-    const { repo } = await makeFixture('test-deleteBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteBranch')
     await deleteBranch({ repo, ref: 'test' })
     const branches = await listBranches({ repo })
     assert.ok(!branches.includes('test'))
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-deleteBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteBranch')
     await deleteBranch({ repo, ref: 'test' })
     const branches = await listBranches({ repo })
     assert.ok(!branches.includes('test'))
   })
 
   await t.test('error:caller-property', async () => {
-    const { repo } = await makeFixture('test-deleteBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteBranch')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await deleteBranch({
@@ -131,7 +131,7 @@ test('deleteBranch', async (t) => {
   })
 
   await t.test('param:force', async () => {
-    const { repo } = await makeFixture('test-deleteBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteBranch')
     // Try to delete a branch that might be checked out
     try {
       await deleteBranch({ repo, ref: 'master', force: true })

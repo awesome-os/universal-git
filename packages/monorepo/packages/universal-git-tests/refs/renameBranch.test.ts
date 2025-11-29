@@ -7,7 +7,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('renameBranch', async (t) => {
   await t.test('error:branch-already-exists', async () => {
     // Setup
-    const { repo } = await makeFixture('test-renameBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-renameBranch')
     let error = null
     // Test
     try {
@@ -25,7 +25,7 @@ test('renameBranch', async (t) => {
 
   await t.test('error:invalid-new-branch-name', async () => {
     // Setup
-    const { repo } = await makeFixture('test-renameBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-renameBranch')
     let error = null
     // Test
     try {
@@ -43,7 +43,7 @@ test('renameBranch', async (t) => {
 
   await t.test('error:invalid-old-branch-name', async () => {
     // Setup
-    const { repo } = await makeFixture('test-renameBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-renameBranch')
     let error = null
     // Test
     try {
@@ -61,7 +61,7 @@ test('renameBranch', async (t) => {
 
   await t.test('param:ref-missing', async () => {
     // Setup
-    const { repo } = await makeFixture('test-renameBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-renameBranch')
     let error = null
     // Test
     try {
@@ -75,7 +75,7 @@ test('renameBranch', async (t) => {
 
   await t.test('param:oldref-missing', async () => {
     // Setup
-    const { repo } = await makeFixture('test-renameBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-renameBranch')
     let error = null
     // Test
     try {
@@ -89,22 +89,21 @@ test('renameBranch', async (t) => {
 
   await t.test('ok:rename-branch', async () => {
     // Setup
-    const { repo } = await makeFixture('test-renameBranch')
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-renameBranch')
     // Test
     await renameBranch({
       repo,
       oldref: 'test-branch',
       ref: 'other-branch',
     })
-    const files = await repo.fs.readdir(path.resolve(gitdir, 'refs', 'heads'))
+    const files = await fs.readdir(path.resolve(gitdir, 'refs', 'heads'))
     assert.strictEqual(files.includes('test-branch'), false)
     assert.strictEqual(await currentBranch({ repo }), 'master')
   })
 
   await t.test('param:checkout-true', async () => {
     // Setup
-    const { repo } = await makeFixture('test-renameBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-renameBranch')
     // Test
     await renameBranch({
       repo,
@@ -117,7 +116,7 @@ test('renameBranch', async (t) => {
 
   await t.test('ok:rename-current-branch', async () => {
     // Setup
-    const { repo } = await makeFixture('test-renameBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-renameBranch')
     // Test
     await renameBranch({
       repo,
@@ -150,7 +149,7 @@ test('renameBranch', async (t) => {
   })
 
   await t.test('param:repo-provided', async () => {
-    const { repo } = await makeFixture('test-renameBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-renameBranch')
     await renameBranch({
       repo,
       oldref: 'test-branch',
@@ -161,7 +160,7 @@ test('renameBranch', async (t) => {
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-renameBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-renameBranch')
     await renameBranch({
       repo,
       oldref: 'test-branch',
@@ -172,11 +171,11 @@ test('renameBranch', async (t) => {
   })
 
   await t.test('error:caller-property', async () => {
-    const { repo } = await makeFixture('test-renameBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-renameBranch')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await renameBranch({
-        gitdir: await repo.getGitdir(),
+        gitdir: gitdir,
         oldref: 'test-branch',
         ref: 'new-branch',
       } as any)
@@ -188,7 +187,7 @@ test('renameBranch', async (t) => {
   })
 
   await t.test('error:old-branch-not-exist', async () => {
-    const { repo } = await makeFixture('test-renameBranch')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-renameBranch')
     const { NotFoundError } = await import('@awesome-os/universal-git-src/errors/NotFoundError.ts')
     try {
       await renameBranch({

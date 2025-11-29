@@ -3,6 +3,7 @@ import { join } from '../GitPath.ts'
 import { ConfigAccess } from "../../utils/configAccess.ts"
 import { createFileSystem } from '../../utils/createFileSystem.ts'
 import type { FileSystemProvider } from "../../models/FileSystem.ts"
+import type { GitBackend } from '../../backends/GitBackend.ts'
 
 /**
  * Loads sparse checkout patterns from .git/info/sparse-checkout
@@ -10,13 +11,26 @@ import type { FileSystemProvider } from "../../models/FileSystem.ts"
 export const loadPatterns = async ({
   fs,
   gitdir,
+  gitBackend,
 }: {
-  fs: FileSystemProvider
-  gitdir: string
+  fs?: FileSystemProvider
+  gitdir?: string
+  gitBackend?: GitBackend
 }): Promise<string[]> => {
-  const sparseCheckoutFile = join(gitdir, 'info', 'sparse-checkout')
   try {
-    const content = await fs.read(sparseCheckoutFile, 'utf8')
+    let content: string | null = null
+    
+    if (gitBackend) {
+      content = await gitBackend.readInfoFile('sparse-checkout')
+    } else if (fs && gitdir) {
+      const sparseCheckoutFile = join(gitdir, 'info', 'sparse-checkout')
+      content = await fs.read(sparseCheckoutFile, 'utf8') as string
+    } else {
+      throw new Error('loadPatterns requires gitBackend OR (fs and gitdir)')
+    }
+
+    if (!content) return []
+
     const patterns = (content as string)
       .split('\n')
       .map(line => line.trim())

@@ -21,6 +21,8 @@ export const analyzeCheckout = async ({
   fs,
   dir,
   gitdir,
+  gitBackend,
+  worktreeBackend,
   treeOid,
   filepaths,
   force = false,
@@ -28,9 +30,11 @@ export const analyzeCheckout = async ({
   cache = {},
   index: gitIndex, // NEW: Accept the index object passed from checkout
 }: {
-  fs: FileSystemProvider
-  dir: string
-  gitdir: string
+  fs?: FileSystemProvider
+  dir?: string
+  gitdir?: string
+  gitBackend?: import('../../backends/GitBackend.ts').GitBackend
+  worktreeBackend?: import('./GitWorktreeBackend.ts').GitWorktreeBackend
   treeOid: string
   filepaths?: string[]
   force?: boolean
@@ -42,12 +46,19 @@ export const analyzeCheckout = async ({
   // This ensures we're using the exact same fs instance that the Repository uses
   // CRITICAL: Always pass both dir and gitdir to prevent createRepository() from calling findRoot
   // which could find the wrong repository (e.g., the workspace repo instead of the test fixture)
-  if (!dir || !gitdir) {
-    throw new Error('analyzeCheckout requires both dir and gitdir to be provided to prevent auto-detection of wrong repository')
+  
+  // Need gitBackend or gitdir to read objects
+  if (!gitBackend && !gitdir) {
+    throw new Error('analyzeCheckout requires gitBackend OR gitdir to be provided')
   }
-  const { createRepository } = await import('../../core-utils/createRepository.ts')
-  const repo = await createRepository({ fs, dir, gitdir, cache, autoDetectConfig: true, ignoreSystemConfig: false })
-  const normalizedFs = repo.fs
+
+  // Validate that we have a way to access the worktree
+  if (!worktreeBackend && (!fs || !dir)) {
+     throw new Error('analyzeCheckout requires either worktreeBackend OR (fs and dir)')
+  }
+  
+  // Use normalizedFs for file operations
+  const normalizedFs = fs ? createFileSystem(fs) : undefined
   
   // Check sparse checkout patterns FIRST (before building tree map for optimization)
   let shouldCheckSparse = false
@@ -57,18 +68,43 @@ export const analyzeCheckout = async ({
     shouldCheckSparse = true
     // Try to detect cone mode from config
     try {
-      coneMode = await SparseCheckoutManager.isConeMode({ fs, gitdir })
+      if (gitBackend) {
+        // Use gitBackend if available
+        const cone = await gitBackend.getConfig('core.sparseCheckoutCone')
+        coneMode = cone === 'true' || cone === true
+      } else if (fs && gitdir) {
+        coneMode = await SparseCheckoutManager.isConeMode({ fs, gitdir })
+      }
     } catch {
       // Config not available, default to false
     }
   } else {
     // Check if sparse checkout is enabled
     try {
-      const patterns = await SparseCheckoutManager.loadPatterns({ fs, gitdir })
+      let patterns: string[] = []
+      if (gitBackend && gitBackend.sparseCheckoutList) {
+        // Use gitBackend if available (requires worktreeBackend for directory access usually, but listing might be config-based or file-based)
+        // sparseCheckoutList usually needs worktreeBackend to find .git/info/sparse-checkout if it's stored there.
+        // Assuming gitBackend handles storage abstraction.
+        // If gitBackend.sparseCheckoutList requires worktreeBackend:
+        if (worktreeBackend) {
+             patterns = await gitBackend.sparseCheckoutList(worktreeBackend)
+        } else if (fs && gitdir) {
+            patterns = await SparseCheckoutManager.loadPatterns({ fs, gitdir })
+        }
+      } else if (fs && gitdir) {
+         patterns = await SparseCheckoutManager.loadPatterns({ fs, gitdir })
+      }
+
       if (patterns.length > 0) {
         finalSparsePatterns = patterns
         shouldCheckSparse = true
-        coneMode = await SparseCheckoutManager.isConeMode({ fs, gitdir })
+        if (gitBackend) {
+             const cone = await gitBackend.getConfig('core.sparseCheckoutCone')
+             coneMode = cone === 'true' || cone === true
+        } else if (fs && gitdir) {
+            coneMode = await SparseCheckoutManager.isConeMode({ fs, gitdir })
+        }
       }
     } catch {
       // Sparse checkout not enabled
@@ -105,7 +141,15 @@ export const analyzeCheckout = async ({
   // Helper to recursively walk tree and build a map of all entries
   // OPTIMIZATION: When sparse patterns are provided, only walk directories that could match
   const buildTreeMap = async (treeOid: string, prefix = '', map: Map<string, { oid: string; mode: string; type: 'blob' | 'tree' | 'commit' }> = new Map()): Promise<Map<string, { oid: string; mode: string; type: 'blob' | 'tree' | 'commit' }>> => {
-    const { object: treeObject } = await readObject({ fs, cache, gitdir, oid: treeOid })
+    // Use gitBackend if available, otherwise use readObject with fs/gitdir
+    let treeObject: UniversalBuffer
+    if (gitBackend) {
+        const result = await gitBackend.readObject(treeOid, 'content', cache)
+        treeObject = result.object
+    } else {
+        const result = await readObject({ fs: fs!, cache, gitdir: gitdir!, oid: treeOid })
+        treeObject = result.object
+    }
     const entries = parseTree(treeObject as UniversalBuffer)
 
     for (const entry of entries) {
@@ -185,12 +229,19 @@ export const analyzeCheckout = async ({
       // File should exist in the final state - mark it to keep
       filesToKeep.add(filepath)
       
-      const workdirPath = join(dir, filepath)
       let workdirExists = false
       try {
-        const stat = await normalizedFs.lstat(workdirPath)
-        if (stat && !(stat as any).isDirectory()) {
-          workdirExists = true
+        if (worktreeBackend) {
+          const stat = await worktreeBackend.lstat(filepath)
+          if (stat && !stat.isDirectory()) {
+            workdirExists = true
+          }
+        } else if (normalizedFs && dir) {
+          const workdirPath = join(dir, filepath)
+          const stat = await normalizedFs.lstat(workdirPath)
+          if (stat && !(stat as any).isDirectory()) {
+            workdirExists = true
+          }
         }
       } catch {
         // File doesn't exist
@@ -216,7 +267,17 @@ export const analyzeCheckout = async ({
         
         let workdirOid: string | null = null
         try {
-          const workdirContent = await normalizedFs.read(workdirPath)
+          let workdirContent: UniversalBuffer | Uint8Array | string
+          if (worktreeBackend) {
+            const result = await worktreeBackend.read(filepath)
+            workdirContent = result as UniversalBuffer | Uint8Array
+          } else if (normalizedFs && dir) {
+            const workdirPath = join(dir, filepath)
+            workdirContent = await normalizedFs.read(workdirPath) as UniversalBuffer
+          } else {
+             throw new Error('Missing worktree access')
+          }
+          
           const { hashObject } = await import('../../core-utils/ShaHasher.ts')
           workdirOid = await hashObject({
             type: 'blob',
@@ -286,10 +347,15 @@ export const analyzeCheckout = async ({
         operations.push(['delete-index', filepath])
       }
       // Check if file exists in workdir
-      const workdirPath = join(dir, filepath)
       try {
-        await normalizedFs.lstat(workdirPath)
-        operations.push(['delete', filepath])
+        if (worktreeBackend) {
+          await worktreeBackend.lstat(filepath)
+          operations.push(['delete', filepath])
+        } else if (normalizedFs && dir) {
+          const workdirPath = join(dir, filepath)
+          await normalizedFs.lstat(workdirPath)
+          operations.push(['delete', filepath])
+        }
       } catch {
         // File doesn't exist in workdir, nothing to delete
       }
@@ -327,14 +393,18 @@ export const executeCheckout = async ({
   fs,
   dir,
   gitdir,
+  gitBackend,
+  worktreeBackend,
   operations,
   cache = {},
   onProgress,
   index: gitIndex, // NEW: Accept the index object passed from checkout
 }: {
-  fs: FileSystemProvider
-  dir: string
-  gitdir: string
+  fs?: FileSystemProvider
+  dir?: string
+  gitdir?: string
+  gitBackend?: import('../../backends/GitBackend.ts').GitBackend
+  worktreeBackend?: import('./GitWorktreeBackend.ts').GitWorktreeBackend
   operations: CheckoutOperation[]
   cache?: Record<string, unknown>
   onProgress?: ProgressCallback
@@ -349,15 +419,20 @@ export const executeCheckout = async ({
   // CRITICAL: Use the Repository's fs (which is already normalized) for all file operations
   // This ensures we're using the exact same fs instance that the Repository uses
   // Get the Repository instance to access normalized fs
-  const { Repository } = await import('../../core-utils/Repository.ts')
   // CRITICAL: Always pass both dir and gitdir to prevent createRepository() from calling findRoot
   // which could find the wrong repository (e.g., the workspace repo instead of the test fixture)
-  if (!dir || !gitdir) {
-    throw new Error('executeCheckout requires both dir and gitdir to be provided to prevent auto-detection of wrong repository')
+  
+  // gitBackend or gitdir needed for object reading
+  if (!gitBackend && !gitdir) {
+      throw new Error('executeCheckout requires gitBackend OR gitdir')
   }
-  const { createRepository } = await import('../../core-utils/createRepository.ts')
-  const repo = await createRepository({ fs, dir, gitdir, cache, autoDetectConfig: true, ignoreSystemConfig: false })
-  const normalizedFs = repo.fs
+
+  // Validate that we have a way to access the worktree
+  if (!worktreeBackend && (!fs || !dir)) {
+     throw new Error('executeCheckout requires either worktreeBackend OR (fs and dir)')
+  }
+
+  const normalizedFs = fs ? createFileSystem(fs) : undefined
   
   // --- START OF THE FIX ---
   // Clear the in-memory index completely. We will rebuild it from scratch based only on operations.
@@ -408,22 +483,38 @@ export const executeCheckout = async ({
         }
       } else {
         // Regular file (blob) - read and write it
-        const { object: blobObject } = await readObject({ fs, cache, gitdir, oid: oid as string })
+        // Use gitBackend if available
+        let blobObject: UniversalBuffer
+        if (gitBackend) {
+             const result = await gitBackend.readObject(oid as string, 'content', cache)
+             blobObject = result.object
+        } else {
+             const result = await readObject({ fs: fs!, cache, gitdir: gitdir!, oid: oid as string })
+             blobObject = result.object
+        }
 
         // Apply LFS smudge filter if needed (converts pointer files to actual content)
         let fileContent = blobObject as UniversalBuffer
         try {
           const { applySmudgeFilter } = await import('../../git/lfs/filter.ts')
-          const { GitBackendFs } = await import('../../backends/GitBackendFs/index.ts')
-          const backend = new GitBackendFs(normalizedFs, gitdir)
-          fileContent = await applySmudgeFilter({
-            fs: normalizedFs,
-            dir,
-            gitdir,
-            filepath: filepath as string,
-            blobContent: blobObject as UniversalBuffer,
-            backend,
-          })
+          // We need a backend to pass to applySmudgeFilter. If we have one, use it.
+          // If not, and we have fs/gitdir, create a temporary GitBackendFs.
+          let backend = gitBackend as any
+          if (!backend && fs && gitdir) {
+             const { GitBackendFs } = await import('../../backends/GitBackendFs/index.ts')
+             backend = new GitBackendFs(normalizedFs, gitdir)
+          }
+
+          if (backend) {
+              fileContent = await applySmudgeFilter({
+                fs: normalizedFs,
+                dir,
+                gitdir: gitdir!, // gitdir is required for LFS
+                filepath: filepath as string,
+                blobContent: blobObject as UniversalBuffer,
+                backend,
+              })
+          }
         } catch (err) {
           // If LFS filter fails, use original content (allows repo to work without LFS objects)
           // This is expected behavior when LFS objects haven't been downloaded yet
@@ -632,16 +723,17 @@ export const getFileStatus = async ({
       } else {
         // File not in root, use resolveFilepath to search recursively
         const { resolveFilepath } = await import('../../utils/resolveFilepath.ts')
-        // resolveFilepath needs fs/gitdir - get them from backends temporarily
-        // TODO: Refactor resolveFilepath to use gitBackend
-        const gitdir = await repo.getGitdir()
-        const fs = (worktreeBackend as any).fs
-        if (!fs) {
-          throw new Error('worktreeBackend must provide fs for resolveFilepath')
-        }
-        const normalizedFs = createFileSystem(fs)
+        // resolveFilepath needs gitBackend
         // resolveFilepath returns the OID directly, not an object
-        headOid = await resolveFilepath({ fs: normalizedFs, cache, gitdir, oid: headTreeOid, filepath })
+        // Pass minimal fs/gitdir if backend doesn't support direct path resolution (not used if gitBackend is passed)
+        headOid = await resolveFilepath({ 
+            cache, 
+            oid: headTreeOid, 
+            filepath,
+            gitBackend,
+            fs: (gitBackend as any).getFs?.(), // Fallback if backend exposes fs
+            gitdir: await repo.getGitdir(), // Fallback
+        })
       }
     } catch (err) {
       // File doesn't exist in HEAD tree
@@ -664,8 +756,7 @@ export const getFileStatus = async ({
   if (indexBuffer.length === 0) {
     index = new GitIndex()
   } else {
-    const { detectObjectFormat } = await import('../../utils/detectObjectFormat.ts')
-    const objectFormat = await detectObjectFormat(undefined, undefined, cache, gitBackend)
+    const objectFormat = await gitBackend.getObjectFormat(cache)
     index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
   }
   
@@ -724,22 +815,28 @@ export const checkout = async ({
   fs,
   dir,
   gitdir,
+  gitBackend,
+  worktreeBackend,
   treeOid,
   filepaths,
   force = false,
   sparsePatterns,
   cache = {},
   onProgress,
+  index,
 }: {
-  fs: FileSystemProvider
-  dir: string
-  gitdir: string
+  fs?: FileSystemProvider
+  dir?: string
+  gitdir?: string
+  gitBackend?: import('../../backends/GitBackend.ts').GitBackend
+  worktreeBackend?: import('./GitWorktreeBackend.ts').GitWorktreeBackend
   treeOid: string
   filepaths?: string[]
   force?: boolean
   sparsePatterns?: string[]
   cache?: Record<string, unknown>
   onProgress?: ProgressCallback
+  index?: import('../../git/index/GitIndex.ts').GitIndex
 }): Promise<void> => {
   // CRITICAL: Use Repository to get a consistent context and access to the index.
   // Read the index ONCE and pass it to both analyzeCheckout and executeCheckout.
@@ -747,38 +844,60 @@ export const checkout = async ({
   // by executeCheckout are persisted when we write it back.
   // CRITICAL: Always pass both dir and gitdir to prevent createRepository() from calling findRoot
   // which could find the wrong repository (e.g., the workspace repo instead of the test fixture)
-  if (!dir || !gitdir) {
-    throw new Error('WorkdirManager.checkout requires both dir and gitdir to be provided to prevent auto-detection of wrong repository')
+  
+  // Need gitBackend or gitdir
+  if (!gitBackend && !gitdir) {
+      throw new Error('checkout requires gitBackend OR gitdir')
   }
-  const { createRepository } = await import('../../core-utils/createRepository.ts')
-  const repo = await createRepository({ fs, dir, gitdir, cache, autoDetectConfig: true, ignoreSystemConfig: false })
+
+  // Need worktreeBackend or fs/dir
+  if (!worktreeBackend && (!fs || !dir)) {
+      throw new Error('checkout requires worktreeBackend OR (fs and dir)')
+  }
+  
+  // Use provided gitBackend or create GitBackendFs
+  let effectiveGitBackend = gitBackend
+  if (!effectiveGitBackend) {
+     if (fs && gitdir) {
+        const { GitBackendFs } = await import('../../backends/GitBackendFs/index.ts')
+        effectiveGitBackend = new GitBackendFs(fs, gitdir)
+     } else {
+        throw new Error('checkout requires gitBackend OR (fs and gitdir)')
+     }
+  }
+  
   const { GitIndex } = await import('../../git/index/GitIndex.ts')
   const { detectObjectFormat } = await import('../../utils/detectObjectFormat.ts')
   
-  let indexBuffer: UniversalBuffer
-  if (repo.gitBackend) {
+  let gitIndex: import('../../git/index/GitIndex.ts').GitIndex
+
+  if (index) {
+    gitIndex = index
+  } else {
+    let indexBuffer: UniversalBuffer
     try {
-      indexBuffer = await repo.gitBackend.readIndex()
+        indexBuffer = await effectiveGitBackend.readIndex()
     } catch {
-      indexBuffer = UniversalBuffer.alloc(0)
+        indexBuffer = UniversalBuffer.alloc(0)
     }
-  } else {
-    throw new Error('gitBackend is required')
-  }
-  
-  let gitIndex: GitIndex
-  if (indexBuffer.length === 0) {
-    gitIndex = new GitIndex()
-  } else {
-    const objectFormat = await detectObjectFormat(fs, gitdir, repo.cache, repo.gitBackend)
-    gitIndex = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+    
+    if (indexBuffer.length === 0) {
+        gitIndex = new GitIndex()
+    } else {
+        // We don't have repo.cache, so pass undefined or a new object
+        // Use gitBackend for object format detection if possible
+        const objectFormat = await effectiveGitBackend.getObjectFormat(cache)
+        gitIndex = await GitIndex.fromBuffer(indexBuffer, objectFormat)
+    }
   }
   
   // Analyze the checkout. Pass the live index object to it.
   const operations = await analyzeCheckout({ 
     fs, 
     dir, 
-    gitdir: await repo.getGitdir(), 
+    gitdir, 
+    gitBackend: effectiveGitBackend,
+    worktreeBackend,
     treeOid, 
     filepaths, 
     force, 
@@ -791,16 +910,19 @@ export const checkout = async ({
   await executeCheckout({ 
     fs, 
     dir, 
-    gitdir: await repo.getGitdir(), 
+    gitdir, 
+    gitBackend: effectiveGitBackend,
+    worktreeBackend,
     operations, 
     index: gitIndex, // Pass the live index object
     cache, 
     onProgress,
   })
   
-  // Write the modified index back to disk. This ensures listFiles() and other operations
-  // see the updated state after the checkout.
-  await repo.writeIndexDirect(gitIndex)
+  // Write the modified index back to disk.
+  const indexObjectFormat = await effectiveGitBackend.getObjectFormat(cache)
+  const buffer = await gitIndex.toBuffer(indexObjectFormat)
+  await effectiveGitBackend.writeIndex(buffer)
 }
 
 /**

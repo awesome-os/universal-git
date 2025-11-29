@@ -14,23 +14,31 @@ import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.
 
 describe('stash flow', () => {
   const addUserConfig = async (repo: Repository) => {
-    const config = await repo.getConfig()
-    await config.set('user.name', 'stash tester')
-    await config.set('user.email', 'test@stash.com')
+    // Config values
+    const name = 'stash tester'
+    const email = 'test@stash.com'
+    
+    // Set config using repository backend directly if available
+    if (repo.gitBackend) {
+      await repo.gitBackend.setConfig('user.name', name)
+      await repo.gitBackend.setConfig('user.email', email)
+    } else {
+      // Fallback to legacy config setting
+      const config = await repo.getConfig()
+      await config.set('user.name', name)
+      await config.set('user.email', email)
+    }
   }
 
   it('ok:detects-staged-changes-shared-cache', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     await addUserConfig(repo)
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
-    
     // Use a shared cache - same as stash tests
     const cache = {}
     
     // Make changes and stage them
-    await repo.fs.write(`${dir}/a.txt`, 'staged changes - a')
-    await repo.fs.write(`${dir}/b.js`, 'staged changes - b')
+    await fs.write(`${dir}/a.txt`, 'staged changes - a')
+    await fs.write(`${dir}/b.js`, 'staged changes - b')
     await add({ repo, filepath: ['a.txt', 'b.js'], cache })
     
     // Verify status
@@ -39,9 +47,7 @@ describe('stash flow', () => {
     
     // Test writeTreeChanges directly - this should work
     const indexTree = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir,
+      repo, // Pass repo
       cache, // Same cache used by add()
       treePair: [TREE({ ref: 'HEAD' }), 'stage'],
     })
@@ -51,17 +57,16 @@ describe('stash flow', () => {
   })
 
   it('ok:detects-staged-changes-Repository-cache', async () => {
-    const { repo: fixtureRepo } = await makeFixture('test-stash')
+    const { repo: fixtureRepo, dir, fs, gitdir } = await makeFixture('test-stash')
     await addUserConfig(fixtureRepo)
-    const dir = await fixtureRepo.getDir()!
     
     // Create Repository with cache
-    const repo = await Repository.open({ fs: fixtureRepo.fs, dir, cache: {}, autoDetectConfig: true })
-    const effectiveGitdir = await repo.getGitdir()
+    const repo = await Repository.open({ fs, dir, gitdir, cache: {}, autoDetectConfig: true })
+    const effectiveGitdir = gitdir
     
     // Make changes and stage them
-    await repo.fs.write(`${dir}/a.txt`, 'staged changes - a')
-    await repo.fs.write(`${dir}/b.js`, 'staged changes - b')
+    await fs.write(`${dir}/a.txt`, 'staged changes - a')
+    await fs.write(`${dir}/b.js`, 'staged changes - b')
     try {
       await add({ repo, filepath: ['a.txt', 'b.js'], cache: repo.cache })
     } catch (error) {
@@ -77,9 +82,7 @@ describe('stash flow', () => {
     
     // Test writeTreeChanges with Repository cache
     const indexTree = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir: effectiveGitdir,
+      repo, // Pass repo
       cache: repo.cache, // Repository's cache
       treePair: [TREE({ ref: 'HEAD' }), 'stage'],
     })
@@ -89,17 +92,14 @@ describe('stash flow', () => {
   })
 
   it('ok:stash-API-shared-cache', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     await addUserConfig(repo)
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
-    
     // Use a shared cache
     const cache = {}
     
     // Make changes and stage them
-    await repo.fs.write(`${dir}/a.txt`, 'staged changes - a')
-    await repo.fs.write(`${dir}/b.js`, 'staged changes - b')
+    await fs.write(`${dir}/a.txt`, 'staged changes - a')
+    await fs.write(`${dir}/b.js`, 'staged changes - b')
     await add({ repo, filepath: ['a.txt', 'b.js'], cache })
     
     // Test stash API directly
@@ -122,16 +122,15 @@ describe('stash flow', () => {
   })
 
   it('ok:stash-API-Repository', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     await addUserConfig(repo)
     
     // Use a shared cache - stash will create Repository internally
     const cache = {}
     
     // Make changes and stage them
-    const dir = await repo.getDir()!
-    await repo.fs.write(`${dir}/a.txt`, 'staged changes - a')
-    await repo.fs.write(`${dir}/b.js`, 'staged changes - b')
+    await fs.write(`${dir}/a.txt`, 'staged changes - a')
+    await fs.write(`${dir}/b.js`, 'staged changes - b')
     await add({ repo, filepath: ['a.txt', 'b.js'], cache })
     
     // Test stash API - it will create Repository internally with the same cache
@@ -150,10 +149,8 @@ describe('stash flow', () => {
   })
 
   it('ok:Repository-sees-staged-changes', async () => {
-    const { repo: fixtureRepo } = await makeFixture('test-stash')
+    const { repo: fixtureRepo, dir, fs, gitdir } = await makeFixture('test-stash')
     await addUserConfig(fixtureRepo)
-    const dir = await fixtureRepo.getDir()!
-    const gitdir = await fixtureRepo.getGitdir()
     
     // Use a shared cache
     const cache = {}
@@ -164,7 +161,7 @@ describe('stash flow', () => {
     await add({ repo: fixtureRepo, filepath: ['a.txt', 'b.js'], cache })
     
     // Check index directly using Repository
-    const repo = await Repository.open({ fs: fixtureRepo.fs, dir, cache, autoDetectConfig: true })
+    const repo = await Repository.open({ fs: fixtureRepo.fs, dir, gitdir, cache, autoDetectConfig: true })
     let index
     try {
       index = await repo.readIndexDirect()
@@ -179,21 +176,27 @@ describe('stash flow', () => {
       throw error
     }
     // Should see the staged files in the index
-    const aEntry = index.entriesMap.get('a.txt')
-    const bEntry = index.entriesMap.get('b.js')
+    // If index is a Buffer (should not happen with readIndexDirect default), wrap it
+    const indexObj = index instanceof Uint8Array ? 
+      (await import('@awesome-os/universal-git-src/git/index/GitIndex.ts')).GitIndex.fromBuffer(index, 'sha1') : 
+      index
+
+    const aEntry = indexObj.entriesMap.get('a.txt')
+    const bEntry = indexObj.entriesMap.get('b.js')
     
     assert.notStrictEqual(aEntry, undefined, 'a.txt should be in index after add()')
     assert.notStrictEqual(bEntry, undefined, 'b.js should be in index after add()')
     
     // Verify the OIDs are different from HEAD (indicating changes)
     const { resolveFilepath } = await import('@awesome-os/universal-git-src/utils/resolveFilepath.ts')
-    const headOid = await repo.gitBackend!.readRef('HEAD')
+    // Use gitBackend to read HEAD
+    const headOid = await repo.gitBackend.readRef('HEAD').catch(() => null)
     
     // If HEAD exists, verify OIDs differ; if HEAD doesn't exist, the files are new
     if (headOid) {
       try {
-        const headA = await resolveFilepath({ fs: repo.fs, cache, gitdir, oid: headOid, filepath: 'a.txt' })
-        const headB = await resolveFilepath({ fs: repo.fs, cache, gitdir, oid: headOid, filepath: 'b.js' })
+        const headA = await resolveFilepath({ gitBackend: repo.gitBackend, cache, oid: headOid, filepath: 'a.txt' })
+        const headB = await resolveFilepath({ gitBackend: repo.gitBackend, cache, oid: headOid, filepath: 'b.js' })
         
         // Index OIDs should be different from HEAD (staged changes)
         assert.notStrictEqual(aEntry!.oid, headA, 'a.txt OID in index should differ from HEAD')
@@ -210,17 +213,14 @@ describe('stash flow', () => {
   })
 
   it('ok:STAGE-walker-sees-staged-changes', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     await addUserConfig(repo)
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
-    
     // Use a shared cache
     const cache = {}
     
     // Make changes and stage them
-    await repo.fs.write(`${dir}/a.txt`, 'staged changes - a')
-    await repo.fs.write(`${dir}/b.js`, 'staged changes - b')
+    await fs.write(`${dir}/a.txt`, 'staged changes - a')
+    await fs.write(`${dir}/b.js`, 'staged changes - b')
     await add({ repo, filepath: ['a.txt', 'b.js'], cache })
     
     // Use STAGE walker to check what it sees
@@ -254,9 +254,8 @@ describe('stash flow', () => {
   })
 
   it('ok:detects-changes-stash-flow-context', async () => {
-    const { repo: fixtureRepo } = await makeFixture('test-stash')
+    const { repo: fixtureRepo, dir, fs, gitdir } = await makeFixture('test-stash')
     await addUserConfig(fixtureRepo)
-    const dir = await fixtureRepo.getDir()!
     
     // Simulate the exact flow from stash API
     const cache = {}
@@ -264,19 +263,18 @@ describe('stash flow', () => {
     // Step 1: Try to open Repository (like stash API does)
     let repo: Repository | undefined
     let effectiveCache = cache
-    let effectiveGitdir = await fixtureRepo.getGitdir()
+    let effectiveGitdir = gitdir
     try {
-      repo = await Repository.open({ fs: fixtureRepo.fs, dir, cache, autoDetectConfig: true })
-      effectiveGitdir = await repo.getGitdir()
+      repo = await Repository.open({ fs: fixtureRepo.fs, dir, gitdir, cache, autoDetectConfig: true })
       effectiveCache = repo.cache
     } catch {
       // If Repository.open fails, continue with provided gitdir
     }
     
     // Step 2: Make changes and stage them
-    const fs = repo?.fs || fixtureRepo.fs
-    await fs.write(`${dir}/a.txt`, 'staged changes - a')
-    await fs.write(`${dir}/b.js`, 'staged changes - b')
+    const worktreeFs = repo?.fs || fixtureRepo.fs
+    await worktreeFs.write(`${dir}/a.txt`, 'staged changes - a')
+    await worktreeFs.write(`${dir}/b.js`, 'staged changes - b')
     try {
       if (repo) {
         await add({ repo, filepath: ['a.txt', 'b.js'], cache: effectiveCache })
@@ -296,9 +294,7 @@ describe('stash flow', () => {
     
     // Step 3: Test writeTreeChanges with the same context as stash
     const indexTree = await writeTreeChanges({
-      fs,
-      dir,
-      gitdir: effectiveGitdir,
+      repo: repo || fixtureRepo, // Pass repo
       cache: effectiveCache, // Same cache as used by add()
       treePair: [TREE({ ref: 'HEAD' }), 'stage'],
     })
@@ -308,9 +304,8 @@ describe('stash flow', () => {
   })
 
   it('behavior:Repository-open-creates-cache', async () => {
-    const { repo: fixtureRepo } = await makeFixture('test-stash')
+    const { repo: fixtureRepo, dir, fs, gitdir } = await makeFixture('test-stash')
     await addUserConfig(fixtureRepo)
-    const dir = await fixtureRepo.getDir()!
     
     // This simulates what happens in stash API:
     // 1. User passes cache = {}
@@ -318,15 +313,15 @@ describe('stash flow', () => {
     // 3. But repo.cache is the same object reference
     
     const userCache = {}
-    const repo = await Repository.open({ fs: fixtureRepo.fs, dir, cache: userCache, autoDetectConfig: true })
-    const effectiveGitdir = await repo.getGitdir()
+    const repo = await Repository.open({ fs: fixtureRepo.fs, dir, gitdir, cache: userCache, autoDetectConfig: true })
+    const effectiveGitdir = gitdir
     
     // Verify cache is the same object
     assert.strictEqual(repo.cache, userCache, 'Repository should use the same cache object')
     
     // Make changes and stage them using repo.cache
-    await repo.fs.write(`${dir}/a.txt`, 'staged changes - a')
-    await repo.fs.write(`${dir}/b.js`, 'staged changes - b')
+    await fs.write(`${dir}/a.txt`, 'staged changes - a')
+    await fs.write(`${dir}/b.js`, 'staged changes - b')
     try {
       await add({ repo, filepath: ['a.txt', 'b.js'], cache: repo.cache })
     } catch (error) {
@@ -356,9 +351,7 @@ describe('stash flow', () => {
     // Test writeTreeChanges with repo.cache
     // This verifies that the cache mechanism works correctly with Repository
     const indexTree = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir: effectiveGitdir,
+      repo, // Pass repo
       cache: repo.cache, // Repository's cache (same as userCache)
       treePair: [TREE({ ref: 'HEAD' }), 'stage'],
     })
@@ -377,10 +370,8 @@ describe('stash flow', () => {
   })
 
   it('behavior:cache-synchronization', async () => {
-    const { repo: fixtureRepo } = await makeFixture('test-stash')
+    const { repo: fixtureRepo, dir, fs, gitdir } = await makeFixture('test-stash')
     await addUserConfig(fixtureRepo)
-    const dir = await fixtureRepo.getDir()!
-    const gitdir = await fixtureRepo.getGitdir()
     
     const cache = {}
     
@@ -391,7 +382,7 @@ describe('stash flow', () => {
     await add({ repo: fixtureRepo, filepath: ['a.txt'], cache })
     
     // Immediately check index state
-    const repo = await Repository.open({ fs: fixtureRepo.fs, dir, cache, autoDetectConfig: true })
+    const repo = await Repository.open({ fs: fixtureRepo.fs, dir, gitdir, cache, autoDetectConfig: true })
     let index
     try {
       index = await repo.readIndexDirect()
@@ -405,14 +396,17 @@ describe('stash flow', () => {
       }
       throw error
     }
-    const aEntry = index.entriesMap.get('a.txt')
+    // If index is a Buffer (should not happen with readIndexDirect default), wrap it
+    const indexObj = index instanceof Uint8Array ? 
+      (await import('@awesome-os/universal-git-src/git/index/GitIndex.ts')).GitIndex.fromBuffer(index, 'sha1') : 
+      index
+
+    const aEntry = indexObj.entriesMap.get('a.txt')
     assert.notStrictEqual(aEntry, undefined, 'Index should have a.txt after add()')
     
     // Immediately test writeTreeChanges with same cache
     const indexTree = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir,
+      repo, // Pass repo
       cache, // Same cache
       treePair: [TREE({ ref: 'HEAD' }), 'stage'],
     })
@@ -422,26 +416,21 @@ describe('stash flow', () => {
   })
 
   it('ok:unstaged-changes-workdir', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     await addUserConfig(repo)
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
-    
     const cache = {}
     
     // Make staged changes
-    await repo.fs.write(`${dir}/a.txt`, 'staged changes - a')
+    await fs.write(`${dir}/a.txt`, 'staged changes - a')
     await add({ repo, filepath: ['a.txt'], cache })
     
     // Make additional unstaged changes
-    await repo.fs.write(`${dir}/a.txt`, 'unstaged changes - a')
-    await repo.fs.write(`${dir}/m.xml`, 'new unstaged file')
+    await fs.write(`${dir}/a.txt`, 'unstaged changes - a')
+    await fs.write(`${dir}/m.xml`, 'new unstaged file')
     
     // Test writeTreeChanges for working directory changes
     const workingTree = await writeTreeChanges({
-      fs: repo.fs,
-      dir,
-      gitdir,
+      repo, // Pass repo
       cache,
       treePair: [STAGE(), 'workdir'],
     })

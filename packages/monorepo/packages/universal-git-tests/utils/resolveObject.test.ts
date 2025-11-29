@@ -12,9 +12,7 @@ import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBu
 
 test('resolveObject', async (t) => {
   await t.test('ok:resolves-blob', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const blobOid = await writeBlob({
@@ -24,7 +22,7 @@ test('resolveObject', async (t) => {
     })
     
     const result = await resolveObject({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: blobOid,
@@ -38,9 +36,7 @@ test('resolveObject', async (t) => {
   })
 
   await t.test('ok:resolves-tree', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const blobOid = await writeBlob({
@@ -58,7 +54,7 @@ test('resolveObject', async (t) => {
     })
     
     const result = await resolveObject({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: treeOid,
@@ -72,9 +68,7 @@ test('resolveObject', async (t) => {
   })
 
   await t.test('ok:resolves-commit', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const treeOid = await writeTree({
@@ -96,7 +90,7 @@ test('resolveObject', async (t) => {
     })
     
     const result = await resolveObject({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: commitOid,
@@ -110,14 +104,13 @@ test('resolveObject', async (t) => {
   })
 
   await t.test('edge:empty-tree-OID', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const emptyTreeOid = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
     
     const result = await resolveObject({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: emptyTreeOid,
@@ -131,14 +124,13 @@ test('resolveObject', async (t) => {
   })
 
   await t.test('edge:custom-empty-tree-OID', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const customEmptyTreeOid = 'a'.repeat(40)
     
     const result = await resolveObject({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: customEmptyTreeOid,
@@ -153,9 +145,7 @@ test('resolveObject', async (t) => {
   })
 
   await t.test('ok:peels-tag-to-target', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const blobOid = await writeBlob({
@@ -177,7 +167,7 @@ test('resolveObject', async (t) => {
     })
     
     const result = await resolveObject({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: tagOid,
@@ -191,9 +181,7 @@ test('resolveObject', async (t) => {
   })
 
   await t.test('ok:resolves-commit-tree', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const treeOid = await writeTree({
@@ -217,7 +205,7 @@ test('resolveObject', async (t) => {
     })
     
     const result = await resolveObject({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: commitOid,
@@ -230,9 +218,7 @@ test('resolveObject', async (t) => {
   })
 
   await t.test('edge:falls-back-empty-tree', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     // Create commit with non-existent tree OID
@@ -250,7 +236,7 @@ test('resolveObject', async (t) => {
     })
     
     const result = await resolveObject({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: commitOid,
@@ -265,9 +251,7 @@ test('resolveObject', async (t) => {
   })
 
   await t.test('error:ObjectTypeError-wrong-type', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const blobOid = await writeBlob({
@@ -279,7 +263,7 @@ test('resolveObject', async (t) => {
     await assert.rejects(
       async () => {
         await resolveObject({
-          fs: repo.fs,
+          fs: fs,
           cache,
           gitdir,
           oid: blobOid,
@@ -294,8 +278,7 @@ test('resolveObject', async (t) => {
   })
 
   await t.test('error:NotFoundError-non-existent', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const nonExistentOid = 'a'.repeat(40)
@@ -303,7 +286,7 @@ test('resolveObject', async (t) => {
     await assert.rejects(
       async () => {
         await resolveObject({
-          fs: repo.fs,
+          fs: fs,
           cache,
           gitdir,
           oid: nonExistentOid,
@@ -318,9 +301,7 @@ test('resolveObject', async (t) => {
   })
 
   await t.test('param:objectFormat', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const blobOid = await writeBlob({
@@ -330,7 +311,7 @@ test('resolveObject', async (t) => {
     })
     
     const result = await resolveObject({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: blobOid,
@@ -344,9 +325,7 @@ test('resolveObject', async (t) => {
   })
 
   await t.test('ok:detects-objectFormat', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const blobOid = await writeBlob({
@@ -356,7 +335,7 @@ test('resolveObject', async (t) => {
     })
     
     const result = await resolveObject({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: blobOid,
@@ -369,9 +348,7 @@ test('resolveObject', async (t) => {
   })
 
   await t.test('ok:nested-tag-peeling', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = (await repo.getDir())!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache: Record<string, unknown> = {}
     
     const blobOid = await writeBlob({
@@ -407,7 +384,7 @@ test('resolveObject', async (t) => {
     })
     
     const result = await resolveObject({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: tag2Oid,

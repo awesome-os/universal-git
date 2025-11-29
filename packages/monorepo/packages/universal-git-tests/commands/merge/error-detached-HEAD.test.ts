@@ -74,7 +74,7 @@ async function verifyAndLogConfig(repo: TestRepo, label: string = 'Before merge'
       // Last resort: use old getConfig API (only reads local config)
       for (const key of mergeConfigKeys) {
         try {
-          ugitConfig[key] = await getConfig({ fs: repo.fs, gitdir: repo.gitdir, path: key })
+          ugitConfig[key] = await getConfig({ fs: fs, gitdir: repo.gitdir, path: key })
         } catch {
           ugitConfig[key] = undefined
         }
@@ -118,7 +118,7 @@ describe('merge', () => {
   })
 
   it('error:detached-HEAD', async () => {
-        const { repo } = await makeFixture('test-merge')
+        const { repo, fs, dir, gitdir } = await makeFixture('test-merge')
 
         // Checkout a commit directly (detached HEAD)
         const commitOid = await repo.resolveRef('main')

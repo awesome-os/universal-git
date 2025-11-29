@@ -6,7 +6,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 describe('readCommit', () => {
   it('error:NotFoundError', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readCommit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readCommit')
     // Test
     let error = null
     try {
@@ -23,7 +23,7 @@ describe('readCommit', () => {
   
   it('ok:basic', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readCommit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readCommit')
     // Test
     const result = await readCommit({
       repo,
@@ -40,7 +40,7 @@ describe('readCommit', () => {
   
   it('ok:from-packfile', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readCommit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readCommit')
     // Test
     const result = await readCommit({
       repo,
@@ -54,7 +54,7 @@ describe('readCommit', () => {
   
   it('behavior:peels-tags', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readCommit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readCommit')
     // Test
     const result = await readCommit({
       repo,
@@ -78,7 +78,7 @@ describe('readCommit', () => {
   })
 
   it('param:oid-missing', async () => {
-    const { repo } = await makeFixture('test-readCommit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readCommit')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await readCommit({
@@ -92,7 +92,7 @@ describe('readCommit', () => {
   })
 
   it('param:repo-provided', async () => {
-    const { repo } = await makeFixture('test-readCommit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readCommit')
     // Provide gitdir explicitly to avoid default parameter evaluation issue
     const result = await readCommit({
       repo,
@@ -103,7 +103,7 @@ describe('readCommit', () => {
   })
 
   it('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-readCommit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readCommit')
     const result = await readCommit({
       repo,
       oid: 'e10ebb90d03eaacca84de1af0a59b444232da99e',
@@ -113,7 +113,7 @@ describe('readCommit', () => {
   })
 
   it('error:caller-property', async () => {
-    const { repo } = await makeFixture('test-readCommit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readCommit')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await readCommit({
@@ -127,7 +127,7 @@ describe('readCommit', () => {
   })
 
   it('edge:no-parent', async () => {
-    const { repo } = await makeFixture('test-readCommit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readCommit')
     // Find a commit without parent (initial commit)
     const result = await readCommit({
       repo,
@@ -138,7 +138,7 @@ describe('readCommit', () => {
   })
 
   it('edge:multiple-parents', async () => {
-    const { repo } = await makeFixture('test-readCommit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readCommit')
     const result = await readCommit({
       repo,
       oid: 'e10ebb90d03eaacca84de1af0a59b444232da99e',

@@ -6,7 +6,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('annotatedTag', async (t) => {
   await t.test('ok:creates-annotated-tag', async () => {
     // Setup
-    const { repo } = await makeFixture('test-annotatedTag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-annotatedTag')
     // Test
     await annotatedTag({
       repo,
@@ -24,7 +24,7 @@ test('annotatedTag', async (t) => {
 
   await t.test('ok:creates-annotated-tag-to-blob', async () => {
     // Setup
-    const { repo } = await makeFixture('test-annotatedTag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-annotatedTag')
     // Test
     await annotatedTag({
       repo,
@@ -47,7 +47,7 @@ test('annotatedTag', async (t) => {
   await t.test('ok:creates-signed-tag', async () => {
     // Setup
     const { pgp } = await import('@isomorphic-git/pgp-plugin')
-    const { repo } = await makeFixture('test-annotatedTag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-annotatedTag')
     // Test
     // Import pgp-keys from fixtures directory
     const pgpKeysUrl = new URL('../__fixtures__/pgp-keys.mjs', import.meta.url).href

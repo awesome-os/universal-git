@@ -6,7 +6,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 describe('listBranches', () => {
   it('ok:basic', async () => {
     // Setup
-    const { repo } = await makeFixture('test-listBranches')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-listBranches')
     // Test
     const branches = await listBranches({ repo })
     assert.ok(Array.isArray(branches))
@@ -17,7 +17,7 @@ describe('listBranches', () => {
   
   it('param:remote', async () => {
     // Setup
-    const { repo } = await makeFixture('test-listBranches')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-listBranches')
     // Test
     const branches = await listBranches({
       repo,
@@ -41,21 +41,21 @@ describe('listBranches', () => {
   })
 
   it('param:repo-provided', async () => {
-    const { repo } = await makeFixture('test-listBranches')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-listBranches')
     const branches = await listBranches({ repo })
     assert.ok(Array.isArray(branches))
     assert.ok(branches.length >= 0)
   })
 
   it('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-listBranches')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-listBranches')
     const branches = await listBranches({ repo })
     assert.ok(Array.isArray(branches))
     assert.ok(branches.length >= 0)
   })
 
   it('error:caller-property', async () => {
-    const { repo } = await makeFixture('test-listBranches')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-listBranches')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await listBranches({
@@ -69,7 +69,7 @@ describe('listBranches', () => {
   })
 
   it('edge:empty-repository', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const branches = await listBranches({ repo })
     assert.ok(Array.isArray(branches))
     // Empty repo might have no branches or a default branch
@@ -77,7 +77,7 @@ describe('listBranches', () => {
   })
 
   it('edge:non-existent-remote', async () => {
-    const { repo } = await makeFixture('test-listBranches')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-listBranches')
     const branches = await listBranches({
       repo,
       remote: 'nonexistent',

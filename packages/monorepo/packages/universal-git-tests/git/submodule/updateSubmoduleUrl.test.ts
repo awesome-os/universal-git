@@ -1,12 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { updateSubmoduleUrl, parseGitmodules } from '@awesome-os/universal-git-src/core-utils/filesystem/SubmoduleManager.ts'
 import { makeNodeFixture } from '../../helpers/makeNodeFixture.ts'
 import { join } from '@awesome-os/universal-git-src/utils/join.ts'
 
 test('updateSubmoduleUrl', async (t) => {
   await t.test('ok:updates-submodule-URL-in-.gitmodules', async () => {
-    const { fs, dir } = await makeNodeFixture('test-submodule-update-url')
+    const { repo, fs, dir } = await makeNodeFixture('test-submodule-update-url')
     
     // Create .gitmodules file
     const gitmodulesContent = `[submodule "lib"]
@@ -16,22 +15,22 @@ test('updateSubmoduleUrl', async (t) => {
     await fs.write(join(dir, '.gitmodules'), gitmodulesContent)
     
     // Update URL
-    await updateSubmoduleUrl({ fs, dir, name: 'lib', url: 'https://github.com/user/new-lib.git' })
+    await repo.gitBackend.updateSubmoduleUrl(repo.worktreeBackend, 'lib', 'https://github.com/user/new-lib.git')
     
     // Verify URL was updated
-    const submodules = await parseGitmodules({ fs, dir })
+    const submodules = await repo.gitBackend.parseGitmodules(repo.worktreeBackend)
     const libInfo = submodules.get('lib')
     assert.ok(libInfo)
     assert.strictEqual(libInfo.url, 'https://github.com/user/new-lib.git')
   })
 
   await t.test('ok:throws-error-when-.gitmodules-does-not-exist', async () => {
-    const { fs, dir } = await makeNodeFixture('test-submodule-update-url-error')
+    const { repo, fs, dir } = await makeNodeFixture('test-submodule-update-url-error')
     
     // Try to update URL when .gitmodules doesn't exist
     await assert.rejects(
       async () => {
-        await updateSubmoduleUrl({ fs, dir, name: 'lib', url: 'https://github.com/user/new-lib.git' })
+        await repo.gitBackend.updateSubmoduleUrl(repo.worktreeBackend, 'lib', 'https://github.com/user/new-lib.git')
       },
       (err: any) => {
         // Should throw an error (could be ENOENT, NOENT, or other file system error)

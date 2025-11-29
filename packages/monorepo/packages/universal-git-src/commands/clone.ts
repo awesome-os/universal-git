@@ -103,7 +103,7 @@ export async function clone({
     if (_repo) {
       // If repo is provided, extract what we need
       fs = _repo.fs
-      effectiveDir = await _repo.getDir() || dir
+      effectiveDir = (_repo.worktreeBackend?.getDirectory ? _repo.worktreeBackend.getDirectory() : undefined) || dir
       effectiveGitdir = await _repo.getGitdir()
       cache = _repo.cache
     } else {
@@ -244,7 +244,7 @@ export async function _clone({
   if (_repo) {
     fs = _repo.fs
     cache = _repo.cache
-    dir = await _repo.getDir() || _dir
+    dir = (_repo.worktreeBackend?.getDirectory ? _repo.worktreeBackend.getDirectory() : undefined) || _dir
     gitdir = await _repo.getGitdir()
   } else {
     if (!_fs) {

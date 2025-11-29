@@ -18,13 +18,11 @@ describe('checkout flow', () => {
   }
 
   it('ok:restore-files-force-checkout', async () => {
-    const { repo } = await makeFixture('test-stash', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash', { init: true })
     await addUserConfig(repo)
-    const dir = (await repo.getDir())!
-    
     // CRITICAL: Use createFileSystem to ensure we're using the same fs instance as the Repository
     // This ensures that writes from checkout are visible to reads in the test
-    const normalizedFs = createFileSystem(repo.fs)
+    const normalizedFs = createFileSystem(fs)
     
     // Get original content - use normalized fs to match checkout's fs
     const originalContent = await normalizedFs.read(`${dir}/a.txt`)
@@ -39,6 +37,7 @@ describe('checkout flow', () => {
     // Checkout with force should restore to HEAD - pass repo to ensure fs consistency
     await checkout({
       repo,
+      dir, // Pass dir explicitly
       ref: 'HEAD',
       force: true,
     })
@@ -49,29 +48,26 @@ describe('checkout flow', () => {
   })
 
   it('ok:create-update-operations', async () => {
-    const { repo } = await makeFixture('test-stash', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash', { init: true })
     await addUserConfig(repo)
-    const dir = (await repo.getDir())!
-    const gitdir = await repo.getGitdir()
-    
     // Get HEAD tree OID - use readCommit from universal-git
     const { readCommit, resolveRef } = await import('@awesome-os/universal-git-src/index.ts')
-    const headOid = await resolveRef({ fs: repo.fs, gitdir, ref: 'HEAD' })
-    const commitResult = await readCommit({ fs: repo.fs, gitdir, oid: headOid })
+    const headOid = await resolveRef({ fs: fs, gitdir, ref: 'HEAD' })
+    const commitResult = await readCommit({ fs: fs, gitdir, oid: headOid })
     const treeOid = commitResult.commit.tree
     assert.ok(treeOid, 'treeOid should be defined')
     assert.strictEqual(typeof treeOid, 'string')
     assert.strictEqual(treeOid.length, 40)
     
     // Make changes to file
-    await repo.fs.write(`${dir}/a.txt`, 'modified content')
+    await fs.write(`${dir}/a.txt`, 'modified content')
     
     // Read the index first, then pass it to analyzeCheckout
-    const index = await repo.readIndexDirect(false)
+    const index = await repo.readIndexDirect()
     
     // Analyze checkout - should detect the change
     const operations = await analyzeCheckout({
-      fs: repo.fs,
+      fs: fs,
       dir,
       gitdir,
       treeOid,
@@ -86,32 +82,29 @@ describe('checkout flow', () => {
   })
 
   it('ok:execute-checkout-operations', async () => {
-    const { repo } = await makeFixture('test-stash', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash', { init: true })
     await addUserConfig(repo)
-    const dir = (await repo.getDir())!
-    const gitdir = await repo.getGitdir()
-    
     // Get original content
-    const originalContent = await repo.fs.read(`${dir}/a.txt`)
+    const originalContent = await fs.read(`${dir}/a.txt`)
     
     // Get HEAD tree OID - use readCommit from universal-git
     const { readCommit, resolveRef } = await import('@awesome-os/universal-git-src/index.ts')
-    const headOid = await resolveRef({ fs: repo.fs, gitdir, ref: 'HEAD' })
-    const commitResult = await readCommit({ fs: repo.fs, gitdir, oid: headOid })
+    const headOid = await resolveRef({ fs: fs, gitdir, ref: 'HEAD' })
+    const commitResult = await readCommit({ fs: fs, gitdir, oid: headOid })
     const treeOid = commitResult.commit.tree
     assert.ok(treeOid, 'treeOid should be defined')
     assert.strictEqual(typeof treeOid, 'string')
     assert.strictEqual(treeOid.length, 40)
     
     // Make changes to file
-    await repo.fs.write(`${dir}/a.txt`, 'modified content')
+    await fs.write(`${dir}/a.txt`, 'modified content')
     
     // Read the index first, then pass it to analyzeCheckout and executeCheckout
-    const index = await repo.readIndexDirect(false)
+    const index = await repo.readIndexDirect()
     
     // Analyze and execute checkout
     const operations = await analyzeCheckout({
-      fs: repo.fs,
+      fs: fs,
       dir,
       gitdir,
       treeOid,
@@ -121,7 +114,7 @@ describe('checkout flow', () => {
     })
     
     await executeCheckout({
-      fs: repo.fs,
+      fs: fs,
       index, // Pass the index object
       dir,
       gitdir,
@@ -129,18 +122,16 @@ describe('checkout flow', () => {
     })
     
     // Verify file is restored
-    const restoredContent = await repo.fs.read(`${dir}/a.txt`)
+    const restoredContent = await fs.read(`${dir}/a.txt`)
     assert.strictEqual(restoredContent.toString(), originalContent.toString())
   })
 
   it('param:cache-checkout-operations', async () => {
-    const { repo } = await makeFixture('test-stash', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash', { init: true })
     await addUserConfig(repo)
-    const dir = (await repo.getDir())!
-    
     // CRITICAL: Use createFileSystem to ensure we're using the same fs instance as the Repository
     // This ensures that writes from checkout are visible to reads in the test
-    const normalizedFs = createFileSystem(repo.fs)
+    const normalizedFs = createFileSystem(fs)
     
     // Get original content - use normalized fs to match checkout's fs
     const originalContent = await normalizedFs.read(`${dir}/a.txt`)
@@ -152,6 +143,7 @@ describe('checkout flow', () => {
     // Now checkout with force should restore to HEAD - pass repo to ensure fs consistency
     await checkout({
       repo,
+      dir, // Pass dir explicitly
       ref: 'HEAD',
       force: true,
     })

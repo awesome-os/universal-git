@@ -39,7 +39,7 @@ const writeSymlink = async (repo: Repository) => {
 describe('add', () => {
   it('ok:single-file', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     
     // makeFixture already provides a worktreeBackend and automatically checks out to it
@@ -57,7 +57,7 @@ describe('add', () => {
   
   it('ok:multiple-files', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     
     // Test
@@ -67,7 +67,7 @@ describe('add', () => {
   
   it('param:parallel-false', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     
     // Test - Note: parallel option is not exposed on repo.add(), but we test the functionality
@@ -82,7 +82,7 @@ describe('add', () => {
   
   it('error:single-failure', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     
     // Test
@@ -99,7 +99,7 @@ describe('add', () => {
   
   it('error:multiple-failures', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     await writeGitIgnore(repo)
 
@@ -122,7 +122,7 @@ describe('add', () => {
   
   it('behavior:ignored-file', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     await writeGitIgnore(repo)
 
@@ -132,7 +132,7 @@ describe('add', () => {
   
   it('param:force-ignored', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     await writeGitIgnore(repo)
 
@@ -151,7 +151,7 @@ describe('add', () => {
   
   it('ok:symlink', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     
     // it's not currently possible to tests symlinks in the browser since there's no way to create them
@@ -182,7 +182,7 @@ describe('add', () => {
 
   it('edge:ignored-file', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     await writeGitIgnore(repo)
     
@@ -193,7 +193,7 @@ describe('add', () => {
   
   it('param:force-ignored-file', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     await writeGitIgnore(repo)
     
@@ -205,7 +205,7 @@ describe('add', () => {
   
   it('error:non-existent-file', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     
     // Test
@@ -223,7 +223,7 @@ describe('add', () => {
 
   it('ok:folder', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     
     // Test
@@ -234,7 +234,7 @@ describe('add', () => {
 
   it('behavior:folder-with-gitignore', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     await writeGitIgnore(repo)
     
@@ -246,7 +246,7 @@ describe('add', () => {
 
   it('param:force-folder-gitignore', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     await writeGitIgnore(repo)
     
@@ -259,7 +259,7 @@ describe('add', () => {
 
   it('ok:add-all', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     await writeGitIgnore(repo)
     
@@ -271,7 +271,7 @@ describe('add', () => {
 
   it('param:add-all-parallel-false', async () => {
     // Setup
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     await writeGitIgnore(repo)
     
@@ -283,13 +283,17 @@ describe('add', () => {
   })
 
   it('behavior:autocrlf-binary-files', async () => {
-    const { repo } = await makeFixture('test-add-autocrlf')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add-autocrlf')
     await repo.init()
     
     if (!repo.worktreeBackend) {
       throw new Error('WorktreeBackend not available')
     }
     const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
+    
+    // Ensure autocrlf is set to true
+    const config = await repo.getConfig()
+    await config.set('core.autocrlf', 'true', 'local')
     
     const autocrlf = await getConfig({ repo, path: 'core.autocrlf' })
     assert.strictEqual(autocrlf, 'true')
@@ -321,7 +325,7 @@ describe('add', () => {
   })
 
   it('error:caller-property', async () => {
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     
     let error: any = null
@@ -336,7 +340,7 @@ describe('add', () => {
   })
 
   it('behavior:directory-sequential', async () => {
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     
     if (!repo.worktreeBackend) {
@@ -361,7 +365,7 @@ describe('add', () => {
   })
 
   it('edge:empty-directory', async () => {
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     
     if (!repo.worktreeBackend) {
@@ -380,7 +384,7 @@ describe('add', () => {
 
 
   it('error:LFS-filter-error', async () => {
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     
     if (!repo.worktreeBackend) {
@@ -400,7 +404,7 @@ describe('add', () => {
   })
 
   it('behavior:autocrlf-config', async () => {
-    const { repo } = await makeFixture('test-add')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-add')
     await repo.init()
     
     if (!repo.worktreeBackend) {

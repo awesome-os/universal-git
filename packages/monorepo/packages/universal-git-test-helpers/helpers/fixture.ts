@@ -9,6 +9,9 @@ import type * as fs from 'fs'
 
 export interface TestFixture {
   repo: Repository
+  fs: FileSystemProvider
+  dir: string
+  gitdir: string
 }
 
 /**
@@ -45,9 +48,12 @@ export async function makeFixture(fixtureName: string, options?: { init?: boolea
     }
   }
   
-  // Return only repo - all operations should go through backend methods
+  // Return repo and convenience accessors
   return {
     repo: fixture.repo,
+    fs: fixture.fs,
+    dir: fixture.dir,
+    gitdir: fixture.gitdir,
   }
 }
 

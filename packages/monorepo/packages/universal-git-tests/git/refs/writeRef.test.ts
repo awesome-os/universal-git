@@ -1,20 +1,18 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { writeRef } from '@awesome-os/universal-git-src/git/refs/writeRef.ts'
-import { resolveRef } from '@awesome-os/universal-git-src/git/refs/readRef.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 
 test('writeRef', async (t) => {
   await t.test('ok:concurrently-reading-writing-ref-should-not-cause-NotFoundError', async () => {
     // There are some assert() calls below, but as of 2023-03-15, if this test fails it will do so by logging instances
     // of 'NotFoundError: Could not find myRef', which should not happen.
-    const { fs, gitdir } = await makeFixture('test-GitRefManager')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-GitRefManager')
     const ref = 'myRef'
     const value = '1234567890123456789012345678901234567890'
-    await writeRef({ fs, gitdir, ref, value }) // Guarantee that the file for the ref exists on disk
+    await repo.gitBackend.writeRef(ref, value, false, repo.cache) // Guarantee that the file for the ref exists on disk
 
     const writePromises: Promise<void>[] = []
-    const resolvePromises: Promise<string>[] = []
+    const resolvePromises: Promise<string | null>[] = []
     // Some arbitrary number of iterations that seems to guarantee that the error (pre-fix) is hit.
     // With 100 the test *mostly* failed but still passed every now and then.
     const iterations = 500
@@ -24,10 +22,10 @@ test('writeRef', async (t) => {
       // calls to writeRef() and resolve(). I tried several variations of the combination but none of them caused the
       // error to happen as consistently.
       if (Math.random() < 0.5) {
-        await writeRef({ fs, gitdir, ref, value })
+        await repo.gitBackend.writeRef(ref, value, false, repo.cache)
       } else {
         writePromises.push(
-          writeRef({ fs, gitdir, ref, value }).catch(err => {
+          repo.gitBackend.writeRef(ref, value, false, repo.cache).catch(err => {
             // Log but don't fail - writes might fail due to race conditions
             console.warn(`Write failed at iteration ${i}:`, err)
             throw err
@@ -36,18 +34,18 @@ test('writeRef', async (t) => {
       }
       if (Math.random() < 0.5) {
         try {
-          const resolvedRef = await resolveRef({ fs, gitdir, ref })
+          const resolvedRef = await repo.gitBackend.readRef(ref, 5, repo.cache)
           assert.strictEqual(resolvedRef, value)
         } catch (err: any) {
           // If resolve fails, it might be because the ref doesn't exist yet
           // Wait a bit and retry once
           await new Promise(resolve => setImmediate(resolve))
-          const resolvedRef = await resolveRef({ fs, gitdir, ref })
+          const resolvedRef = await repo.gitBackend.readRef(ref, 5, repo.cache)
           assert.strictEqual(resolvedRef, value)
         }
       } else {
         resolvePromises.push(
-          resolveRef({ fs, gitdir, ref }).catch(async (err: any) => {
+          repo.gitBackend.readRef(ref, 5, repo.cache).catch(async (err: any) => {
             // If resolve fails with NotFoundError, wait a bit and retry multiple times
             // This handles race conditions where the ref is being written
             if (err && (err.code === 'NotFoundError' || err.name === 'NotFoundError')) {
@@ -55,7 +53,7 @@ test('writeRef', async (t) => {
               for (let retry = 0; retry < 5; retry++) {
                 await new Promise(resolve => setImmediate(resolve))
                 try {
-                  return await resolveRef({ fs, gitdir, ref })
+                  return await repo.gitBackend.readRef(ref, 5, repo.cache)
                 } catch (retryErr: any) {
                   if (retryErr && (retryErr.code === 'NotFoundError' || retryErr.name === 'NotFoundError')) {
                     // Still NotFoundError, continue retrying

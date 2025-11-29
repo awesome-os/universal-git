@@ -1,11 +1,5 @@
 import { InvalidOidError } from '../../errors/InvalidOidError.ts'
-import { readPackedRefs } from './packedRefs.ts'
-import { resolveRef } from './readRef.ts'
-import { writeRef, writeSymbolicRef } from './writeRef.ts'
-import { listRefs } from './listRefs.ts'
-import { deleteRefs } from './deleteRef.ts'
-import { existsRef } from './expandRef.ts'
-import { logRefUpdate } from '../logs/logRefUpdate.ts'
+import type { GitBackend } from '../../backends/GitBackend.ts'
 import type { FileSystemProvider } from '../../models/FileSystem.ts'
 
 /**
@@ -14,8 +8,7 @@ import type { FileSystemProvider } from '../../models/FileSystem.ts'
  * This function handles the translation of remote refs (from fetch/push operations)
  * to local remote-tracking refs (e.g., refs/remotes/origin/main).
  * 
- * @param fs - File system client
- * @param gitdir - Path to .git directory
+ * @param gitBackend - Git backend instance
  * @param remote - Remote name (e.g., 'origin')
  * @param refs - Map of server ref paths to OIDs
  * @param symrefs - Map of server symbolic ref paths to targets
@@ -28,8 +21,7 @@ import type { FileSystemProvider } from '../../models/FileSystem.ts'
  * @example
  * ```typescript
  * const result = await updateRemoteRefs({
- *   fs,
- *   gitdir,
+ *   gitBackend: repo.gitBackend,
  *   remote: 'origin',
  *   refs: new Map([['refs/heads/main', 'abc123...']]),
  *   symrefs: new Map(),
@@ -37,8 +29,7 @@ import type { FileSystemProvider } from '../../models/FileSystem.ts'
  * ```
  */
 export async function updateRemoteRefs({
-  fs,
-  gitdir,
+  gitBackend,
   remote,
   refs,
   symrefs,
@@ -46,9 +37,11 @@ export async function updateRemoteRefs({
   refspecs,
   prune = false,
   pruneTags = false,
+  // Legacy parameters for backward compatibility
+  fs: _fs,
+  gitdir: _gitdir,
 }: {
-  fs: FileSystemProvider
-  gitdir: string
+  gitBackend?: GitBackend
   remote: string
   refs: Map<string, string>
   symrefs: Map<string, string>
@@ -56,7 +49,21 @@ export async function updateRemoteRefs({
   refspecs?: string[]
   prune?: boolean
   pruneTags?: boolean
+  // Legacy parameters for backward compatibility
+  fs?: FileSystemProvider
+  gitdir?: string
 }): Promise<{ pruned: string[] }> {
+  // Support both new signature (gitBackend) and legacy signature (fs/gitdir)
+  let backend: GitBackend
+  if (gitBackend) {
+    backend = gitBackend
+  } else if (_fs && _gitdir) {
+    // Legacy: create a temporary backend
+    const { GitBackendFs } = await import('../../backends/GitBackendFs/index.ts')
+    backend = new GitBackendFs(_fs, _gitdir)
+  } else {
+    throw new Error('Either gitBackend or (fs and gitdir) must be provided')
+  }
   // Validate input
   for (const value of refs.values()) {
     if (!value.match(/[0-9a-f]{40}/)) {
@@ -73,7 +80,8 @@ export async function updateRemoteRefs({
     for (const [serverRef, oid] of refs.entries()) {
       if (serverRef.startsWith('refs/tags/') && !serverRef.endsWith('^{}')) {
         // Only fetch tags that don't conflict
-        if (!(await existsRef({ fs, gitdir, ref: serverRef }))) {
+        const existingRef = await backend.readRef(serverRef, 5, {})
+        if (!existingRef) {
           actualRefsToWrite.set(serverRef, oid)
         }
       }
@@ -112,7 +120,7 @@ export async function updateRemoteRefs({
   const pruned: string[] = []
   if (prune) {
     const remoteRefsPath = `refs/remotes/${remote}`
-    const existingRefs = await listRefs({ fs, gitdir, filepath: remoteRefsPath })
+    const existingRefs = await backend.listRefs(remoteRefsPath)
     for (const ref of existingRefs) {
       const fullRef = `${remoteRefsPath}/${ref}`
       if (!actualRefsToWrite.has(fullRef)) {
@@ -120,7 +128,9 @@ export async function updateRemoteRefs({
       }
     }
     if (pruned.length > 0) {
-      await deleteRefs({ fs, gitdir, refs: pruned })
+      for (const ref of pruned) {
+        await backend.deleteRef(ref, {})
+      }
     }
   }
 
@@ -129,31 +139,30 @@ export async function updateRemoteRefs({
     // Read old ref OID for reflog before updating
     let oldRefOid: string | undefined
     try {
-      oldRefOid = await resolveRef({ fs, gitdir, ref: key })
+      const refValue = await backend.readRef(key, 5, {})
+      oldRefOid = refValue || undefined
     } catch {
       // Ref doesn't exist yet
       oldRefOid = undefined
     }
     
     if (value.startsWith('ref: ')) {
-      await writeSymbolicRef({ fs, gitdir, ref: key, value: value.slice(5) })
+      await backend.writeSymbolicRef(key, value.slice(5), oldRefOid, {})
     } else {
-      await writeRef({ fs, gitdir, ref: key, value })
+      await backend.writeRef(key, value, false, {})
       
       // Add descriptive reflog entry for remote ref update (fetch)
       // Note: writeRef already logs reflog, but we want a more descriptive message
       if (oldRefOid !== value && key.startsWith('refs/remotes/')) {
-        await logRefUpdate({
-          fs,
-          gitdir,
-          ref: key,
-          oldOid: oldRefOid || '0000000000000000000000000000000000000000',
-          newOid: value,
-          message: `update by fetch`,
-        }).catch(() => {
+        try {
+          const timestamp = Math.floor(Date.now() / 1000)
+          const oldOid = oldRefOid || '0000000000000000000000000000000000000000'
+          const entry = `${oldOid} ${value} universal-git <noreply@isomorphic-git.org> ${timestamp} +0000\tupdate by fetch\n`
+          await backend.appendReflog(key, entry)
+        } catch {
           // Silently ignore reflog errors (Git's behavior)
           // Note: writeRef already wrote a reflog entry, so this is just for a better message
-        })
+        }
       }
     }
   }
@@ -164,7 +173,8 @@ export async function updateRemoteRefs({
       // Read old ref OID for reflog before deleting
       let oldRefOid: string | undefined
       try {
-        oldRefOid = await resolveRef({ fs, gitdir, ref })
+        const refValue = await backend.readRef(ref, 5, {})
+        oldRefOid = refValue || undefined
       } catch {
         // Ref doesn't exist, skip
         continue
@@ -172,16 +182,13 @@ export async function updateRemoteRefs({
       
       // Add descriptive reflog entry for remote ref deletion (prune)
       if (oldRefOid) {
-        await logRefUpdate({
-          fs,
-          gitdir,
-          ref,
-          oldOid: oldRefOid,
-          newOid: '0000000000000000000000000000000000000000', // Zero OID for deletion
-          message: `update by fetch (pruned)`,
-        }).catch(() => {
+        try {
+          const timestamp = Math.floor(Date.now() / 1000)
+          const entry = `${oldRefOid} 0000000000000000000000000000000000000000 universal-git <noreply@isomorphic-git.org> ${timestamp} +0000\tupdate by fetch (pruned)\n`
+          await backend.appendReflog(ref, entry)
+        } catch {
           // Silently ignore reflog errors (Git's behavior)
-        })
+        }
       }
     }
   }

@@ -74,7 +74,7 @@ async function verifyAndLogConfig(repo: TestRepo, label: string = 'Before merge'
       // Last resort: use old getConfig API (only reads local config)
       for (const key of mergeConfigKeys) {
         try {
-          ugitConfig[key] = await getConfig({ fs: repo.fs, gitdir: repo.gitdir, path: key })
+          ugitConfig[key] = await getConfig({ fs: fs, gitdir: repo.gitdir, path: key })
         } catch {
           ugitConfig[key] = undefined
         }
@@ -120,7 +120,7 @@ describe('merge', () => {
   it('error:multiple-merge-bases', async () => {
         // This is hard to test without creating a specific fixture
         // But we can test the error path exists
-        const { repo } = await makeFixture('test-merge')
+        const { repo, fs, dir, gitdir } = await makeFixture('test-merge')
 
         // Most fixtures won't have multiple merge bases, so this might not throw
         // But if it does, it should be MergeNotSupportedError

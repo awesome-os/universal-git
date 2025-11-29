@@ -74,7 +74,7 @@ async function verifyAndLogConfig(repo: TestRepo, label: string = 'Before merge'
       // Last resort: use old getConfig API (only reads local config)
       for (const key of mergeConfigKeys) {
         try {
-          ugitConfig[key] = await getConfig({ fs: repo.fs, gitdir: repo.gitdir, path: key })
+          ugitConfig[key] = await getConfig({ fs: fs, gitdir: repo.gitdir, path: key })
         } catch {
           ugitConfig[key] = undefined
         }
@@ -119,10 +119,8 @@ describe('merge', () => {
 
   it('error:UnmergedPathsError', async () => {
         // Setup
-        const { repo } = await makeFixture('test-GitIndex-unmerged')
+        const { repo, fs, dir, gitdir } = await makeFixture('test-GitIndex-unmerged')
         if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
-        const gitdir = await repo.getGitdir()
-
         // Verify the fixture has unmerged paths first
         // repo is already available from makeFixture
 

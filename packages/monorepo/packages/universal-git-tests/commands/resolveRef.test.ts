@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { resolveRef, init, commit, add, writeRef } from '@awesome-os/universal-git-src/index.ts'
+import { resolveRef, init, commit, add } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { MissingParameterError } from '@awesome-os/universal-git-src/errors/MissingParameterError.ts'
 import { NotFoundError } from '@awesome-os/universal-git-src/errors/NotFoundError.ts'
@@ -20,11 +20,11 @@ test('resolveRef', async (t) => {
   })
 
   await t.test('param:gitdir-or-dir-missing', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await resolveRef({
-        fs: repo.fs,
+        fs: fs,
         // intentionally missing both gitdir and dir
         ref: 'HEAD',
       } as any)
@@ -36,7 +36,7 @@ test('resolveRef', async (t) => {
   })
 
   await t.test('param:ref-missing', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     try {
       await resolveRef({
         repo,
@@ -49,19 +49,17 @@ test('resolveRef', async (t) => {
   })
 
   await t.test('ok:resolves-ref', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a ref directly
     const testOid = 'a'.repeat(40)
-    await writeRef({ repo, ref: 'refs/heads/test-branch', value: testOid })
+    await repo.gitBackend.writeRef('refs/heads/test-branch', testOid, false, repo.cache)
     
     const resolved = await resolveRef({ repo, ref: 'refs/heads/test-branch' })
     assert.strictEqual(resolved, testOid, 'Should resolve ref to the OID')
   })
 
   await t.test('error:NotFoundError', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     
     try {
       await resolveRef({ repo, ref: 'refs/heads/nonexistent' })
@@ -72,12 +70,10 @@ test('resolveRef', async (t) => {
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const dir = (await repo.getDir())!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a ref directly
     const testOid = 'a'.repeat(40)
-    await writeRef({ repo, ref: 'refs/heads/test-branch', value: testOid })
+    await repo.gitBackend.writeRef('refs/heads/test-branch', testOid, false, repo.cache)
     
     // Resolve using dir only (gitdir should be derived)
     const resolved = await resolveRef({ repo, ref: 'refs/heads/test-branch' })
@@ -85,14 +81,14 @@ test('resolveRef', async (t) => {
   })
 
   await t.test('param:depth', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     
     // Create refs directly
     const mainOid = 'a'.repeat(40)
-    await writeRef({ repo, ref: 'refs/heads/main', value: mainOid })
+    await repo.gitBackend.writeRef('refs/heads/main', mainOid, false, repo.cache)
     
     // Create a symbolic ref pointing to main
-    await writeRef({ repo, ref: 'refs/heads/test', value: 'refs/heads/main' })
+    await repo.gitBackend.writeRef('refs/heads/test', 'refs/heads/main', false, repo.cache)
     
     // Resolve with depth
     const resolved = await resolveRef({ repo, ref: 'refs/heads/test', depth: 1 })

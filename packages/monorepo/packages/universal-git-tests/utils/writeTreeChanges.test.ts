@@ -30,7 +30,7 @@ describe('writeTreeChanges', () => {
   })
 
   it('param:treePair-missing', async () => {
-    const { repo } = await makeFixture('test-empty')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty')
     try {
       await writeTreeChanges({
         repo,
@@ -42,7 +42,7 @@ describe('writeTreeChanges', () => {
   })
 
   it('edge:empty-repo-no-HEAD', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     
     // Set up user config
     await setupUserConfig(repo)
@@ -73,7 +73,7 @@ describe('writeTreeChanges', () => {
   })
 
   it('ok:WORKDIR-tree-pair', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     
     // Set up user config
     await setupUserConfig(repo)
@@ -99,7 +99,7 @@ describe('writeTreeChanges', () => {
   })
 
   it('ok:TREE-specific-ref', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     
     // Set up user config
     await setupUserConfig(repo)
@@ -127,7 +127,7 @@ describe('writeTreeChanges', () => {
   })
 
   it('behavior:ignored-files', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     
     // Set up user config
     await setupUserConfig(repo)
@@ -161,7 +161,7 @@ describe('writeTreeChanges', () => {
     }
   })
   it('ok:detect-staged-changes', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     
     // Set up user config
     await setupUserConfig(repo)
@@ -205,7 +205,7 @@ describe('writeTreeChanges', () => {
   })
   
   it('ok:returns-null-no-staged-changes', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     
     // Use a shared cache
     const cache = {}
@@ -230,7 +230,7 @@ describe('writeTreeChanges', () => {
     
     // Verify index matches HEAD by comparing file lists
     // If they don't match, writeTreeChanges will correctly detect changes (not null)
-    const index = await repo.readIndexDirect(false) // Force fresh read
+    const index = await repo.readIndexDirect()
     const indexFiles = Array.from(index.entriesMap.keys()).sort()
     const headFilesSorted = headFiles.sort()
     
@@ -266,7 +266,7 @@ describe('writeTreeChanges', () => {
   })
   
   it('ok:detect-workdir-changes', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     
     // Set up user config
     await setupUserConfig(repo)
@@ -301,7 +301,7 @@ describe('writeTreeChanges', () => {
   })
   
   it('ok:detect-new-files-staged', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     
     // Set up user config
     await setupUserConfig(repo)
@@ -336,7 +336,7 @@ describe('writeTreeChanges', () => {
   })
   
   it('ok:multiple-file-changes', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     
     // Set up user config
     await setupUserConfig(repo)
@@ -386,7 +386,7 @@ describe('writeTreeChanges', () => {
   })
   
   it('behavior:shared-cache', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     
     // Set up user config
     await setupUserConfig(repo)
@@ -472,7 +472,7 @@ describe('writeTreeChanges', () => {
   })
   
   it('ok:returns-null-HEAD-STAGE-identical', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     
     // Set up user config and make an initial commit
     await setupUserConfig(repo)
@@ -496,7 +496,7 @@ describe('writeTreeChanges', () => {
     // Verify index matches HEAD before testing
     let index
     try {
-      index = await repo.readIndexDirect(false) // Force fresh read
+      index = await repo.readIndexDirect()
     } catch (error) {
       // If index is empty or corrupted, treat it as empty index
       if ((error as any)?.code === 'InternalError' && 
@@ -534,7 +534,7 @@ describe('writeTreeChanges', () => {
   })
 
   it('behavior:detect-changes-after-add', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     
     // Set up user config
     await setupUserConfig(repo)
@@ -566,7 +566,7 @@ describe('writeTreeChanges', () => {
     // Verify mutation was recorded (if the implementation records it)
     // Note: Some implementations may not record mutations, so we make this optional
     const { normalize } = await import('@awesome-os/universal-git-src/core-utils/GitPath.ts')
-    const normalizedGitdir = normalize(await repo.getGitdir())
+    const normalizedGitdir = normalize(gitdir)
     const latestWrite = mutationStream.getLatest('index-write', normalizedGitdir)
     // Only assert if mutation stream is being used
     if (latestWrite !== undefined) {
@@ -590,7 +590,7 @@ describe('writeTreeChanges', () => {
   })
 
   it('behavior:detect-changes-cache-invalidated', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     
     // Set up user config
     await setupUserConfig(repo)
@@ -645,7 +645,7 @@ describe('writeTreeChanges', () => {
   })
 
   it('ok:handle-deleted-files', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     
     // Set up user config
     await setupUserConfig(repo)
@@ -685,7 +685,7 @@ describe('writeTreeChanges', () => {
   })
 
   it('ok:multiple-sequential-add', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     
     // Set up user config
     await setupUserConfig(repo)
@@ -733,7 +733,7 @@ describe('writeTreeChanges', () => {
   })
 
   it('behavior:different-cache-instances', async () => {
-    const { repo } = await makeFixture('test-stash')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-stash')
     
     // Set up user config
     await setupUserConfig(repo)

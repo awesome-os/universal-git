@@ -175,3 +175,5 @@ export * from './transport/index.ts'
 
 // Export Worker infrastructure
 export * from './workers/index.ts'
+
+export { Repository } from './core-utils/Repository.ts'

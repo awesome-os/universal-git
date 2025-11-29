@@ -6,7 +6,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 describe('listTags', () => {
   it('ok:basic', async () => {
     // Setup
-    const { repo } = await makeFixture('test-listTags')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-listTags')
     // Test
     const refs = await listTags({
       repo,
@@ -31,21 +31,21 @@ describe('listTags', () => {
   })
 
   it('param:repo-provided', async () => {
-    const { repo } = await makeFixture('test-listTags')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-listTags')
     const tags = await listTags({ repo })
     assert.ok(Array.isArray(tags))
     assert.ok(tags.length >= 0)
   })
 
   it('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-listTags')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-listTags')
     const tags = await listTags({ repo })
     assert.ok(Array.isArray(tags))
     assert.ok(tags.length >= 0)
   })
 
   it('error:caller-property', async () => {
-    const { repo } = await makeFixture('test-listTags')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-listTags')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await listTags({
@@ -59,7 +59,7 @@ describe('listTags', () => {
   })
 
   it('edge:empty-repository', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const tags = await listTags({ repo })
     assert.ok(Array.isArray(tags))
     assert.strictEqual(tags.length, 0)

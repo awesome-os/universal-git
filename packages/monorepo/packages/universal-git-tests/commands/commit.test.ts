@@ -24,7 +24,7 @@ describe('commit', () => {
   })
   it('error:UnmergedPathsError', async () => {
     // Setup
-    const { repo } = await makeFixture('test-GitIndex-unmerged')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-GitIndex-unmerged')
     // Test
     let error = null
     try {
@@ -61,7 +61,7 @@ describe('commit', () => {
   
   it('ok:basic', async () => {
     // Setup
-    const { repo } = await makeFixture('test-commit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-commit')
     const { oid: originalOid } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     // Test
     const author = {
@@ -89,7 +89,6 @@ describe('commit', () => {
     assert.strictEqual(currentOid, sha)
     
     // Verify reflog entry was created (if reflog exists)
-    const gitdir = await repo.getGitdir()
     // Get fs from backend for verifyReflogEntry (legacy helper)
     const gitBackend = repo.gitBackend
     if (!gitBackend || !('getFs' in gitBackend) || typeof gitBackend.getFs !== 'function') {
@@ -124,7 +123,7 @@ describe('commit', () => {
 
   it('ok:initial-commit', async () => {
     // Setup
-    const { repo } = await makeFixture('test-init', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-init', { init: true })
     if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
     await repo.worktreeBackend.write('hello.md', 'Hello, World!')
     await add({ repo, filepath: 'hello.md' })
@@ -151,7 +150,7 @@ describe('commit', () => {
 
   it('param:message-missing', async () => {
     // Setup
-    const { repo } = await makeFixture('test-commit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-commit')
     // Test
     const author = {
       name: 'Mr. Test',
@@ -177,7 +176,7 @@ describe('commit', () => {
 
   it('behavior:noUpdateBranch', async () => {
     // Setup
-    const { repo } = await makeFixture('test-commit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-commit')
     const { oid: originalOid } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     // Test
     const sha = await commit({
@@ -207,7 +206,7 @@ describe('commit', () => {
 
   it('behavior:dryRun', async () => {
     // Setup
-    const { repo } = await makeFixture('test-commit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-commit')
     const { oid: originalOid } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     // Test
     const sha = await commit({
@@ -237,7 +236,7 @@ describe('commit', () => {
 
   it('param:custom-ref', async () => {
     // Setup
-    const { repo } = await makeFixture('test-commit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-commit')
     const { oid: originalOid } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     // Test
     const sha = await commit({
@@ -270,7 +269,7 @@ describe('commit', () => {
 
   it('param:custom-parents-tree', async () => {
     // Setup
-    const { repo } = await makeFixture('test-commit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-commit')
     const { oid: originalOid } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     // Test
     const parent = [
@@ -307,7 +306,7 @@ describe('commit', () => {
 
   it('param:author-missing', async () => {
     // Setup
-    const { repo } = await makeFixture('test-commit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-commit')
     // Test
     // Use ignoreSystemConfig: true to ensure no global/system config is read
     // This makes the test hermetic and independent of the test environment
@@ -334,7 +333,7 @@ describe('commit', () => {
 
   it('behavior:timezone', async () => {
     // Setup
-    const { repo } = await makeFixture('test-commit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-commit')
     let commits
     // Test
     await commit({
@@ -395,7 +394,7 @@ describe('commit', () => {
 
   it('behavior:amend-new-message', async () => {
     // Setup
-    const { repo } = await makeFixture('test-commit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-commit')
     const author = {
       name: 'Mr. Test',
       email: 'mrtest@example.com',
@@ -433,7 +432,7 @@ describe('commit', () => {
 
   it('behavior:amend-change-author', async () => {
     // Setup
-    const { repo } = await makeFixture('test-commit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-commit')
     const author = {
       name: 'Mr. Test',
       email: 'mrtest@example.com',
@@ -476,7 +475,7 @@ describe('commit', () => {
 
   it('error:amend-no-initial-commit', async () => {
     // Setup
-    const { repo } = await makeFixture('test-init', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-init', { init: true })
     if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
     await repo.worktreeBackend.write('hello.md', 'Hello, World!')
     await add({ repo, filepath: 'hello.md' })
@@ -541,7 +540,7 @@ describe('commit', () => {
 
   it('error:caller-property', async () => {
     // Use a fresh repo without config to ensure no author is found
-    const { repo } = await makeFixture('test-init', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-init', { init: true })
     if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
     
     // Add a file so we have something to commit
@@ -566,7 +565,7 @@ describe('commit', () => {
   })
 
   it('param:signingKey-without-onSign', async () => {
-    const { repo } = await makeFixture('test-commit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-commit')
     
     let error: any = null
     try {
@@ -592,7 +591,7 @@ describe('commit', () => {
   })
 
   it('behavior:default-branch-from-config', async () => {
-    const { repo } = await makeFixture('test-init', { init: true, defaultBranch: 'develop' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-init', { init: true, defaultBranch: 'develop' })
     if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
     
     await repo.worktreeBackend.write('file.txt', 'content')
@@ -648,7 +647,7 @@ describe('commit', () => {
   })
 
   it('behavior:default-branch-master', async () => {
-    const { repo } = await makeFixture('test-init', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-init', { init: true })
     if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
     
     await repo.worktreeBackend.write('file.txt', 'content')
@@ -674,7 +673,7 @@ describe('commit', () => {
   })
 
   it('param:custom-ref-creates-commit', async () => {
-    const { repo } = await makeFixture('test-commit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-commit')
     const { oid: originalOid } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     
     const sha = await commit({
@@ -700,7 +699,7 @@ describe('commit', () => {
   })
 
   it('behavior:amend-uses-previous-parents', async () => {
-    const { repo } = await makeFixture('test-commit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-commit')
     const author = {
       name: 'Mr. Test',
       email: 'mrtest@example.com',
@@ -737,7 +736,7 @@ describe('commit', () => {
   })
 
   it('param:parent-resolves-refs', async () => {
-    const { repo } = await makeFixture('test-commit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-commit')
     const { oid: originalOid } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     
     const sha = await commit({
@@ -758,7 +757,7 @@ describe('commit', () => {
   })
 
   it('param:tree-uses-provided', async () => {
-    const { repo } = await makeFixture('test-commit')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-commit')
     const { commit: originalCommit } = (await log({ repo, ref: 'HEAD', depth: 1 }))[0]
     
     const sha = await commit({
@@ -779,10 +778,8 @@ describe('commit', () => {
   })
 
   it('error:index-read-error', async () => {
-    const { repo } = await makeFixture('test-init', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-init', { init: true })
     if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
-    const gitdir = await repo.getGitdir()
-    
     await repo.worktreeBackend.write('file.txt', 'content')
     await add({ repo, filepath: 'file.txt' })
     
@@ -818,7 +815,7 @@ describe('commit', () => {
   })
 
   it('param:autoDetectConfig-false', async () => {
-    const { repo } = await makeFixture('test-init', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-init', { init: true })
     if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
     
     await repo.worktreeBackend.write('file.txt', 'content')

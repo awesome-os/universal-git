@@ -160,6 +160,9 @@ export interface GitWorktreeBackend {
    * This method allows consumers to access the directory path without knowing
    * the backend implementation. Backends that don't have a concept of a directory
    * (e.g., some blob storage backends) should return null.
+   * 
+   * @deprecated - This encourages reliance on filesystem paths. 
+   * Future versions will remove this in favor of passing GitWorktreeBackend directly.
    */
   getDirectory?(): string | null
 

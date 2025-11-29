@@ -137,8 +137,7 @@ export async function createRepository(options: {
     cache,
     systemConfigPath,
     globalConfigPath,
-    autoDetectConfig,
-    ignoreSystemConfig,
+    autoDetectConfig: autoDetectConfig && !ignoreSystemConfig,
   })
   
   // Initialize repository if requested
@@ -180,7 +179,10 @@ export async function createRepository(options: {
     // This ensures fs is available immediately
     // For empty repositories, checkout will just set up the worktree without requiring a ref
     try {
-      await repo.checkout(worktreeBackend)
+      // If we are just opening an existing repository (not initializing), we should NOT
+      // perform a checkout which would reset the working directory and index.
+      // We just want to attach the worktree.
+      await repo.checkout(worktreeBackend, { noCheckout: !init })
     } catch (err) {
       // If checkout fails (e.g., empty repo), just set up the worktree without checking out a ref
       // This allows createRepository to succeed even for empty repositories
@@ -192,7 +194,7 @@ export async function createRepository(options: {
           ;(repo as any)._dir = worktreeDir
         }
         const { Worktree } = await import('./Worktree.ts')
-        ;(repo as any)._worktree = new Worktree(repo, worktreeDir || '', worktreeBackend)
+        ;(repo as any)._worktree = new Worktree(repo, worktreeDir || '', null, null, worktreeBackend)
       } else {
         throw err
       }

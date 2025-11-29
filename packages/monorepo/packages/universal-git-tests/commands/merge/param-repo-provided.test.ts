@@ -126,7 +126,7 @@ describe('merge', () => {
   })
 
   it('param:repo-provided', async () => {
-        const { repo } = await makeFixture('test-merge')
+        const { repo, fs, dir, gitdir } = await makeFixture('test-merge')
 
         const originalOid = await repo.resolveRef('main')
         const desiredOid = await repo.resolveRef('newest')

@@ -58,7 +58,8 @@ export async function readBlob(this: GitBackendFs, oid: string, filepath?: strin
       const tree = GitTree.from(UniversalBuffer.from(currentObj.object))
       const entry = tree.entries().find(e => e.path === part)
       if (!entry || !entry.oid) {
-        throw new Error(`File not found: ${filepath}`)
+        const { NotFoundError } = await import('../../errors/NotFoundError.ts')
+        throw new NotFoundError(filepath!)
       }
       
       currentOid = entry.oid

@@ -6,16 +6,14 @@ import { verifyReflogEntry } from '@awesome-os/universal-git-test-helpers/helper
 
 test('resetToCommit', async (t) => {
   await t.test('ok:reset-to-specific-commit-creates-reflog-entry', async () => {
-    const { repo } = await makeFixture('test-branch')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
     const cache = {}
     
     // Get initial HEAD OID
     const initialHeadOid = await resolveRef({ repo, ref: 'HEAD' })
     
     // Make a new commit to have something to reset from
-    await repo.fs.write(`${dir}/new-file.txt`, 'new content')
+    await fs.write(`${dir}/new-file.txt`, 'new content')
     await add({ repo, filepath: 'new-file.txt', cache })
     const newCommitOid = await commit({
       repo,
@@ -43,7 +41,7 @@ test('resetToCommit', async (t) => {
     
     // Verify reflog entry was created for the branch reset
     await verifyReflogEntry({
-      fs: repo.fs,
+      fs: fs,
       gitdir,
       ref: fullBranchRef,
       expectedOldOid: newCommitOid,
@@ -54,17 +52,14 @@ test('resetToCommit', async (t) => {
   })
 
   await t.test('ok:reset-to-HEAD~1-creates-reflog-entry', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     // Get current HEAD OID (this will be the commit we reset to)
     const baseHeadOid = await resolveRef({ repo, ref: 'HEAD' })
     
     // Make a commit so we have HEAD~1
-    await repo.fs.write(`${dir}/commit1.txt`, 'commit 1')
+    await fs.write(`${dir}/commit1.txt`, 'commit 1')
     await add({ repo, filepath: 'commit1.txt', cache })
     const commit1Oid = await commit({
       fs,
@@ -81,7 +76,7 @@ test('resetToCommit', async (t) => {
     })
     
     // Make another commit so we have HEAD and HEAD~1
-    await repo.fs.write(`${dir}/commit2.txt`, 'commit 2')
+    await fs.write(`${dir}/commit2.txt`, 'commit 2')
     await add({ repo, filepath: 'commit2.txt', cache })
     const commit2Oid = await commit({
       fs,
@@ -112,7 +107,7 @@ test('resetToCommit', async (t) => {
     // Verify reflog entry was created for the branch reset
     // Note: The message will use the OID, not "HEAD~1", since we passed the OID
     await verifyReflogEntry({
-      fs: repo.fs,
+      fs: fs,
       gitdir,
       ref: fullBranchRef,
       expectedOldOid: commit2Oid,
@@ -123,11 +118,8 @@ test('resetToCommit', async (t) => {
   })
 
   await t.test('ok:reset-to-branch-ref-creates-reflog-entry', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     // Get master branch OID (test-branch fixture uses 'master' as default branch)
     const masterBranchOid = await resolveRef({ repo, ref: 'refs/heads/master' })
@@ -137,7 +129,7 @@ test('resetToCommit', async (t) => {
     await branch({ repo, ref: 'feature-branch', checkout: true })
     
     // Make a commit on the new branch
-    await repo.fs.write(`${dir}/feature.txt`, 'feature content')
+    await fs.write(`${dir}/feature.txt`, 'feature content')
     await add({ repo, filepath: 'feature.txt', cache })
     const featureCommitOid = await commit({
       fs,
@@ -165,7 +157,7 @@ test('resetToCommit', async (t) => {
     // Verify reflog entry was created for the branch reset
     // Soft reset uses "reset: updating" message
     await verifyReflogEntry({
-      fs: repo.fs,
+      fs: fs,
       gitdir,
       ref: 'refs/heads/feature-branch',
       expectedOldOid: featureCommitOid,
@@ -176,10 +168,7 @@ test('resetToCommit', async (t) => {
   })
 
   await t.test('edge:reset-empty-repo-no-reflog', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const fs = repo.fs
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const cache = {}
     
     // Try to reset - should not throw but also should not create reflog
@@ -200,17 +189,14 @@ test('resetToCommit', async (t) => {
     // Reset might fail if HEAD doesn't exist, which is expected
     // The important thing is that no reflog should be created
     const { readLog } = await import('@awesome-os/universal-git-src/git/logs/readLog.ts')
-    const reflog = await readLog({ fs: repo.fs, gitdir, ref: 'refs/heads/main', parsed: true })
+    const reflog = await readLog({ fs: fs, gitdir, ref: 'refs/heads/main', parsed: true })
     // In an empty repo, there should be no reflog entries
     assert.strictEqual(reflog.length, 0, 'Should have no reflog entries in empty repo')
   })
 
   await t.test('ok:reset-uses-provided-branch-parameter', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     // Get master branch OID
     const masterBranchOid = await resolveRef({ repo, ref: 'refs/heads/master' })
@@ -220,7 +206,7 @@ test('resetToCommit', async (t) => {
     await branch({ repo, ref: 'test-branch', checkout: true })
     
     // Make a commit on test-branch
-    await repo.fs.write(`${dir}/test.txt`, 'test content')
+    await fs.write(`${dir}/test.txt`, 'test content')
     await add({ repo, filepath: 'test.txt', cache })
     const testCommitOid = await commit({
       fs,
@@ -251,18 +237,15 @@ test('resetToCommit', async (t) => {
   })
 
   await t.test('ok:reset-uses-current-branch-when-branch-not-provided', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     // Get current branch name
     const branchName = await currentBranch({ repo })
     const initialOid = await resolveRef({ repo, ref: 'HEAD' })
     
     // Make a commit
-    await repo.fs.write(`${dir}/new.txt`, 'new content')
+    await fs.write(`${dir}/new.txt`, 'new content')
     await add({ repo, filepath: 'new.txt', cache })
     const newCommitOid = await commit({
       fs,
@@ -293,11 +276,8 @@ test('resetToCommit', async (t) => {
 
 
   await t.test('edge:reset-no-reflog-when-oldOid-equals-newOid', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     // Get current HEAD OID
     const currentOid = await resolveRef({ repo, ref: 'HEAD' })
@@ -313,7 +293,7 @@ test('resetToCommit', async (t) => {
     
     // Get reflog entries
     const { readLog } = await import('@awesome-os/universal-git-src/git/logs/readLog.ts')
-    const reflog = await readLog({ fs: repo.fs, gitdir, ref: `refs/heads/${branchName}`, parsed: true })
+    const reflog = await readLog({ fs: fs, gitdir, ref: `refs/heads/${branchName}`, parsed: true })
     
     // Find the reset entry (if any)
     const resetEntry = reflog.find(entry => entry.message.includes('reset: moving to'))
@@ -326,11 +306,8 @@ test('resetToCommit', async (t) => {
   })
 
   await t.test('ok:reset-handles-branch-that-does-not-exist-yet', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     // Get a commit OID to reset to
     const targetOid = await resolveRef({ repo, ref: 'HEAD' })
@@ -350,11 +327,8 @@ test('resetToCommit', async (t) => {
   })
 
   await t.test('behavior:reset-error-has-caller-property-set', async () => {
-    const { repo } = await makeFixture('test-empty')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty')
+      const cache = {}
     
     let error: any = null
     try {
@@ -375,17 +349,14 @@ test('resetToCommit', async (t) => {
   })
 
   await t.test('behavior:reset-skips-workdir-cleanup-when-dir-not-provided', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     // Get current HEAD OID
     const currentOid = await resolveRef({ repo, ref: 'HEAD' })
     
     // Make a commit
-    await repo.fs.write(`${dir}/file.txt`, 'content')
+    await fs.write(`${dir}/file.txt`, 'content')
     await add({ repo, filepath: 'file.txt', cache })
     const newCommitOid = await commit({
       fs,
@@ -402,7 +373,7 @@ test('resetToCommit', async (t) => {
     })
     
     // Create an untracked file
-    await repo.fs.write(`${dir}/untracked.txt`, 'untracked')
+    await fs.write(`${dir}/untracked.txt`, 'untracked')
     
     // Reset without providing dir (should still work, but won't clean workdir or checkout)
     // Note: checkout requires dir, so reset will fail at checkout step
@@ -410,7 +381,7 @@ test('resetToCommit', async (t) => {
     let error: any = null
     try {
       await resetToCommit({
-        fs: repo.fs,
+        fs: fs,
         gitdir,
         ref: currentOid,
         mode: 'hard',
@@ -436,14 +407,11 @@ test('resetToCommit', async (t) => {
   })
 
   await t.test('ok:reset-uses-default-branch-main-when-config-not-exist', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const fs = repo.fs
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const cache = {}
     
     // Make an initial commit
-    await repo.fs.write(`${dir}/file.txt`, 'content')
+    await fs.write(`${dir}/file.txt`, 'content')
     await add({ repo, filepath: 'file.txt', cache })
     const initialOid = await commit({
       fs,
@@ -460,7 +428,7 @@ test('resetToCommit', async (t) => {
     })
     
     // Make another commit
-    await repo.fs.write(`${dir}/file2.txt`, 'content2')
+    await fs.write(`${dir}/file2.txt`, 'content2')
     await add({ repo, filepath: 'file2.txt', cache })
     await commit({
       repo,
@@ -476,7 +444,7 @@ test('resetToCommit', async (t) => {
     
     // Detach HEAD
     const { writeRef } = await import('@awesome-os/universal-git-src/index.ts')
-    await writeRef({ fs: repo.fs, gitdir, ref: 'HEAD', value: initialOid, force: true })
+    await writeRef({ fs: fs, gitdir, ref: 'HEAD', value: initialOid, force: true })
     
     // Reset without providing branch (should use 'main' as default) with mixed mode
     await resetToCommit({
@@ -495,17 +463,14 @@ test('resetToCommit', async (t) => {
   // ============================================
 
   await t.test('ok:soft-reset-only-updates-HEAD-and-branch-ref', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     // Get initial HEAD OID
     const initialHeadOid = await resolveRef({ repo, ref: 'HEAD' })
     
     // Make a commit
-    await repo.fs.write(`${dir}/new-file.txt`, 'new content')
+    await fs.write(`${dir}/new-file.txt`, 'new content')
     await add({ repo, filepath: 'new-file.txt', cache })
     const newCommitOid = await commit({
       fs,
@@ -522,11 +487,11 @@ test('resetToCommit', async (t) => {
     })
     
     // Stage another change (this will remain staged after soft reset)
-    await repo.fs.write(`${dir}/staged-file.txt`, 'staged content')
+    await fs.write(`${dir}/staged-file.txt`, 'staged content')
     await add({ repo, filepath: 'staged-file.txt', cache })
     
     // Create unstaged change (this will remain unstaged after soft reset)
-    await repo.fs.write(`${dir}/unstaged-file.txt`, 'unstaged content')
+    await fs.write(`${dir}/unstaged-file.txt`, 'unstaged content')
     
     // Get files in index before reset
     const indexBefore = await listFiles({ repo })
@@ -551,12 +516,12 @@ test('resetToCommit', async (t) => {
     assert.deepStrictEqual(indexAfter.sort(), indexBefore.sort(), 'Index should be unchanged after soft reset')
     
     // Verify working directory is unchanged (unstaged files remain)
-    const unstagedContent = await repo.fs.read(`${dir}/unstaged-file.txt`, 'utf8')
+    const unstagedContent = await fs.read(`${dir}/unstaged-file.txt`, 'utf8')
     assert.strictEqual(unstagedContent, 'unstaged content', 'Unstaged files should remain')
     
     // Verify reflog message
     await verifyReflogEntry({
-      fs: repo.fs,
+      fs: fs,
       gitdir,
       ref: fullBranchRef,
       expectedOldOid: newCommitOid,
@@ -567,16 +532,13 @@ test('resetToCommit', async (t) => {
   })
 
   await t.test('ok:soft-reset-keeps-staged-changes', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     const initialHeadOid = await resolveRef({ repo, ref: 'HEAD' })
     
     // Make a commit
-    await repo.fs.write(`${dir}/file1.txt`, 'content1')
+    await fs.write(`${dir}/file1.txt`, 'content1')
     await add({ repo, filepath: 'file1.txt', cache })
     await commit({
       repo,
@@ -591,7 +553,7 @@ test('resetToCommit', async (t) => {
     })
     
     // Stage a new file
-    await repo.fs.write(`${dir}/staged.txt`, 'staged')
+    await fs.write(`${dir}/staged.txt`, 'staged')
     await add({ repo, filepath: 'staged.txt', cache })
     
     // Soft reset
@@ -608,16 +570,13 @@ test('resetToCommit', async (t) => {
   })
 
   await t.test('ok:soft-reset-keeps-working-directory-changes', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     const initialHeadOid = await resolveRef({ repo, ref: 'HEAD' })
     
     // Make a commit
-    await repo.fs.write(`${dir}/file1.txt`, 'content1')
+    await fs.write(`${dir}/file1.txt`, 'content1')
     await add({ repo, filepath: 'file1.txt', cache })
     await commit({
       repo,
@@ -632,7 +591,7 @@ test('resetToCommit', async (t) => {
     })
     
     // Create unstaged file
-    await repo.fs.write(`${dir}/unstaged.txt`, 'unstaged')
+    await fs.write(`${dir}/unstaged.txt`, 'unstaged')
     
     // Soft reset
     await resetToCommit({
@@ -643,7 +602,7 @@ test('resetToCommit', async (t) => {
     })
     
     // Verify unstaged file still exists
-    const content = await repo.fs.read(`${dir}/unstaged.txt`, 'utf8')
+    const content = await fs.read(`${dir}/unstaged.txt`, 'utf8')
     assert.strictEqual(content, 'unstaged', 'Unstaged files should remain')
     
     // Verify it's still untracked (not in index)
@@ -652,15 +611,12 @@ test('resetToCommit', async (t) => {
   })
 
   await t.test('ok:soft-reset-reflog-message-is-correct', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     const initialHeadOid = await resolveRef({ repo, ref: 'HEAD' })
     
-    await repo.fs.write(`${dir}/file.txt`, 'content')
+    await fs.write(`${dir}/file.txt`, 'content')
     await add({ repo, filepath: 'file.txt', cache })
     const newCommitOid = await commit({
       fs,
@@ -687,7 +643,7 @@ test('resetToCommit', async (t) => {
     })
     
     await verifyReflogEntry({
-      fs: repo.fs,
+      fs: fs,
       gitdir,
       ref: fullBranchRef,
       expectedOldOid: newCommitOid,
@@ -702,16 +658,13 @@ test('resetToCommit', async (t) => {
   // ============================================
 
   await t.test('ok:mixed-reset-updates-index-but-keeps-working-directory', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     const initialHeadOid = await resolveRef({ repo, ref: 'HEAD' })
     
     // Make a commit
-    await repo.fs.write(`${dir}/file1.txt`, 'content1')
+    await fs.write(`${dir}/file1.txt`, 'content1')
     await add({ repo, filepath: 'file1.txt', cache })
     const commit1Oid = await commit({
       fs,
@@ -728,11 +681,11 @@ test('resetToCommit', async (t) => {
     })
     
     // Stage a new file
-    await repo.fs.write(`${dir}/staged.txt`, 'staged')
+    await fs.write(`${dir}/staged.txt`, 'staged')
     await add({ repo, filepath: 'staged.txt', cache })
     
     // Create unstaged file
-    await repo.fs.write(`${dir}/unstaged.txt`, 'unstaged')
+    await fs.write(`${dir}/unstaged.txt`, 'unstaged')
     
     // Mixed reset to initial commit
     const branchName = await currentBranch({ repo })
@@ -754,7 +707,7 @@ test('resetToCommit', async (t) => {
     assert.ok(!indexFiles.includes('staged.txt'), 'Staged file should be removed from index')
     
     // Verify working directory is unchanged (unstaged file remains)
-    const unstagedContent = await repo.fs.read(`${dir}/unstaged.txt`, 'utf8')
+    const unstagedContent = await fs.read(`${dir}/unstaged.txt`, 'utf8')
     assert.strictEqual(unstagedContent, 'unstaged', 'Unstaged files should remain')
     
     // Verify unstaged file is now untracked (was never committed, not in index)
@@ -762,7 +715,7 @@ test('resetToCommit', async (t) => {
     
     // Verify reflog message
     await verifyReflogEntry({
-      fs: repo.fs,
+      fs: fs,
       gitdir,
       ref: fullBranchRef,
       expectedOldOid: commit1Oid,
@@ -773,14 +726,11 @@ test('resetToCommit', async (t) => {
   })
 
   await t.test('ok:mixed-reset-unstages-all-changes', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     // Make initial commit
-    await repo.fs.write(`${dir}/file1.txt`, 'content1')
+    await fs.write(`${dir}/file1.txt`, 'content1')
     await add({ repo, filepath: 'file1.txt', cache })
     const initialOid = await commit({
       fs,
@@ -797,8 +747,8 @@ test('resetToCommit', async (t) => {
     })
     
     // Stage multiple files
-    await repo.fs.write(`${dir}/file2.txt`, 'content2')
-    await repo.fs.write(`${dir}/file3.txt`, 'content3')
+    await fs.write(`${dir}/file2.txt`, 'content2')
+    await fs.write(`${dir}/file3.txt`, 'content3')
     await add({ repo, filepath: 'file2.txt', cache })
     await add({ repo, filepath: 'file3.txt', cache })
     
@@ -822,21 +772,18 @@ test('resetToCommit', async (t) => {
     assert.ok(!indexFiles.includes('file3.txt'), 'file3 should be unstaged (not in index)')
     
     // Verify files still exist in working directory
-    const content2 = await repo.fs.read(`${dir}/file2.txt`, 'utf8')
-    const content3 = await repo.fs.read(`${dir}/file3.txt`, 'utf8')
+    const content2 = await fs.read(`${dir}/file2.txt`, 'utf8')
+    const content3 = await fs.read(`${dir}/file3.txt`, 'utf8')
     assert.strictEqual(content2, 'content2', 'file2 should exist in working directory')
     assert.strictEqual(content3, 'content3', 'file3 should exist in working directory')
   })
 
   await t.test('ok:mixed-reset-keeps-working-directory-changes', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     // Make initial commit with file1.txt
-    await repo.fs.write(`${dir}/file1.txt`, 'content1')
+    await fs.write(`${dir}/file1.txt`, 'content1')
     await add({ repo, filepath: 'file1.txt', cache })
     const initialHeadOid = await commit({
       fs,
@@ -853,7 +800,7 @@ test('resetToCommit', async (t) => {
     })
     
     // Make another commit
-    await repo.fs.write(`${dir}/file2.txt`, 'content2')
+    await fs.write(`${dir}/file2.txt`, 'content2')
     await add({ repo, filepath: 'file2.txt', cache })
     await commit({
       repo,
@@ -868,10 +815,10 @@ test('resetToCommit', async (t) => {
     })
     
     // Modify a tracked file (unstaged)
-    await repo.fs.write(`${dir}/file1.txt`, 'modified content')
+    await fs.write(`${dir}/file1.txt`, 'modified content')
     
     // Create new untracked file
-    await repo.fs.write(`${dir}/new-file.txt`, 'new content')
+    await fs.write(`${dir}/new-file.txt`, 'new content')
     
     // Mixed reset to initial commit (which has file1.txt)
     await resetToCommit({
@@ -882,11 +829,11 @@ test('resetToCommit', async (t) => {
     })
     
     // Verify modified file still has changes
-    const modifiedContent = await repo.fs.read(`${dir}/file1.txt`, 'utf8')
+    const modifiedContent = await fs.read(`${dir}/file1.txt`, 'utf8')
     assert.strictEqual(modifiedContent, 'modified content', 'Modified file should keep changes')
     
     // Verify new file still exists
-    const newContent = await repo.fs.read(`${dir}/new-file.txt`, 'utf8')
+    const newContent = await fs.read(`${dir}/new-file.txt`, 'utf8')
     assert.strictEqual(newContent, 'new content', 'New file should remain')
     
     // Verify index was reset (file1.txt should be in index with original content, file2.txt should not)
@@ -906,15 +853,12 @@ test('resetToCommit', async (t) => {
   })
 
   await t.test('ok:mixed-reset-reflog-message-is-correct', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     const initialHeadOid = await resolveRef({ repo, ref: 'HEAD' })
     
-    await repo.fs.write(`${dir}/file.txt`, 'content')
+    await fs.write(`${dir}/file.txt`, 'content')
     await add({ repo, filepath: 'file.txt', cache })
     const newCommitOid = await commit({
       fs,
@@ -941,7 +885,7 @@ test('resetToCommit', async (t) => {
     })
     
     await verifyReflogEntry({
-      fs: repo.fs,
+      fs: fs,
       gitdir,
       ref: fullBranchRef,
       expectedOldOid: newCommitOid,
@@ -956,16 +900,13 @@ test('resetToCommit', async (t) => {
   // ============================================
 
   await t.test('ok:hard-reset-explicit-mode-works-same-as-default', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     const initialHeadOid = await resolveRef({ repo, ref: 'HEAD' })
     
     // Make a commit
-    await repo.fs.write(`${dir}/file1.txt`, 'content1')
+    await fs.write(`${dir}/file1.txt`, 'content1')
     await add({ repo, filepath: 'file1.txt', cache })
     const commit1Oid = await commit({
       fs,
@@ -982,11 +923,11 @@ test('resetToCommit', async (t) => {
     })
     
     // Stage a file
-    await repo.fs.write(`${dir}/staged.txt`, 'staged')
+    await fs.write(`${dir}/staged.txt`, 'staged')
     await add({ repo, filepath: 'staged.txt', cache })
     
     // Create unstaged file
-    await repo.fs.write(`${dir}/unstaged.txt`, 'unstaged')
+    await fs.write(`${dir}/unstaged.txt`, 'unstaged')
     
     // Hard reset (explicit)
     await resetToCommit({
@@ -1008,7 +949,7 @@ test('resetToCommit', async (t) => {
     // Check if file exists using lstat (more reliable than trying to read)
     let fileExists = false
     try {
-      const stat = await repo.fs.lstat(`${dir}/unstaged.txt`)
+      const stat = await fs.lstat(`${dir}/unstaged.txt`)
       if (stat) {
         fileExists = true
       }
@@ -1034,16 +975,13 @@ test('resetToCommit', async (t) => {
   // ============================================
 
   await t.test('behavior:soft-vs-mixed-vs-hard-behavior-differences', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     const initialHeadOid = await resolveRef({ repo, ref: 'HEAD' })
     
     // Make a commit
-    await repo.fs.write(`${dir}/file1.txt`, 'content1')
+    await fs.write(`${dir}/file1.txt`, 'content1')
     await add({ repo, filepath: 'file1.txt', cache })
     const commit1Oid = await commit({
       fs,
@@ -1060,8 +998,8 @@ test('resetToCommit', async (t) => {
     })
     
     // Test soft reset
-    await repo.fs.write(`${dir}/staged-soft.txt`, 'staged')
-    await repo.fs.write(`${dir}/unstaged-soft.txt`, 'unstaged')
+    await fs.write(`${dir}/staged-soft.txt`, 'staged')
+    await fs.write(`${dir}/unstaged-soft.txt`, 'unstaged')
     await add({ repo, filepath: 'staged-soft.txt', cache })
     
     await resetToCommit({
@@ -1072,8 +1010,8 @@ test('resetToCommit', async (t) => {
     })
     
     // After soft reset: both files should exist
-    const stagedSoftExists = await repo.fs.read(`${dir}/staged-soft.txt`, 'utf8').catch(() => null)
-    const unstagedSoftExists = await repo.fs.read(`${dir}/unstaged-soft.txt`, 'utf8').catch(() => null)
+    const stagedSoftExists = await fs.read(`${dir}/staged-soft.txt`, 'utf8').catch(() => null)
+    const unstagedSoftExists = await fs.read(`${dir}/unstaged-soft.txt`, 'utf8').catch(() => null)
     assert.strictEqual(stagedSoftExists, 'staged', 'Soft reset: staged file should exist')
     assert.strictEqual(unstagedSoftExists, 'unstaged', 'Soft reset: unstaged file should exist')
     
@@ -1085,8 +1023,8 @@ test('resetToCommit', async (t) => {
       cache,
     })
     
-    await repo.fs.write(`${dir}/staged-mixed.txt`, 'staged')
-    await repo.fs.write(`${dir}/unstaged-mixed.txt`, 'unstaged')
+    await fs.write(`${dir}/staged-mixed.txt`, 'staged')
+    await fs.write(`${dir}/unstaged-mixed.txt`, 'unstaged')
     await add({ repo, filepath: 'staged-mixed.txt', cache })
     
     await resetToCommit({
@@ -1098,12 +1036,12 @@ test('resetToCommit', async (t) => {
     
     // After mixed reset: staged file removed from index but exists in workdir, unstaged exists
     try {
-      await repo.fs.read(`${dir}/staged-mixed.txt`, 'utf8')
+      await fs.read(`${dir}/staged-mixed.txt`, 'utf8')
       // File exists in workdir (good)
     } catch {
       assert.fail('Mixed reset: staged file should exist in working directory')
     }
-    const unstagedMixedExists = await repo.fs.read(`${dir}/unstaged-mixed.txt`, 'utf8').catch(() => null)
+    const unstagedMixedExists = await fs.read(`${dir}/unstaged-mixed.txt`, 'utf8').catch(() => null)
     assert.strictEqual(unstagedMixedExists, 'unstaged', 'Mixed reset: unstaged file should exist')
     
     // Reset back and test hard
@@ -1114,8 +1052,8 @@ test('resetToCommit', async (t) => {
       cache,
     })
     
-    await repo.fs.write(`${dir}/staged-hard.txt`, 'staged')
-    await repo.fs.write(`${dir}/unstaged-hard.txt`, 'unstaged')
+    await fs.write(`${dir}/staged-hard.txt`, 'staged')
+    await fs.write(`${dir}/unstaged-hard.txt`, 'unstaged')
     await add({ repo, filepath: 'staged-hard.txt', cache })
     
     await resetToCommit({
@@ -1126,8 +1064,8 @@ test('resetToCommit', async (t) => {
     })
     
     // After hard reset: both files should be removed
-    const stagedHardExists = await repo.fs.read(`${dir}/staged-hard.txt`, 'utf8').catch(() => null)
-    const unstagedHardExists = await repo.fs.read(`${dir}/unstaged-hard.txt`, 'utf8').catch(() => null)
+    const stagedHardExists = await fs.read(`${dir}/staged-hard.txt`, 'utf8').catch(() => null)
+    const unstagedHardExists = await fs.read(`${dir}/unstaged-hard.txt`, 'utf8').catch(() => null)
     assert.strictEqual(stagedHardExists, null, 'Hard reset: staged file should be removed')
     assert.strictEqual(unstagedHardExists, null, 'Hard reset: unstaged file should be removed')
   })
@@ -1137,16 +1075,13 @@ test('resetToCommit', async (t) => {
   // ============================================
 
   await t.test('edge:soft-reset-with-no-changes', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     const initialHeadOid = await resolveRef({ repo, ref: 'HEAD' })
     
     // Make a commit
-    await repo.fs.write(`${dir}/file.txt`, 'content')
+    await fs.write(`${dir}/file.txt`, 'content')
     await add({ repo, filepath: 'file.txt', cache })
     const newCommitOid = await commit({
       fs,
@@ -1176,16 +1111,13 @@ test('resetToCommit', async (t) => {
   })
 
   await t.test('edge:mixed-reset-with-empty-index', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     const initialHeadOid = await resolveRef({ repo, ref: 'HEAD' })
     
     // Make a commit
-    await repo.fs.write(`${dir}/file.txt`, 'content')
+    await fs.write(`${dir}/file.txt`, 'content')
     await add({ repo, filepath: 'file.txt', cache })
     await commit({
       repo,
@@ -1213,16 +1145,13 @@ test('resetToCommit', async (t) => {
   })
 
   await t.test('behavior:default-mode-is-hard-backward-compatibility', async () => {
-    const { repo } = await makeFixture('test-branch')
-      const fs = repo.fs
-      const dir = await repo.getDir()!
-      const gitdir = await repo.getGitdir()
-    const cache = {}
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+      const cache = {}
     
     const initialHeadOid = await resolveRef({ repo, ref: 'HEAD' })
     
     // Make a commit
-    await repo.fs.write(`${dir}/file.txt`, 'content')
+    await fs.write(`${dir}/file.txt`, 'content')
     await add({ repo, filepath: 'file.txt', cache })
     await commit({
       repo,
@@ -1237,7 +1166,7 @@ test('resetToCommit', async (t) => {
     })
     
     // Create unstaged file
-    await repo.fs.write(`${dir}/unstaged.txt`, 'unstaged')
+    await fs.write(`${dir}/unstaged.txt`, 'unstaged')
     
     // Reset without mode (should default to hard)
     await resetToCommit({
@@ -1250,7 +1179,7 @@ test('resetToCommit', async (t) => {
     // Check if file exists using lstat (more reliable than trying to read)
     let fileExists = false
     try {
-      const stat = await repo.fs.lstat(`${dir}/unstaged.txt`)
+      const stat = await fs.lstat(`${dir}/unstaged.txt`)
       if (stat) {
         fileExists = true
       }

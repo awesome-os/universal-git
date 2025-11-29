@@ -9,9 +9,7 @@ const createStream = UniversalBuffer.createStream
 
 test('processReceivePack', async (t) => {
   await t.test('handles empty request (no triplets)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Empty request with just flush packet
     const request = [GitPktLine.flush()]
     const stream = createStream(request)
@@ -26,7 +24,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles single ref update', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
@@ -54,9 +52,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles multiple ref updates', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid1 = 'a'.repeat(40)
     const newOid2 = 'b'.repeat(40)
@@ -89,9 +85,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles ref deletion (zero OID)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a ref first
     const existingOid = 'a'.repeat(40)
     await repo.gitBackend.writeRef('refs/heads/feature', existingOid, false, {})
@@ -126,9 +120,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles ref update with existing ref', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a ref first
     const oldOid = 'a'.repeat(40)
     await repo.gitBackend.writeRef('refs/heads/main', oldOid, false, {})
@@ -158,9 +150,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles ref update conflict (oldOid mismatch)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a ref with different OID
     const actualOid = 'a'.repeat(40)
     await repo.gitBackend.writeRef('refs/heads/main', actualOid, false, {})
@@ -192,9 +182,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles ref update with capabilities', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/main'
@@ -217,9 +205,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles empty lines in request', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/main'
@@ -243,9 +229,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles invalid ref update line (less than 3 parts)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create request with invalid line (only 2 parts)
     const request = [
       GitPktLine.encode('a'.repeat(40) + ' b'.repeat(40) + '\n'),
@@ -264,9 +248,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles ref name with spaces', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/feature branch'
@@ -289,9 +271,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles error during ref update', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/main'
@@ -303,9 +283,11 @@ test('processReceivePack', async (t) => {
     ]
     const stream = createStream(request)
     
-    // Use invalid gitdir to cause error
+    // Use invalid gitdir to cause error - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
-      gitBackend: repo.gitBackend,
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -315,9 +297,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles context parameter', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/main'
@@ -342,9 +322,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles SHA256 object format', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Note: This test verifies the code path for SHA256 detection
     // Actual SHA256 OIDs are 64 characters
     const oldOid = '0'.repeat(40)
@@ -367,9 +345,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles end of stream (line === true)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a stream that ends without flush
     const request: UniversalBuffer[] = []
     const stream = createStream(request)
@@ -385,9 +361,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles malformed ref name (repeated single characters)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     // Malformed ref name - repeated single characters
@@ -410,9 +384,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles ref name that does not start with refs/', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     // Valid ref name that doesn't start with refs/
@@ -435,9 +407,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles empty ref name', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     
@@ -459,9 +429,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles multiple capabilities in first line', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/main'
@@ -484,9 +452,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles ref update with zero OID for new ref', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const zeroOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/new-branch'
@@ -513,9 +479,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles partial ref update failures', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create first ref
     const existingOid1 = 'a'.repeat(40)
     await repo.gitBackend.writeRef('refs/heads/branch1', existingOid1, false, {})
@@ -554,7 +518,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles filesystem error during ref read', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
@@ -579,7 +543,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles object format detection failure', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
@@ -605,9 +569,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles ref update with very long ref name', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const longRef = 'refs/heads/' + 'a'.repeat(200) // Very long ref name
@@ -630,9 +592,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles ref update with special characters in ref name', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/feature@v2.0'
@@ -654,9 +614,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles multiple ref updates with mixed success and failure', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create first ref
     const existingOid1 = 'a'.repeat(40)
     await repo.gitBackend.writeRef('refs/heads/success1', existingOid1, false, {})
@@ -698,9 +656,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles ref update with trailing whitespace', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/main'
@@ -724,9 +680,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles request with only whitespace lines', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Request with only whitespace
     const request = [
       GitPktLine.encode('   \n'),
@@ -745,9 +699,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles request with malformed OID (too short)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Request with OID that's too short
     const shortOid = 'a'.repeat(20) // Should be 40
     const ref = 'refs/heads/main'
@@ -775,9 +727,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles filesystem error when reading ref (ENOENT on gitdir)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/main'
@@ -805,9 +755,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles filesystem error when reading ref (error message contains /nonexistent/)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/main'
@@ -832,9 +780,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles update hook rejection (non-ENOENT error)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a mock filesystem that throws a non-ENOENT error when hooks are called
     // This is tricky to test without actual hooks, so we'll test the error path differently
     // by creating a scenario where the hook would reject
@@ -863,9 +809,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles post-receive hook error', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/main'
@@ -889,9 +833,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles ref failure without error message', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a scenario that might result in a ref failure without error message
     // This is an edge case, but we should test the code path
     
@@ -905,9 +847,11 @@ test('processReceivePack', async (t) => {
     ]
     const stream = createStream(request)
     
-    // Use invalid gitdir to potentially trigger error path
+    // Use invalid gitdir to potentially trigger error path - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
-      gitBackend: repo.gitBackend,
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -917,9 +861,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles system error (non-validation error)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/main'
@@ -949,9 +891,7 @@ test('processReceivePack', async (t) => {
     // This tests the edge case where a ref has ok=false but no error message
     // We need to create a scenario that triggers this
     
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/main'
@@ -962,9 +902,11 @@ test('processReceivePack', async (t) => {
     ]
     const stream = createStream(request)
     
-    // Use invalid gitdir to potentially trigger error without message
+    // Use invalid gitdir to potentially trigger error without message - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
-      gitBackend: repo.gitBackend,
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -975,9 +917,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles outer catch block error', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a request that will cause an error in the outer try-catch
     // This could be a malformed request or filesystem error
     
@@ -999,9 +939,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles error with error code in error string', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/main'
@@ -1012,9 +950,11 @@ test('processReceivePack', async (t) => {
     ]
     const stream = createStream(request)
     
-    // Use invalid gitdir to cause error with code
+    // Use invalid gitdir to cause error with code - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
-      gitBackend: repo.gitBackend,
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -1030,9 +970,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles validation error filtering (hook rejected)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a ref update that would be rejected by hook
     // Since we can't easily mock hooks, we'll test the error filtering logic
     // by creating a result that simulates hook rejection
@@ -1057,9 +995,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles error with "no such file" and gitdir in message', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/main'
@@ -1070,10 +1006,11 @@ test('processReceivePack', async (t) => {
     ]
     const stream = createStream(request)
     
-    // Use gitdir path that will trigger "no such file" error with gitdir in path
+    // Use gitdir path that will trigger "no such file" error with gitdir in path - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/gitdir/path')
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/gitdir/path',
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -1083,9 +1020,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles multiple failed refs with system errors', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid1 = 'a'.repeat(40)
     const newOid2 = 'b'.repeat(40)
@@ -1097,9 +1032,11 @@ test('processReceivePack', async (t) => {
     ]
     const stream = createStream(request)
     
-    // Use invalid gitdir to cause system errors for all refs
+    // Use invalid gitdir to cause system errors for all refs - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
-      gitBackend: repo.gitBackend,
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -1113,9 +1050,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles error with errno code', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/main'
@@ -1126,9 +1061,11 @@ test('processReceivePack', async (t) => {
     ]
     const stream = createStream(request)
     
-    // Use invalid gitdir to cause error with errno
+    // Use invalid gitdir to cause error with errno - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
-      gitBackend: repo.gitBackend,
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -1138,9 +1075,7 @@ test('processReceivePack', async (t) => {
   })
 
   await t.test('handles update hook rejection with non-ENOENT error', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create an update hook that rejects (non-ENOENT error)
     const { join } = await import('@awesome-os/universal-git-src/utils/join.ts')
     const hooksDir = join(gitdir, 'hooks')
@@ -1182,9 +1117,7 @@ process.exit(1);
   })
 
   await t.test('handles post-receive hook error', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a post-receive hook that errors
     const { join } = await import('@awesome-os/universal-git-src/utils/join.ts')
     const hooksDir = join(gitdir, 'hooks')
@@ -1220,9 +1153,7 @@ process.exit(1);
   })
 
   await t.test('handles validation error filtering (hook rejected message)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create an update hook that rejects with "hook rejected" message
     const { join } = await import('@awesome-os/universal-git-src/utils/join.ts')
     const hooksDir = join(gitdir, 'hooks')
@@ -1264,9 +1195,7 @@ process.exit(1);
     // This tests the edge case where ref.ok === false but ref.error is undefined
     // We need to create a scenario that triggers this
     
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a request that will cause an error during processing
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
@@ -1278,10 +1207,11 @@ process.exit(1);
     ]
     const stream = createStream(request)
     
-    // Use invalid gitdir to cause system error
+    // Use invalid gitdir to cause system error - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/gitdir/path')
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/gitdir/path',
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -1292,9 +1222,7 @@ process.exit(1);
   })
 
   await t.test('handles filter return false when status.ok is not false', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/main'
@@ -1317,9 +1245,7 @@ process.exit(1);
   })
 
   await t.test('handles outer catch block with general error', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a request that will cause an error when trying to read refs
     // Use a valid gitdir but with a ref that will cause a filesystem error
     // when resolveRef tries to read it (this should trigger the outer catch)
@@ -1335,10 +1261,11 @@ process.exit(1);
     
     // Use an invalid gitdir that might pass the early check but fail during ref operations
     // On some systems, the gitdir check might not catch this, so the error will occur
-    // when resolveRef tries to read the ref, which should trigger the outer catch block
+    // when resolveRef tries to read the ref, which should trigger the outer catch block - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/gitdir/path/that/might/pass/early/check')
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/gitdir/path/that/might/pass/early/check',
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -1358,9 +1285,7 @@ process.exit(1);
   })
 
   await t.test('handles error with "update hook" in message', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create an update hook that rejects with "update hook" in message
     const { join } = await import('@awesome-os/universal-git-src/utils/join.ts')
     const hooksDir = join(gitdir, 'hooks')
@@ -1397,9 +1322,7 @@ process.exit(1);
   })
 
   await t.test('handles error filtering with multiple validation errors', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create two refs - one with conflict, one that succeeds
     const existingOid1 = 'a'.repeat(40)
     await repo.gitBackend.writeRef('refs/heads/branch1', existingOid1, false, {})
@@ -1434,9 +1357,7 @@ process.exit(1);
   })
 
   await t.test('handles unpackError already set scenario', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a scenario where unpackError is already set (from pre-receive hook)
     // This tests the path where !result.unpackError is false
     
@@ -1450,9 +1371,11 @@ process.exit(1);
     ]
     const stream = createStream(request)
     
-    // Use invalid gitdir to cause error early (sets unpackError)
+    // Use invalid gitdir to cause error early (sets unpackError) - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
-      gitBackend: repo.gitBackend,
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -1462,9 +1385,7 @@ process.exit(1);
   })
 
   await t.test('handles filesystem error with error code ENOENT when reading ref', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a ref first
     const existingOid = 'a'.repeat(40)
     await repo.gitBackend.writeRef('refs/heads/existing', existingOid, false, {})
@@ -1479,10 +1400,11 @@ process.exit(1);
     ]
     const stream = createStream(request)
     
-    // Use invalid gitdir to cause ENOENT when reading ref
+    // Use invalid gitdir to cause ENOENT when reading ref - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/gitdir/path')
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/gitdir/path',
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -1494,9 +1416,7 @@ process.exit(1);
   })
 
   await t.test('handles filesystem error with error message containing "no such file" and gitdir', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a ref first
     const existingOid = 'a'.repeat(40)
     await repo.gitBackend.writeRef('refs/heads/test', existingOid, false, {})
@@ -1511,10 +1431,11 @@ process.exit(1);
     ]
     const stream = createStream(request)
     
-    // Use gitdir path that will trigger "no such file" error with gitdir in path
+    // Use gitdir path that will trigger "no such file" error with gitdir in path - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/gitdir/path')
     const result = await processReceivePack({
-      fs: repo.fs,
-      gitdir: '/nonexistent/gitdir/path',
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -1524,9 +1445,7 @@ process.exit(1);
   })
 
   await t.test('handles filesystem error with lowercase enoent in message', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/main'
@@ -1537,9 +1456,11 @@ process.exit(1);
     ]
     const stream = createStream(request)
     
-    // Use invalid gitdir to trigger error with enoent in message
+    // Use invalid gitdir to trigger error with enoent in message - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
-      gitBackend: repo.gitBackend,
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -1549,9 +1470,7 @@ process.exit(1);
   })
 
   await t.test('handles error with "ref update" and "conflict" in message (validation error)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a ref with specific OID
     const existingOid = 'a'.repeat(40)
     await repo.gitBackend.writeRef('refs/heads/branch', existingOid, false, {})
@@ -1580,9 +1499,7 @@ process.exit(1);
   })
 
   await t.test('handles multiple system errors vs validation errors', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create one ref that will have a conflict (validation error)
     const existingOid1 = 'a'.repeat(40)
     await repo.gitBackend.writeRef('refs/heads/conflict', existingOid1, false, {})
@@ -1603,9 +1520,13 @@ process.exit(1);
     ]
     const stream = createStream(request)
     
-    // Use invalid gitdir to cause system error for second ref
+    // Use invalid gitdir to cause system error for second ref - create backend with invalid gitdir
+    // Note: This test mixes validation errors (conflict) with system errors (invalid gitdir)
+    // The system error should cause unpackOk = false even if there's also a validation error
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
-      gitBackend: repo.gitBackend,
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -1615,9 +1536,7 @@ process.exit(1);
   })
 
   await t.test('handles error string formatting with code prefix', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/main'
@@ -1628,9 +1547,11 @@ process.exit(1);
     ]
     const stream = createStream(request)
     
-    // Use invalid gitdir to cause error with code
+    // Use invalid gitdir to cause error with code - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
-      gitBackend: repo.gitBackend,
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     
@@ -1645,9 +1566,7 @@ process.exit(1);
   })
 
   await t.test('handles error with errno but no code', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
-    const gitdir = await repo.getGitdir()
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     const oldOid = '0'.repeat(40)
     const newOid = 'a'.repeat(40)
     const ref = 'refs/heads/main'
@@ -1658,9 +1577,11 @@ process.exit(1);
     ]
     const stream = createStream(request)
     
-    // Use invalid gitdir to cause error
+    // Use invalid gitdir to cause error - create backend with invalid gitdir
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
-      gitBackend: repo.gitBackend,
+      gitBackend: invalidBackend,
       requestBody: stream,
     })
     

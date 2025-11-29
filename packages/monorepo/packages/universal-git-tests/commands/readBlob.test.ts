@@ -6,8 +6,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 describe('readBlob', () => {
   it('error:test-missing', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readBlob')
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readBlob')
     // Test
     let error = null
     try {
@@ -24,7 +23,7 @@ describe('readBlob', () => {
   
   it('ok:blob', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readBlob')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readBlob')
     // Test
     const { blob } = await readBlob({
       repo,
@@ -37,7 +36,7 @@ describe('readBlob', () => {
   
   it('ok:peels-tags', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readBlob')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readBlob')
     // Test
     const { oid } = await readBlob({
       repo,
@@ -48,7 +47,7 @@ describe('readBlob', () => {
   
   it('ok:with-simple-filepath-to-blob', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readBlob')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readBlob')
     // Test
     const { oid, blob } = await readBlob({
       repo,
@@ -61,7 +60,7 @@ describe('readBlob', () => {
   
   it('ok:with-deep-filepath-to-blob', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readBlob')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readBlob')
     // Test
     // This test may fail if packfile isn't loaded - skip if InternalError
     try {
@@ -84,7 +83,7 @@ describe('readBlob', () => {
   
   it('error:with-simple-filepath-to-tree', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readBlob')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readBlob')
     // Test
     let error = null
     try {
@@ -102,7 +101,7 @@ describe('readBlob', () => {
   
   it('error:with-erroneous-filepath-directory-is-a-file', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readBlob')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readBlob')
     // Test
     let error = null
     try {
@@ -125,7 +124,7 @@ describe('readBlob', () => {
   
   it('error:with-erroneous-filepath-no-such-directory', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readBlob')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readBlob')
     // Test
     let error = null
     try {
@@ -148,7 +147,7 @@ describe('readBlob', () => {
   
   it('error:with-erroneous-filepath-leading-slash', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readBlob')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readBlob')
     // Test
     let error = null
     try {
@@ -168,7 +167,7 @@ describe('readBlob', () => {
   
   it('error:with-erroneous-filepath-trailing-slash', async () => {
     // Setup
-    const { repo } = await makeFixture('test-readBlob')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-readBlob')
     // Test
     let error = null
     try {

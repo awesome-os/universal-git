@@ -6,7 +6,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('addRemote', async (t) => {
   await t.test('ok:basic', async () => {
     // Setup
-    const { repo } = await makeFixture('test-addRemote')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-addRemote')
     const remote = 'baz'
     const url = 'git@github.com:baz/baz.git'
     // Test
@@ -21,7 +21,7 @@ test('addRemote', async (t) => {
 
   await t.test('param:url-missing', async () => {
     // Setup
-    const { repo } = await makeFixture('test-addRemote')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-addRemote')
     const remote = 'baz'
     // Test
     let error: unknown = null
@@ -40,7 +40,7 @@ test('addRemote', async (t) => {
 
   await t.test('error:InvalidRefNameError', async () => {
     // Setup
-    const { repo } = await makeFixture('test-addRemote')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-addRemote')
     const remote = '@{HEAD~1}'
     const url = 'git@github.com:baz/baz.git'
     // Test

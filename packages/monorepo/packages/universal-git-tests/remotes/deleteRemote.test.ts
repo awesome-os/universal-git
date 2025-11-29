@@ -6,7 +6,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('deleteRemote', async (t) => {
   await t.test('ok:basic', async () => {
     // Setup
-    const { repo } = await makeFixture('test-deleteRemote')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteRemote')
     const remote = 'foo'
     // Test
     await deleteRemote({ repo, remote })
@@ -16,7 +16,7 @@ test('deleteRemote', async (t) => {
 
   await t.test('param:remote-missing', async () => {
     // Setup
-    const { repo } = await makeFixture('test-addRemote')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-addRemote')
     // Test
     let error = null
     try {
@@ -43,23 +43,21 @@ test('deleteRemote', async (t) => {
   })
 
   await t.test('param:repo-provided', async () => {
-    const { repo } = await makeFixture('test-deleteRemote')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteRemote')
     await deleteRemote({ repo, remote: 'foo' })
     const remotes = await listRemotes({ repo })
     assert.deepStrictEqual(remotes, [{ remote: 'bar', url: 'git@github.com:bar/bar.git' }])
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-deleteRemote')
-    const dir = (await repo.getDir())!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteRemote')
     await deleteRemote({ repo, dir, remote: 'foo' })
     const remotes = await listRemotes({ repo })
     assert.deepStrictEqual(remotes, [{ remote: 'bar', url: 'git@github.com:bar/bar.git' }])
   })
 
   await t.test('error:caller-property', async () => {
-    const { repo } = await makeFixture('test-deleteRemote')
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteRemote')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await deleteRemote({
@@ -74,7 +72,7 @@ test('deleteRemote', async (t) => {
   })
 
   await t.test('edge:non-existent-remote', async () => {
-    const { repo } = await makeFixture('test-deleteRemote')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteRemote')
     try {
       await deleteRemote({ repo, remote: 'nonexistent' })
       // Should not throw - deleteRemote is idempotent

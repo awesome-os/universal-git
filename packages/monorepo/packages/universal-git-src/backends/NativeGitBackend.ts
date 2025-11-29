@@ -499,6 +499,103 @@ export class NativeGitBackend implements GitBackend {
   }
 
   // ============================================================================
+  // File Operations (Staging Area)
+  // ============================================================================
+
+  async add(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    filepaths: string | string[],
+    options?: { force?: boolean; update?: boolean; parallel?: boolean }
+  ): Promise<void> {
+    const workdir = this.getWorkdir()
+    const paths = Array.isArray(filepaths) ? filepaths : [filepaths]
+    const flags: string[] = []
+    if (options?.force) flags.push('-f')
+    if (options?.update) flags.push('-u')
+    
+    // git add supports multiple paths
+    const cmd = `add ${flags.join(' ')}`
+    
+    for (const path of paths) {
+        this.execGit(`${cmd} "${path}"`, { cwd: workdir })
+    }
+  }
+
+  async remove(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    filepaths: string | string[],
+    options?: { cached?: boolean; force?: boolean }
+  ): Promise<void> {
+    const workdir = this.getWorkdir()
+    const paths = Array.isArray(filepaths) ? filepaths : [filepaths]
+    const flags: string[] = []
+    if (options?.cached) flags.push('--cached')
+    if (options?.force) flags.push('-f')
+    
+    const cmd = `rm ${flags.join(' ')}`
+    for (const path of paths) {
+        this.execGit(`${cmd} "${path}"`, { cwd: workdir })
+    }
+  }
+
+  async updateIndex(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    filepath: string,
+    options?: {
+      oid?: string
+      mode?: number
+      add?: boolean
+      remove?: boolean
+      force?: boolean
+    }
+  ): Promise<string | void> {
+    const workdir = this.getWorkdir()
+    if (options?.add && options.oid && options.mode) {
+        // Mode in octal
+        const modeStr = options.mode.toString(8)
+        this.execGit(`update-index --add --cacheinfo ${modeStr},${options.oid},"${filepath}"`, { cwd: workdir })
+        return options.oid
+    }
+    if (options?.remove) {
+        this.execGit(`update-index --remove "${filepath}"`, { cwd: workdir })
+        return
+    }
+    return this.fsBackend.updateIndex(worktreeBackend, filepath, options)
+  }
+
+  // ============================================================================
+  // Commit Operations
+  // ============================================================================
+
+  async commit(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    message: string,
+    options?: {
+      author?: Partial<import('../models/GitCommit.ts').Author>
+      committer?: Partial<import('../models/GitCommit.ts').Author>
+      noVerify?: boolean
+      amend?: boolean
+      dryRun?: boolean
+      noUpdateBranch?: boolean
+      ref?: string
+      parent?: string[]
+      tree?: string
+      signingKey?: string
+      onSign?: import('../core-utils/Signing.ts').SignCallback
+    }
+  ): Promise<string> {
+    if (options?.dryRun) {
+        return '0000000000000000000000000000000000000000'
+    }
+    
+    // Delegate to createCommit which handles author/committer/env
+    return this.createCommit(message, {
+        author: options?.author,
+        committer: options?.committer,
+    })
+  }
+
+  // ============================================================================
   // Utility Methods
   // ============================================================================
 
@@ -507,8 +604,53 @@ export class NativeGitBackend implements GitBackend {
     this.execGit('init', { cwd: this.getWorkdir() })
   }
 
+  async init(options: {
+    defaultBranch?: string
+    objectFormat?: 'sha1' | 'sha256'
+  } = {}): Promise<void> {
+    const { defaultBranch = 'master', objectFormat = 'sha1' } = options
+    const workdir = this.getWorkdir()
+    
+    // Initialize with native git
+    // Use --initial-branch to set default branch name (requires git 2.28+)
+    try {
+      this.execGit(`init --initial-branch=${defaultBranch}`, { cwd: workdir })
+    } catch {
+      // Fallback for older git versions: init then rename branch
+      this.execGit('init', { cwd: workdir })
+      try {
+        this.execGit(`symbolic-ref HEAD refs/heads/${defaultBranch}`, { cwd: workdir })
+      } catch {
+        // Ignore errors if HEAD update fails (e.g. bare repo)
+      }
+    }
+
+    // Set object format if sha256 (requires git 2.29+)
+    if (objectFormat === 'sha256') {
+      try {
+        // Check if git supports sha256
+        this.execGit(`init --object-format=sha256`, { cwd: workdir })
+      } catch (err) {
+        throw new Error(`Git initialization with sha256 failed: ${(err as Error).message}`)
+      }
+    }
+
+    // Set basic config to ensure compatibility
+    // We do this via execGit to ensure it's set in the native git config
+    try {
+      this.execGit('config core.bare false', { cwd: workdir })
+      this.execGit('config core.logallrefupdates true', { cwd: workdir })
+    } catch {
+      // Ignore errors if config setting fails
+    }
+  }
+
   async isInitialized(): Promise<boolean> {
     return this.fsBackend.isInitialized()
+  }
+
+  async getObjectFormat(cache?: Record<string, unknown>): Promise<'sha1' | 'sha256'> {
+    return this.fsBackend.getObjectFormat(cache)
   }
 
   async existsFile(path: string): Promise<boolean> {
@@ -547,6 +689,126 @@ export class NativeGitBackend implements GitBackend {
 
   async close(): Promise<void> {
     return this.fsBackend.close()
+  }
+
+  // ============================================================================
+  // Branch/Checkout Operations
+  // ============================================================================
+
+  async checkout(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    ref: string,
+    options?: {
+      filepaths?: string[]
+      force?: boolean
+      noCheckout?: boolean
+      noUpdateHead?: boolean
+      dryRun?: boolean
+      sparsePatterns?: string[]
+      onProgress?: import('../git/remote/types.ts').ProgressCallback
+      remote?: string
+      track?: boolean
+      oldOid?: string
+    }
+  ): Promise<void> {
+    const workdir = this.getWorkdir()
+    
+    // Build git command
+    const args: string[] = []
+    
+    if (options?.force) args.push('--force')
+    
+    // Check if ref is a local branch to determine if we should use --track
+    // git checkout --track <local-branch> fails with "missing branch name; try -b"
+    // Also check if ref is a commit OID (SHA-1) - cannot track a commit
+    let isLocalBranch = false
+    const isOid = /^[0-9a-f]{40}$/.test(ref)
+    
+    if (!isOid) {
+      try {
+        this.execGit(`show-ref --verify --quiet refs/heads/${ref}`)
+        isLocalBranch = true
+      } catch {
+        // Not a local branch
+      }
+    }
+
+    if (options?.track && !isLocalBranch && !isOid) args.push('--track')
+    
+    // Add ref
+    args.push(ref)
+    
+    // Add filepaths
+    if (options?.filepaths && options.filepaths.length > 0) {
+      args.push('--')
+      args.push(...options.filepaths)
+    }
+    
+    try {
+      this.execGit(`checkout ${args.join(' ')}`, { cwd: workdir })
+    } catch (err: any) {
+      // Map known errors
+      if (err.message.includes('did not match any file(s) known to git')) {
+        const { NotFoundError } = await import('../errors/NotFoundError.ts')
+        throw new NotFoundError(ref)
+      }
+      throw err
+    }
+  }
+
+  async checkoutTree(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    treeOid: string,
+    options?: {
+      filepaths?: string[]
+      force?: boolean
+      dryRun?: boolean
+      sparsePatterns?: string[]
+      onProgress?: import('../git/remote/types.ts').ProgressCallback
+      index?: import('../git/index/GitIndex.ts').GitIndex
+    }
+  ): Promise<void> {
+    // Native git checkout can checkout a tree/commit
+    const workdir = this.getWorkdir()
+    const args: string[] = []
+    if (options?.force) args.push('--force')
+    args.push(treeOid)
+    if (options?.filepaths) {
+      args.push('--')
+      args.push(...options.filepaths)
+    }
+    this.execGit(`checkout ${args.join(' ')}`, { cwd: workdir })
+  }
+
+  async switch(
+    worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend,
+    branch: string,
+    options?: {
+      create?: boolean
+      force?: boolean
+      track?: boolean
+      remote?: string
+    }
+  ): Promise<void> {
+    const workdir = this.getWorkdir()
+    const args: string[] = []
+    if (options?.create) args.push('-c')
+    if (options?.force) args.push('--force')
+    if (options?.track) args.push('--track')
+    args.push(branch)
+    this.execGit(`switch ${args.join(' ')}`, { cwd: workdir })
+  }
+
+  // ============================================================================
+  // Walkers
+  // ============================================================================
+
+  async createTreeWalker(ref: string, cache?: Record<string, unknown>): Promise<any> {
+    return this.fsBackend.createTreeWalker(ref, cache)
+  }
+
+  async createIndexWalker(cache?: Record<string, unknown>): Promise<any> {
+    return this.fsBackend.createIndexWalker(cache)
   }
 
   // ============================================================================
@@ -629,10 +891,16 @@ export class NativeGitBackend implements GitBackend {
       
       // Build merge command
       const mergeArgs: string[] = []
+      
+      // Handle dryRun
+      if (options?.dryRun) {
+        mergeArgs.push('--no-commit', '--no-ff')
+      }
+      
       if (options?.noUpdateBranch) {
-        // For dry run, we'll handle it differently
-        if (options.dryRun) {
-          mergeArgs.push('--no-commit', '--no-ff')
+        // For noUpdateBranch, we also use no-commit
+        if (!options.dryRun) {
+             mergeArgs.push('--no-commit', '--no-ff')
         }
       } else {
         if (!options?.fastForward) {
@@ -789,6 +1057,14 @@ export class NativeGitBackend implements GitBackend {
    */
   async reloadConfig(): Promise<void> {
     return this.fsBackend.reloadConfig()
+  }
+
+  /**
+   * Returns the configuration as a plain JavaScript object
+   * This provides a unified view of the configuration
+   */
+  async getConfigFile(): Promise<any> {
+    return this.fsBackend.getConfigFile()
   }
 
   // ============================================================================

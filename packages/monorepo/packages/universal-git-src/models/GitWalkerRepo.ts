@@ -49,28 +49,52 @@ export class GitWalkerRepo {
     this.rootEntryPromise = (async () => {
       let oid: string
       try {
-        // Use gitBackend.expandRef() to resolve the ref
-        oid = await this.gitBackend.expandRef(ref)
+        // Use gitBackend.readRef() to resolve the ref to an OID
+        const resolved = await this.gitBackend.readRef(ref)
+        if (!resolved) {
+          // If readRef returns null, try to treat ref as OID directly
+          if (ref.length === 40 && /[0-9a-f]{40}/.test(ref)) {
+            oid = ref
+          } else {
+            throw new NotFoundError(ref)
+          }
+        } else {
+          oid = resolved
+        }
       } catch (e) {
+        // If ref resolution fails, check if it's a fresh branch
         if (e instanceof NotFoundError) {
           // Handle fresh branches with no commits
-          oid = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+          // Only if ref looks like a branch name (starts with refs/heads/ or doesn't look like an OID)
+          // For raw OIDs that fail resolution, we should probably rethrow
+          if (ref.startsWith('refs/heads/') || !/^[0-9a-f]{40}$/.test(ref)) {
+            // Empty tree OID for SHA-1
+            oid = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+          } else {
+            throw e
+          }
         } else {
           throw e
         }
       }
       // Read the commit object to get the tree OID
-      const commitObj = await this.gitBackend.readObject({ oid })
-      if (commitObj.type !== 'commit') {
-        throw new Error(`Expected commit object, got ${commitObj.type}`)
+      const commitObj = await this.gitBackend.readObject(oid, 'content', this.cache)
+      
+      let treeOid: string
+      if (commitObj.type === 'commit') {
+        const commitBuffer = commitObj.object
+        const commitText = commitBuffer.toString('utf8')
+        const treeMatch = commitText.match(/^tree ([a-f0-9]{40})/m)
+        if (!treeMatch) {
+          throw new Error('Commit object missing tree reference')
+        }
+        treeOid = treeMatch[1]
+      } else if (commitObj.type === 'tree') {
+        treeOid = oid
+      } else {
+        throw new Error(`Expected commit or tree object, got ${commitObj.type}`)
       }
-      const commitBuffer = UniversalBuffer.from(commitObj.object)
-      const commitText = commitBuffer.toString('utf8')
-      const treeMatch = commitText.match(/^tree ([a-f0-9]{40})/m)
-      if (!treeMatch) {
-        throw new Error('Commit object missing tree reference')
-      }
-      const treeOid = treeMatch[1]
+
       return {
         type: 'tree' as const,
         mode: '40000',
@@ -148,7 +172,7 @@ export class GitWalkerRepo {
         return null
       }
       
-      const result = await this.gitBackend.readObject({ oid: currentOid })
+      const result = await this.gitBackend.readObject(currentOid, 'content', this.cache)
       if (result.type !== 'tree') {
         return null
       }
@@ -199,7 +223,7 @@ export class GitWalkerRepo {
     
     let result: any
     try {
-      result = await this.gitBackend.readObject({ oid })
+      result = await this.gitBackend.readObject(oid, 'content', this.cache)
     } catch (error) {
       if (error instanceof NotFoundError) {
         // If tree object doesn't exist, this might be a repository integrity issue
@@ -284,7 +308,7 @@ export class GitWalkerRepo {
       if (!oid) {
         throw new Error(`No oid for obj ${JSON.stringify(obj)}`)
       }
-      const result = await this.gitBackend.readObject({ oid })
+      const result = await this.gitBackend.readObject(oid, 'content', this.cache)
       const type = result.type
       const object = result.object
       if (type !== 'blob') {

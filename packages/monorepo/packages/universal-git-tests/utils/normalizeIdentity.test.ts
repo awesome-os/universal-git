@@ -7,11 +7,9 @@ import type { CommitObject } from '@awesome-os/universal-git-src/models/GitCommi
 
 test('normalizeIdentity', async (t) => {
   await t.test('ok:author-provided-values', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
-
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const result = await normalizeIdentity({
-      fs: repo.fs,
+      fs: fs,
       gitdir,
       type: 'author',
       provided: {
@@ -31,11 +29,9 @@ test('normalizeIdentity', async (t) => {
   })
 
   await t.test('ok:committer-provided-values', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
-
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const result = await normalizeIdentity({
-      fs: repo.fs,
+      fs: fs,
       gitdir,
       type: 'committer',
       provided: {
@@ -51,8 +47,7 @@ test('normalizeIdentity', async (t) => {
 
 
   await t.test('behavior:author-priority', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     await setConfig({ repo, path: 'user.name', value: 'Config Name' })
     await setConfig({ repo, path: 'user.email', value: 'config@example.com' })
 
@@ -75,7 +70,7 @@ test('normalizeIdentity', async (t) => {
     }
 
     const result = await normalizeIdentity({
-      fs: repo.fs,
+      fs: fs,
       gitdir,
       type: 'author',
       provided: {
@@ -91,8 +86,7 @@ test('normalizeIdentity', async (t) => {
   })
 
   await t.test('behavior:committer-priority', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     await setConfig({ repo, path: 'user.name', value: 'Config Name' })
     await setConfig({ repo, path: 'user.email', value: 'config@example.com' })
 
@@ -115,7 +109,7 @@ test('normalizeIdentity', async (t) => {
     }
 
     const result = await normalizeIdentity({
-      fs: repo.fs,
+      fs: fs,
       gitdir,
       type: 'committer',
       provided: {
@@ -135,12 +129,11 @@ test('normalizeIdentity', async (t) => {
   })
 
   await t.test('edge:returns-undefined-no-name', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Don't set user.name in config
 
     const result = await normalizeIdentity({
-      fs: repo.fs,
+      fs: fs,
       gitdir,
       type: 'author',
     })
@@ -149,13 +142,12 @@ test('normalizeIdentity', async (t) => {
   })
 
   await t.test('behavior:uses-fallback-committer', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     await setConfig({ repo, path: 'user.name', value: 'Config Name' })
     await setConfig({ repo, path: 'user.email', value: 'config@example.com' })
 
     const result = await normalizeIdentity({
-      fs: repo.fs,
+      fs: fs,
       gitdir,
       type: 'committer',
       fallback: {
@@ -170,8 +162,7 @@ test('normalizeIdentity', async (t) => {
   })
 
   await t.test('ok:uses-commit-committer', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const gitdir = await repo.getGitdir()
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     await setConfig({ repo, path: 'user.name', value: 'Config Name' })
 
     const commit: CommitObject = {
@@ -193,7 +184,7 @@ test('normalizeIdentity', async (t) => {
     }
 
     const result = await normalizeIdentity({
-      fs: repo.fs,
+      fs: fs,
       gitdir,
       type: 'committer',
       commit,

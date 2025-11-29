@@ -10,6 +10,7 @@ import {
   statusMatrix,
   commit as gitCommit,
   getConfig,
+  setConfig,
   init,
   branch,
   checkout,
@@ -74,7 +75,7 @@ async function verifyAndLogConfig(repo: TestRepo, label: string = 'Before merge'
       // Last resort: use old getConfig API (only reads local config)
       for (const key of mergeConfigKeys) {
         try {
-          ugitConfig[key] = await getConfig({ fs: repo.fs, gitdir: repo.gitdir, path: key })
+          ugitConfig[key] = await getConfig({ fs: fs, gitdir: repo.gitdir, path: key })
         } catch {
           ugitConfig[key] = undefined
         }
@@ -119,7 +120,9 @@ describe('merge', () => {
 
   it('behavior:noUpdateBranch', async () => {
         // Setup
-        const { repo } = await makeFixture('test-merge')
+        const { repo, fs, dir, gitdir } = await makeFixture('test-merge')
+        await setConfig({ repo, path: 'user.name', value: 'Test User' })
+        await setConfig({ repo, path: 'user.email', value: 'test@example.com' })
         // Test
         const originalOid = await resolveRef({
         repo,

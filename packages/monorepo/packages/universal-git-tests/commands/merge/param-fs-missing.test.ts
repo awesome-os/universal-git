@@ -74,7 +74,7 @@ async function verifyAndLogConfig(repo: TestRepo, label: string = 'Before merge'
       // Last resort: use old getConfig API (only reads local config)
       for (const key of mergeConfigKeys) {
         try {
-          ugitConfig[key] = await getConfig({ fs: repo.fs, gitdir: repo.gitdir, path: key })
+          ugitConfig[key] = await getConfig({ fs: fs, gitdir: repo.gitdir, path: key })
         } catch {
           ugitConfig[key] = undefined
         }
@@ -118,7 +118,7 @@ describe('merge', () => {
   })
 
   it('param:fs-missing', async () => {
-        const { repo } = await makeFixture('test-merge')
+        const { repo, fs, dir, gitdir } = await makeFixture('test-merge')
         const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
 
         let error: unknown = null
@@ -134,6 +134,6 @@ describe('merge', () => {
 
         assert.notStrictEqual(error, null, 'Should throw error when fs is missing')
         assert.ok(error instanceof MissingParameterError, 'Should throw MissingParameterError')
-        assert.strictEqual((error as any)?.data?.parameter, 'fs', 'Error should be for fs parameter')
+        assert.strictEqual((error as any)?.data?.parameter, 'repo', 'Error should be for repo parameter')
         })
 })

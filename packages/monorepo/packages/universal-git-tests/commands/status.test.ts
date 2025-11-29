@@ -8,7 +8,7 @@ import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBu
 describe('status', () => {
   it('ok:basic', async () => {
     // Setup
-    const { repo } = await makeFixture('test-status')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-status')
     const dir = repo.getWorktree()?.dir
     if (!dir) throw new Error('Repository must have a worktree')
     // Test
@@ -41,11 +41,11 @@ describe('status', () => {
     assert.strictEqual(d2, 'added')
 
     // And finally the weirdo cases
-    const acontent = await repo.fs.read(path.join(dir, 'a.txt'))
-    await repo.fs.write(path.join(dir, 'a.txt'), 'Hi')
+    const acontent = await fs.read(path.join(dir, 'a.txt'))
+    await fs.write(path.join(dir, 'a.txt'), 'Hi')
     await add({ repo, filepath: 'a.txt' })
     if (acontent) {
-      await repo.fs.write(path.join(dir, 'a.txt'), acontent)
+      await fs.write(path.join(dir, 'a.txt'), acontent)
     }
     const a3 = await status({ repo, filepath: 'a.txt' })
     assert.strictEqual(a3, '*unmodified')
@@ -54,9 +54,9 @@ describe('status', () => {
     const a4 = await status({ repo, filepath: 'a.txt' })
     assert.strictEqual(a4, '*undeleted')
 
-    await repo.fs.write(path.join(dir, 'e.txt'), 'Hi')
+    await fs.write(path.join(dir, 'e.txt'), 'Hi')
     await add({ repo, filepath: 'e.txt' })
-    await repo.fs.rm(path.join(dir, 'e.txt'))
+    await fs.rm(path.join(dir, 'e.txt'))
     const e3 = await status({ repo, filepath: 'e.txt' })
     // e3 might be '*absent' or '*added' depending on fixture state
     assert.ok(e3 === '*absent' || e3 === '*added', `Expected '*absent' or '*added', got '${e3}'`)
@@ -77,11 +77,11 @@ describe('status', () => {
 
   it('ok:fresh-repo-no-commits', async () => {
     // Setup
-    const { repo } = await makeFixture('test-empty')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty')
     const dir = repo.getWorktree()?.dir
     if (!dir) throw new Error('Repository must have a worktree')
-    await repo.fs.write(path.join(dir, 'a.txt'), 'Hi')
-    await repo.fs.write(path.join(dir, 'b.txt'), 'Hi')
+    await fs.write(path.join(dir, 'a.txt'), 'Hi')
+    await fs.write(path.join(dir, 'b.txt'), 'Hi')
     await add({ repo, filepath: 'b.txt' })
     // Test
     const a = await status({ repo, filepath: 'a.txt' })
@@ -92,12 +92,12 @@ describe('status', () => {
 
   it('error:index-empty-file', async () => {
     // Setup
-    const { repo } = await makeFixture('test-empty')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty')
     const dir = repo.getWorktree()?.dir
     if (!dir) throw new Error('Repository must have a worktree')
     const file = 'a.txt'
 
-    await repo.fs.write(path.join(dir, file), 'Hi', 'utf8')
+    await fs.write(path.join(dir, file), 'Hi', 'utf8')
     await add({ repo, filepath: file })
     // Corrupt index through backend - write empty index
     // Write empty buffer to create an empty but existing index file
@@ -130,12 +130,12 @@ describe('status', () => {
 
   it('error:index-no-magic-number', async () => {
     // Setup
-    const { repo } = await makeFixture('test-empty')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty')
     const dir = repo.getWorktree()?.dir
     if (!dir) throw new Error('Repository must have a worktree')
     const file = 'a.txt'
 
-    await repo.fs.write(path.join(dir, file), 'Hi', 'utf8')
+    await fs.write(path.join(dir, file), 'Hi', 'utf8')
     await add({ repo, filepath: file })
     // Corrupt index through backend - write invalid index
     const invalidIndex = new TextEncoder().encode('no-magic-number')
@@ -161,12 +161,12 @@ describe('status', () => {
 
   it('error:index-wrong-checksum', async () => {
     // Setup
-    const { repo } = await makeFixture('test-empty')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty')
     const dir = repo.getWorktree()?.dir
     if (!dir) throw new Error('Repository must have a worktree')
     const file = 'a.txt'
 
-    await repo.fs.write(path.join(dir, file), 'Hi', 'utf8')
+    await fs.write(path.join(dir, file), 'Hi', 'utf8')
     await add({ repo, filepath: file })
     // Corrupt index through backend - write invalid index with wrong checksum
     const invalidIndex = new TextEncoder().encode('DIRCxxxxx')

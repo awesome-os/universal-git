@@ -74,7 +74,7 @@ async function verifyAndLogConfig(repo: TestRepo, label: string = 'Before merge'
       // Last resort: use old getConfig API (only reads local config)
       for (const key of mergeConfigKeys) {
         try {
-          ugitConfig[key] = await getConfig({ fs: repo.fs, gitdir: repo.gitdir, path: key })
+          ugitConfig[key] = await getConfig({ fs: fs, gitdir: repo.gitdir, path: key })
         } catch {
           ugitConfig[key] = undefined
         }
@@ -124,9 +124,8 @@ describe('merge', () => {
 
         if (!isGitAvailable()) {
         // Fallback to fixture-based test if git is not available
-        const { repo } = await makeFixture('test-merge')
+        const { repo, fs, dir, gitdir } = await makeFixture('test-merge')
         if (!repo.worktreeBackend) throw new Error('Repository must have a worktree')
-        const gitdir = await repo.getGitdir()
         const testFile = `${gitdir}/o.conflict.example`
         const outFile = `${dir}/o.txt`
         let error: unknown = null
@@ -146,8 +145,8 @@ describe('merge', () => {
         } catch (e) {
         error = e
         }
-        const outContent = await repo.fs!.read(outFile, 'utf-8')
-        const testContent = await repo.fs!.read(testFile, 'utf-8')
+        const outContent = await fs!.read(outFile, 'utf-8')
+        const testContent = await fs!.read(testFile, 'utf-8')
         assert.strictEqual(outContent, testContent)
         assert.notStrictEqual(error, null)
         assert.ok(error instanceof Errors.MergeConflictError || (error as any).code === Errors.MergeConflictError.code)
@@ -200,6 +199,9 @@ describe('merge', () => {
         }
 
         // Reset for universal-git test
+        try {
+          execSync('git reset --hard', { cwd: dir })
+        } catch {}
         await checkout({ repo: repo.repo, ref: 'a' })
 
         // Read and compare config before universal-git merge

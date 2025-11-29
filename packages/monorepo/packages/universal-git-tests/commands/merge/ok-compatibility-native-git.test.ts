@@ -191,8 +191,12 @@ describe('merge', () => {
         cache: repository.cache,
         })
 
-        // Switch back to main and make another commit
-        await checkout({ fs, dir: sourceRepoPath, ref: 'main' })
+        // Switch back to main (or master) and make another commit
+        console.log('Checking out main...')
+        const branches = await fs.promises.readdir(join(sourceRepoPath, '.git/refs/heads'))
+        const mainBranch = branches.includes('main') ? 'main' : 'master'
+        console.log(`Detected main branch: ${mainBranch}`)
+        await checkout({ fs, dir: sourceRepoPath, ref: mainBranch })
         await normalizedFs.write(join(sourceRepoPath, 'file4.txt'), 'content 4\n')
         await add({ fs, dir: sourceRepoPath, filepath: 'file4.txt', cache: repository.cache })
         const commit3 = await gitCommit({

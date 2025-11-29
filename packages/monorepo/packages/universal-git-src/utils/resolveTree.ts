@@ -5,6 +5,8 @@ import { detectObjectFormat, type ObjectFormat } from "./detectObjectFormat.ts"
 import type { FileSystemProvider } from "../models/FileSystem.ts"
 import type { TreeObject } from "../models/GitTree.ts"
 
+import type { GitBackend } from '../backends/GitBackend.ts'
+
 export type ResolveTreeResult = {
   tree: TreeObject
   oid: string
@@ -14,17 +16,28 @@ export async function resolveTree({
   fs,
   cache,
   gitdir,
+  gitBackend,
   oid,
   objectFormat,
 }: {
-  fs: FileSystemProvider
+  fs?: FileSystemProvider
   cache: Record<string, unknown>
-  gitdir: string
+  gitdir?: string
+  gitBackend?: GitBackend
   oid: string
   objectFormat?: ObjectFormat
 }): Promise<ResolveTreeResult> {
   // Detect object format if not provided
-  const format = objectFormat || await detectObjectFormat(fs, gitdir)
+  let format = objectFormat
+  if (!format) {
+    if (gitBackend) {
+      format = await gitBackend.getObjectFormat(cache)
+    } else if (fs && gitdir) {
+      format = await detectObjectFormat(fs, gitdir)
+    } else {
+      format = 'sha1'
+    }
+  }
   
   // Get empty tree OID based on format (SHA-1: 40 zeros, SHA-256: 64 zeros)
   const emptyTreeOid = format === 'sha256' 
@@ -35,6 +48,7 @@ export async function resolveTree({
     fs,
     cache,
     gitdir,
+    gitBackend,
     oid,
     expectedType: 'tree',
     parser: (buf) => {

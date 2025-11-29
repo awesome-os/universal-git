@@ -1,5 +1,5 @@
 import { MissingParameterError } from "../errors/MissingParameterError.ts"
-import { parseGitmodules, initSubmodule, updateSubmoduleUrl, getSubmoduleByName, getSubmoduleGitdir } from "../core-utils/filesystem/SubmoduleManager.ts"
+// import { parseGitmodules, initSubmodule, updateSubmoduleUrl, getSubmoduleByName, getSubmoduleGitdir } from "../git/worktree/SubmoduleManager.ts"
 import { normalizeCommandArgs } from '../utils/commandHelpers.ts'
 import { assertParameter } from "../utils/assertParameter.ts"
 import { join } from "../utils/join.ts"

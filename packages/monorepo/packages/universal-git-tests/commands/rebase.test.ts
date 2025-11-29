@@ -8,10 +8,8 @@ import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.
 
 test('rebase', async (t) => {
   await t.test('ok:rebase-creates-start-and-finish-reflog-entries', async () => {
-    const { repo } = await makeFixture('test-branch')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
-    const fs = repo.fs!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+    !
     
     // Get initial branch state
     let branchName = await currentBranch({ repo })
@@ -105,10 +103,8 @@ test('rebase', async (t) => {
   })
 
   await t.test('ok:rebase-with-abbreviated-ref-creates-correct-reflog-messages', async () => {
-    const { repo } = await makeFixture('test-branch')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
-    const fs = repo.fs!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+    !
     
     // Get initial branch state
     let branchName = await currentBranch({ repo })
@@ -198,10 +194,8 @@ test('rebase', async (t) => {
   })
 
   await t.test('ok:rebase-with-conflicts-creates-start-reflog-entry-but-no-finish', async () => {
-    const { repo } = await makeFixture('test-branch')
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
-    const fs = repo.fs!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-branch')
+    !
     
     // Get initial branch state
     let branchName = await currentBranch({ repo })

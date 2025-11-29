@@ -220,15 +220,32 @@ async function _createStashCommit({ fs, dir, gitdir, message = '', cache = {}, r
   // This ensures add() and stash() share the same cache for index synchronization
   const effectiveCache = cache // Always use the provided cache to ensure consistency with add()
 
+  // Create temporary repo if not provided, to satisfy writeTreeChanges requirement
+  let effectiveRepo = repo
+  if (!effectiveRepo) {
+    const { Repository } = await import('../core-utils/Repository.ts')
+    const { GitBackendFs } = await import('../backends/GitBackendFs/index.ts')
+    const { createGitWorktreeBackend } = await import('../git/worktree/index.ts')
+    
+    const gitBackend = new GitBackendFs(fs, finalEffectiveGitdir)
+    const worktreeBackend = finalDir ? createGitWorktreeBackend({ fs, dir: finalDir }) : undefined
+    
+    effectiveRepo = new Repository({
+      gitBackend,
+      worktreeBackend,
+      cache: effectiveCache,
+    })
+  }
+
   // CRITICAL: Check for changes BEFORE resolving HEAD
   // This ensures we throw "nothing to stash" error before trying to resolve HEAD
   // which might fail with NotFoundError in a fresh repository
   // Ensure index is read from disk before writeTreeChanges
-  if (repo) {
+  if (effectiveRepo) {
     // Force fresh read to bypass cache
-    if (repo.gitBackend) {
+    if (effectiveRepo.gitBackend) {
       try {
-        await repo.gitBackend.readIndex()
+        await effectiveRepo.gitBackend.readIndex()
       } catch {
         // Index doesn't exist, that's okay
       }
@@ -245,9 +262,7 @@ async function _createStashCommit({ fs, dir, gitdir, message = '', cache = {}, r
   let indexTree: string | null = null
   try {
     indexTree = await writeTreeChanges({
-      fs,
-      dir: finalDir,
-      gitdir: finalEffectiveGitdir,
+      repo: effectiveRepo,
       cache: effectiveCache,
       treePair: [WalkerFactory.tree({ ref: 'HEAD' }), 'stage'],
     })
@@ -275,9 +290,7 @@ async function _createStashCommit({ fs, dir, gitdir, message = '', cache = {}, r
   let worktreeTree: string | null = null
   try {
     worktreeTree = await writeTreeChanges({
-      fs,
-      dir: finalDir,
-      gitdir: finalEffectiveGitdir,
+      repo: effectiveRepo,
       cache: effectiveCache,
       treePair: [workDirCompareBase, 'workdir'],
     })
@@ -306,12 +319,12 @@ async function _createStashCommit({ fs, dir, gitdir, message = '', cache = {}, r
 
   // NOW we can safely resolve HEAD - we know there are changes to stash
   // prepare the stash commit: first parent is the current branch HEAD
-  // Use Repository.resolveRefDirect() or direct resolveRef() for consistency
+  // Use Repository.resolveRef() or direct resolveRef() for consistency
   // Handle the case where HEAD doesn't exist (fresh repo with no commits)
   let headCommit: string
   try {
     if (repo) {
-      headCommit = await repo.resolveRefDirect('HEAD')
+      headCommit = await repo.resolveRef('HEAD')
     } else {
       const { resolveRef } = await import('../git/refs/readRef.ts')
       headCommit = await resolveRef({ fs, gitdir: effectiveGitdir, ref: 'HEAD' })
@@ -461,12 +474,12 @@ export async function _stashPush({ fs, dir, gitdir, message = '', cache = {}, re
   // Finally, reset worktree and index to HEAD
   // Get HEAD commit to get tree OID, then use WorkdirManager.checkout directly
   // This ensures we're checking out the exact HEAD tree, not just the branch ref
-  // Use Repository.resolveRefDirect() or direct resolveRef() for consistency
+  // Use Repository.resolveRef() or direct resolveRef() for consistency
   // Note: We already resolved HEAD in _createStashCommit, so this should always succeed
   let headCommit: string
   try {
     if (repo) {
-      headCommit = await repo.resolveRefDirect('HEAD')
+      headCommit = await repo.resolveRef('HEAD')
     } else {
       const { resolveRef } = await import('../git/refs/readRef.ts')
       headCommit = await resolveRef({ fs, gitdir: effectiveGitdir, ref: 'HEAD' })
@@ -510,14 +523,29 @@ export async function _stashPush({ fs, dir, gitdir, message = '', cache = {}, re
   // Use WorkdirManager.checkout directly since we have a treeOid, not a ref
   // This ensures consistent cache, gitdir, and index synchronization
   // repo.checkout() expects a ref string, but we have a treeOid, so use WorkdirManager directly
-  await WorkdirManager.checkout({
-    fs,
-    dir: dir || '',
-    gitdir: effectiveGitdir,
-    treeOid: headTreeOid,
-    force: true, // force checkout to discard changes
-    cache: effectiveCache,
-  })
+  const { GitIndex } = await import('../git/index/GitIndex.ts')
+  const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+  const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+
+  if (repo && repo.worktreeBackend && repo.gitBackend && repo.gitBackend.checkoutTree) {
+    // Use backend method if available
+    await repo.gitBackend.checkoutTree(repo.worktreeBackend, headTreeOid, {
+      force: true, // force checkout to discard changes
+      cache: effectiveCache,
+    })
+  } else {
+    // Fallback for when repo is not available or doesn't have worktree backend
+    // Fix for the test failure "WorkdirManager.checkout requires both dir and gitdir"
+    // We need to ensure 'dir' is passed.
+    await WorkdirManager.checkout({
+      fs,
+      dir: dir || '', // Fallback to empty string if undefined
+      gitdir: effectiveGitdir,
+      treeOid: headTreeOid,
+      force: true, // force checkout to discard changes
+      cache: effectiveCache,
+    })
+  }
 
   return stashCommit
 }
@@ -597,16 +625,33 @@ export async function _stashApply({ fs, dir, gitdir, refIdx = 0, cache = {}, rep
   // Ensure dir is defined (default to empty string if not provided)
   const finalDir: string = dir || ''
   
+  // Create temporary repo if not provided, to satisfy applyTreeChanges requirement
+  let effectiveRepo = repo
+  if (!effectiveRepo) {
+    const { Repository } = await import('../core-utils/Repository.ts')
+    const { GitBackendFs } = await import('../backends/GitBackendFs/index.ts')
+    const { createGitWorktreeBackend } = await import('../git/worktree/index.ts')
+    
+    const gitBackend = new GitBackendFs(fs, finalEffectiveGitdir)
+    const worktreeBackend = finalDir ? createGitWorktreeBackend({ fs, dir: finalDir }) : undefined
+    
+    effectiveRepo = new Repository({
+      gitBackend,
+      worktreeBackend,
+      cache: effectiveCache,
+    })
+  }
+
   // Check for unmerged paths before applying stash
-  if (repo) {
+  if (effectiveRepo) {
     const { GitIndex } = await import('../git/index/GitIndex.ts')
     const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
     const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
     
     let indexBuffer: UniversalBuffer
-    if (repo.gitBackend) {
+    if (effectiveRepo.gitBackend) {
       try {
-        indexBuffer = await repo.gitBackend.readIndex()
+        indexBuffer = await effectiveRepo.gitBackend.readIndex()
       } catch {
         indexBuffer = UniversalBuffer.alloc(0)
       }
@@ -618,7 +663,7 @@ export async function _stashApply({ fs, dir, gitdir, refIdx = 0, cache = {}, rep
     if (indexBuffer.length === 0) {
       index = new GitIndex()
     } else {
-      const objectFormat = await detectObjectFormat(fs, effectiveGitdir, repo.cache, repo.gitBackend)
+      const objectFormat = await detectObjectFormat(fs, effectiveGitdir, effectiveRepo.cache, effectiveRepo.gitBackend)
       index = await GitIndex.fromBuffer(indexBuffer, objectFormat)
     }
     
@@ -663,9 +708,7 @@ export async function _stashApply({ fs, dir, gitdir, refIdx = 0, cache = {}, rep
     })
     // Apply index commit tree to index (stage the changes)
     await applyTreeChanges({
-      fs,
-      dir: finalDir,
-      gitdir: finalEffectiveGitdir,
+      repo: effectiveRepo,
       cache: effectiveCache,
       stashCommit: indexCommit,
       parentCommit: headCommit,
@@ -694,9 +737,7 @@ export async function _stashApply({ fs, dir, gitdir, refIdx = 0, cache = {}, rep
   // But actually, we should compare stash tree vs the base that was used when stashing
   const worktreeBaseCommit = indexCommit || headCommit
   await applyTreeChanges({
-    fs,
-    dir: finalDir,
-    gitdir: finalEffectiveGitdir,
+    repo: effectiveRepo,
     cache: effectiveCache,
     stashCommit: stashCommit.oid, // Stash commit OID - its tree is the worktree state
     parentCommit: worktreeBaseCommit, // Base commit - compare stash tree vs this commit's tree

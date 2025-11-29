@@ -22,10 +22,10 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 describe('abortMerge', () => {
   it('ok:conflicted-files-different-stages', async () => {
     // Setup
-    const { repo } = await makeFixture('test-abortMerge')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-abortMerge', { init: true })
     
     // Checkout branch 'a' first to ensure HEAD is on the correct branch
-    await checkout({ repo, ref: 'a' })
+    await checkout({ repo, dir, ref: 'a' })
 
     const branchA = await resolveRef({ repo, ref: 'a' })
     const branchB = await resolveRef({ repo, ref: 'b' })
@@ -48,6 +48,7 @@ describe('abortMerge', () => {
     try {
       await merge({
         repo,
+        dir,
         ours: 'a',
         theirs: 'b',
         abortOnConflict: false,
@@ -60,6 +61,9 @@ describe('abortMerge', () => {
       })
     } catch (e) {
       error = e
+    }
+    if (!(error instanceof Errors.MergeConflictError || (error as any).code === Errors.MergeConflictError.code)) {
+      console.log('Unexpected error:', error)
     }
     assert.notStrictEqual(error, null)
     assert.ok(error instanceof Errors.MergeConflictError || (error as any).code === Errors.MergeConflictError.code)
@@ -116,16 +120,17 @@ describe('abortMerge', () => {
 
   it('ok:abort-merge', async () => {
     // Setup
-    const { repo } = await makeFixture('test-abortMerge')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-abortMerge', { init: true })
     
     // Checkout branch 'a' first to ensure HEAD is on the correct branch
-    await checkout({ repo, ref: 'a' })
+    await checkout({ repo, dir, ref: 'a' })
 
     // Test
     let error: unknown = null
     try {
       await merge({
         repo,
+        dir,
         theirs: 'b',
         abortOnConflict: false,
         author: {
@@ -142,7 +147,7 @@ describe('abortMerge', () => {
     assert.notStrictEqual(error, null)
     assert.ok(error instanceof Errors.MergeConflictError || (error as any).code === Errors.MergeConflictError.code)
 
-    await abortMerge({ repo })
+    await abortMerge({ repo, dir })
 
     const trees = [TREE({ ref: 'HEAD' }), WORKDIR(), STAGE()]
     await walk({
@@ -168,10 +173,10 @@ describe('abortMerge', () => {
 
   it('ok:abort-after-modifying-files', async () => {
     // Setup
-    const { repo } = await makeFixture('test-abortMerge')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-abortMerge', { init: true })
     
     // Checkout branch 'a' first to ensure HEAD is on the correct branch
-    await checkout({ repo, ref: 'a' })
+    await checkout({ repo, dir, ref: 'a' })
     
     if (!repo.worktreeBackend) {
       throw new Error('Repository worktreeBackend is not available')
@@ -182,6 +187,7 @@ describe('abortMerge', () => {
     try {
       await merge({
         repo,
+        dir,
         theirs: 'b',
         abortOnConflict: false,
         author: {
@@ -202,7 +208,7 @@ describe('abortMerge', () => {
     await repo.worktreeBackend.write('b', 'new text for file b')
     await repo.worktreeBackend.write('c', 'new text for file c')
 
-    await abortMerge({ repo })
+    await abortMerge({ repo, dir })
 
     const trees = [TREE({ ref: 'HEAD' }), WORKDIR(), STAGE()]
     await walk({
@@ -234,10 +240,10 @@ describe('abortMerge', () => {
 
   it('behavior:workdir-ne-index-eq-head', async () => {
     // Setup
-    const { repo } = await makeFixture('test-abortMerge')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-abortMerge', { init: true })
     
     // Checkout branch 'a' first to ensure HEAD is on the correct branch
-    await checkout({ repo, ref: 'a' })
+    await checkout({ repo, dir, ref: 'a' })
     
     if (!repo.worktreeBackend) {
       throw new Error('Repository worktreeBackend is not available')
@@ -265,6 +271,7 @@ describe('abortMerge', () => {
     try {
       await merge({
         repo,
+        dir,
         theirs: 'b',
         abortOnConflict: false,
         author: {
@@ -282,7 +289,7 @@ describe('abortMerge', () => {
     assert.ok(error instanceof Errors.MergeConflictError || (error as any).code === Errors.MergeConflictError.code)
 
     await repo.worktreeBackend.write('c', 'new text for file c')
-    await abortMerge({ repo })
+    await abortMerge({ repo, dir })
 
     const fileAContent = await repo.worktreeBackend.read('a').then(buffer => {
       assert.ok(buffer !== null, 'File a content should not be null')

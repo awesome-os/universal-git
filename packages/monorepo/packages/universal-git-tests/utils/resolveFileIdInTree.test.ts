@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { resolveFileIdInTree } from '@awesome-os/universal-git-src/utils/resolveFileIdInTree.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { writeBlob, writeTree, writeCommit, writeRef } from '@awesome-os/universal-git-src/index.ts'
+import { writeBlob, writeTree, writeCommit } from '@awesome-os/universal-git-src/index.ts'
 
 // Helper to create author/committer with timestamps
 const createAuthor = (name: string, email: string) => ({
@@ -14,10 +14,7 @@ const createAuthor = (name: string, email: string) => ({
 
 test('resolveFileIdInTree', async (t) => {
   await t.test('ok:resolve-file-root', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
-
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const fileOid = await writeBlob({ repo, blob: Buffer.from('file content') })
     const treeOid = await writeTree({
       repo,
@@ -26,7 +23,7 @@ test('resolveFileIdInTree', async (t) => {
 
     const cache = {}
     const result = await resolveFileIdInTree({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: treeOid,
@@ -37,10 +34,7 @@ test('resolveFileIdInTree', async (t) => {
   })
 
   await t.test('ok:resolve-file-nested', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
-
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const fileOid = await writeBlob({ repo, blob: Buffer.from('nested file') })
     const subdirTreeOid = await writeTree({
       repo,
@@ -53,7 +47,7 @@ test('resolveFileIdInTree', async (t) => {
 
     const cache = {}
     const result = await resolveFileIdInTree({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: rootTreeOid,
@@ -64,10 +58,7 @@ test('resolveFileIdInTree', async (t) => {
   })
 
   await t.test('ok:resolve-file-deeply-nested', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
-
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const fileOid = await writeBlob({ repo, blob: Buffer.from('deep file') })
     const level3TreeOid = await writeTree({
       repo,
@@ -88,7 +79,7 @@ test('resolveFileIdInTree', async (t) => {
 
     const cache = {}
     const result = await resolveFileIdInTree({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: rootTreeOid,
@@ -99,10 +90,7 @@ test('resolveFileIdInTree', async (t) => {
   })
 
   await t.test('ok:resolve-file-matches-tree-OID', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
-
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const treeOid = await writeTree({
       repo,
       tree: [{ path: 'file.txt', mode: '100644', oid: 'a'.repeat(40), type: 'blob' }],
@@ -110,7 +98,7 @@ test('resolveFileIdInTree', async (t) => {
 
     const cache = {}
     const result = await resolveFileIdInTree({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: treeOid,
@@ -121,10 +109,7 @@ test('resolveFileIdInTree', async (t) => {
   })
 
   await t.test('ok:resolve-multiple-files-same-OID', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
-
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const fileOid = await writeBlob({ repo, blob: Buffer.from('same content') })
     const subdir1TreeOid = await writeTree({
       repo,
@@ -144,7 +129,7 @@ test('resolveFileIdInTree', async (t) => {
 
     const cache = {}
     const result = await resolveFileIdInTree({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: rootTreeOid,
@@ -159,10 +144,7 @@ test('resolveFileIdInTree', async (t) => {
   })
 
   await t.test('ok:resolve-file-single-match-returns-string', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
-
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const fileOid = await writeBlob({ repo, blob: Buffer.from('content') })
     const treeOid = await writeTree({
       repo,
@@ -171,7 +153,7 @@ test('resolveFileIdInTree', async (t) => {
 
     const cache = {}
     const result = await resolveFileIdInTree({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: treeOid,
@@ -184,10 +166,7 @@ test('resolveFileIdInTree', async (t) => {
   })
 
   await t.test('edge:empty-file-OID', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
-
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const treeOid = await writeTree({
       repo,
       tree: [{ path: 'file.txt', mode: '100644', oid: 'a'.repeat(40), type: 'blob' }],
@@ -195,7 +174,7 @@ test('resolveFileIdInTree', async (t) => {
 
     const cache = {}
     const result = await resolveFileIdInTree({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: treeOid,
@@ -206,10 +185,7 @@ test('resolveFileIdInTree', async (t) => {
   })
 
   await t.test('error:fileId-not-found', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
-
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const fileOid = await writeBlob({ repo, blob: Buffer.from('file content') })
     const otherFileOid = await writeBlob({ repo, blob: Buffer.from('other content') })
     const treeOid = await writeTree({
@@ -219,7 +195,7 @@ test('resolveFileIdInTree', async (t) => {
 
     const cache = {}
     const result = await resolveFileIdInTree({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: treeOid,
@@ -230,10 +206,7 @@ test('resolveFileIdInTree', async (t) => {
   })
 
   await t.test('ok:resolve-file-multiple-files', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
-
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const file1Oid = await writeBlob({ repo, blob: Buffer.from('file1') })
     const file2Oid = await writeBlob({ repo, blob: Buffer.from('file2') })
     const file3Oid = await writeBlob({ repo, blob: Buffer.from('file3') })
@@ -248,7 +221,7 @@ test('resolveFileIdInTree', async (t) => {
 
     const cache = {}
     const result1 = await resolveFileIdInTree({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: treeOid,
@@ -259,10 +232,7 @@ test('resolveFileIdInTree', async (t) => {
   })
 
   await t.test('ok:resolve-file-complex-nested', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    const gitdir = await repo.getGitdir()
-
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const file1Oid = await writeBlob({ repo, blob: Buffer.from('file1') })
     const file2Oid = await writeBlob({ repo, blob: Buffer.from('file2') })
     const file3Oid = await writeBlob({ repo, blob: Buffer.from('file3') })
@@ -288,7 +258,7 @@ test('resolveFileIdInTree', async (t) => {
 
     const cache = {}
     const result = await resolveFileIdInTree({
-      fs: repo.fs,
+      fs: fs,
       cache,
       gitdir,
       oid: rootTreeOid,

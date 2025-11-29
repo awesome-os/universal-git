@@ -1,12 +1,14 @@
-import { join, normalize } from "../../core-utils/GitPath.ts"
+import { join } from '../../core-utils/GitPath.ts'
 import { UniversalBuffer } from "../../utils/UniversalBuffer.ts"
 import type { GitBackendFs } from './GitBackendFs.ts'
+import { parse as parseConfig, serialize as serializeConfig } from '../../core-utils/ConfigParser.ts'
+import type { GitWorktreeBackend } from '../../git/worktree/GitWorktreeBackend.ts'
 
 /**
  * Submodule operations for GitBackendFs
  */
 
-export async function readGitmodules(this: GitBackendFs, worktreeBackend: import('../../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend): Promise<string | null> {
+export async function readGitmodules(this: GitBackendFs, worktreeBackend: GitWorktreeBackend): Promise<string | null> {
   // .gitmodules is in the working directory root
   // Use worktreeBackend to read it (worktreeBackend is a black box)
   try {
@@ -20,13 +22,13 @@ export async function readGitmodules(this: GitBackendFs, worktreeBackend: import
   }
 }
 
-export async function writeGitmodules(this: GitBackendFs, worktreeBackend: import('../../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend, data: string): Promise<void> {
+export async function writeGitmodules(this: GitBackendFs, worktreeBackend: GitWorktreeBackend, data: string): Promise<void> {
   // .gitmodules is in the working directory root
   // Use worktreeBackend to write it (worktreeBackend is a black box)
   await worktreeBackend.write('.gitmodules', UniversalBuffer.from(data, 'utf8'))
 }
 
-export async function parseGitmodules(this: GitBackendFs, worktreeBackend: import('../../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend): Promise<Map<string, { path: string; url: string; branch?: string }>> {
+export async function parseGitmodules(this: GitBackendFs, worktreeBackend: GitWorktreeBackend): Promise<Map<string, { path: string; url: string; branch?: string }>> {
   // Read .gitmodules from worktree backend
   const content = await this.readGitmodules(worktreeBackend)
   const submodules = new Map<string, { path: string; url: string; branch?: string }>()
@@ -35,8 +37,6 @@ export async function parseGitmodules(this: GitBackendFs, worktreeBackend: impor
     return submodules
   }
 
-  // Parse .gitmodules using ConfigParser (GitBackendFs implementation detail)
-  const { parse: parseConfig } = await import('../../core-utils/ConfigParser.ts')
   const buffer = UniversalBuffer.from(content, 'utf8')
   const config = parseConfig(buffer)
 
@@ -67,7 +67,7 @@ export async function parseGitmodules(this: GitBackendFs, worktreeBackend: impor
   return submodules
 }
 
-export async function getSubmoduleByName(this: GitBackendFs, worktreeBackend: import('../../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend, name: string): Promise<{ name: string; path: string; url: string; branch?: string } | null> {
+export async function getSubmoduleByName(this: GitBackendFs, worktreeBackend: GitWorktreeBackend, name: string): Promise<{ name: string; path: string; url: string; branch?: string } | null> {
   // First, parse all submodules to ensure worktree backend has the info
   const submodules = await this.parseGitmodules(worktreeBackend)
   
@@ -81,7 +81,7 @@ export async function getSubmoduleByName(this: GitBackendFs, worktreeBackend: im
   return null
 }
 
-export async function getSubmoduleByPath(this: GitBackendFs, worktreeBackend: import('../../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend, path: string): Promise<{ name: string; path: string; url: string; branch?: string } | null> {
+export async function getSubmoduleByPath(this: GitBackendFs, worktreeBackend: GitWorktreeBackend, path: string): Promise<{ name: string; path: string; url: string; branch?: string } | null> {
   // Try to get from worktree backend first
   if (worktreeBackend.getSubmodule) {
     const info = await worktreeBackend.getSubmodule(path)
@@ -118,5 +118,135 @@ export async function writeSubmoduleConfig(this: GitBackendFs, path: string, dat
   }
   const fullPath = join(moduleDir, 'config')
   await this.getFs().write(fullPath, UniversalBuffer.from(data, 'utf8'))
+}
+
+// -------------------------------------------------------------------------------------------------
+// Submodule Utility Functions (Refactored from SubmoduleManager.ts)
+// -------------------------------------------------------------------------------------------------
+
+/**
+ * Checks if a path is a submodule
+ */
+export async function isSubmodule(this: GitBackendFs, worktreeBackend: GitWorktreeBackend, path: string): Promise<boolean> {
+  const submodule = await this.getSubmoduleByPath(worktreeBackend, path)
+  return submodule !== null
+}
+
+/**
+ * Gets the gitdir for a submodule
+ * 
+ * @deprecated Use `repo.getSubmodule(path)` to get the submodule Repository instance instead.
+ * The submodule Repository's gitdir can be accessed via `await submoduleRepo.getGitdir()`.
+ */
+export async function getSubmoduleGitdir(this: GitBackendFs, path: string): Promise<string> {
+  // Submodules are stored in .git/modules/<path>
+  return join(this.getGitdir(), 'modules', path)
+}
+
+/**
+ * Initializes a submodule (creates the submodule directory structure and copies URL to config)
+ * This is equivalent to `git submodule init <name>` - it copies the submodule URL from
+ * .gitmodules into .git/config, allowing the URL to be overridden in config without
+ * modifying .gitmodules.
+ */
+export async function initSubmodule(
+  this: GitBackendFs,
+  worktreeBackend: GitWorktreeBackend,
+  name: string
+): Promise<void> {
+  const submodule = await this.getSubmoduleByName(worktreeBackend, name)
+  if (!submodule) {
+    throw new Error(`Submodule ${name} not found in .gitmodules`)
+  }
+
+  // Copy submodule URL from .gitmodules to .git/config
+  // This allows the URL to be overridden in config without modifying .gitmodules
+  
+  // Only set the URL in config if it's not already set (don't overwrite user overrides)
+  // We need to use getConfig/setConfig from GitBackendFs
+  try {
+    const existingUrl = await this.getConfig(`submodule.${name}.url`)
+    // IMPORTANT: existingUrl can be undefined, null, or a value.
+    // If it's a value, we don't overwrite it.
+    if (existingUrl === undefined || existingUrl === null) {
+      await this.setConfig(`submodule.${name}.url`, submodule.url, 'local')
+    }
+  } catch {
+    // If getConfig fails (e.g. config doesn't exist yet), set it
+    await this.setConfig(`submodule.${name}.url`, submodule.url, 'local')
+  }
+
+  // Submodule directory in worktree
+  const submoduleDir = submodule.path
+  
+  // Create submodule directory (if it doesn't exist)
+  try {
+    await worktreeBackend.mkdir(submoduleDir)
+  } catch {
+    // Directory might already exist, that's okay
+  }
+
+  // Submodule gitdir in .git/modules
+  const submoduleGitdir = await this.getSubmoduleGitdir(submodule.path)
+  
+  // Create submodule gitdir (if it doesn't exist)
+  // Note: This uses the git backend's FS, not the worktree backend
+  try {
+    await this.getFs().mkdir(submoduleGitdir)
+  } catch {
+    // Directory might already exist, that's okay
+  }
+
+  // Invalidate submodule cache so getSubmodule() will create a fresh Repository instance
+  // This is handled by Repository, but here we just ensure the config is updated
+}
+
+/**
+ * Updates a submodule (clones and checks out the correct commit)
+ * 
+ * Note: The actual clone/checkout would be handled by the high-level API
+ * This is just the low-level utility to ensure structure exists
+ */
+export async function updateSubmodule(
+  this: GitBackendFs,
+  worktreeBackend: GitWorktreeBackend,
+  name: string,
+  commitOid: string
+): Promise<void> {
+  const submodule = await this.getSubmoduleByName(worktreeBackend, name)
+  if (!submodule) {
+    throw new Error(`Submodule ${name} not found in .gitmodules`)
+  }
+
+  // Ensure initialized
+  await this.initSubmodule(worktreeBackend, name)
+
+  // The actual clone and checkout would be handled by the high-level API
+}
+
+/**
+ * Updates a submodule URL in .gitmodules
+ */
+export async function updateSubmoduleUrl(
+  this: GitBackendFs,
+  worktreeBackend: GitWorktreeBackend,
+  name: string,
+  url: string
+): Promise<void> {
+  const content = await this.readGitmodules(worktreeBackend)
+  
+  // Throw error if .gitmodules doesn't exist
+  if (content === null || content === undefined) {
+    const { NotFoundError } = await import('../../errors/NotFoundError.ts')
+    throw new NotFoundError('.gitmodules')
+  }
+  
+  const buffer = UniversalBuffer.isBuffer(content) ? content : UniversalBuffer.from(content as string, 'utf8')
+  const config = parseConfig(buffer)
+
+  config.set(`submodule.${name}.url`, url)
+
+  const updatedConfig = serializeConfig(config)
+  await this.writeGitmodules(worktreeBackend, updatedConfig)
 }
 

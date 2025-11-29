@@ -17,8 +17,6 @@ import {
   type RefUpdate,
 } from '@awesome-os/universal-git-src/git/hooks/serverHooks.ts'
 import { init } from '@awesome-os/universal-git-src/commands/init.ts'
-import { writeRef } from '@awesome-os/universal-git-src/git/refs/writeRef.ts'
-import { readRef } from '@awesome-os/universal-git-src/git/refs/readRef.ts'
 
 /**
  * Helper to create a temporary test repository

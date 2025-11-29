@@ -6,6 +6,7 @@ import { writeTree } from '../../../commands/writeTree.ts'
 import { parse as parseBlob } from '../../../core-utils/parsers/Blob.ts'
 import { getNotesRef } from './readNote.ts'
 import type { FileSystemProvider } from "../../../models/FileSystem.ts"
+import type { GitBackend } from '../../../backends/GitBackend.ts'
 import type { TreeEntry } from "../../../models/GitTree.ts"
 import { UniversalBuffer } from '../../../utils/UniversalBuffer.ts'
 
@@ -13,22 +14,47 @@ import { UniversalBuffer } from '../../../utils/UniversalBuffer.ts'
  * Writes a note for a given object
  */
 export const writeNote = async ({
-  fs,
-  gitdir,
+  gitBackend,
   oid,
   note,
   namespace = 'commits',
   cache = {},
   force = false,
+  // Legacy parameters for backward compatibility
+  fs: _fs,
+  gitdir: _gitdir,
 }: {
-  fs: FileSystemProvider
-  gitdir: string
+  gitBackend?: GitBackend
   oid: string
   note: UniversalBuffer | string
   namespace?: string
   cache?: Record<string, unknown>
   force?: boolean
+  // Legacy parameters for backward compatibility
+  fs?: FileSystemProvider
+  gitdir?: string
 }): Promise<string> => {
+  // Support both new signature (gitBackend) and legacy signature (fs/gitdir)
+  let backend: GitBackend
+  let fs: FileSystemProvider | undefined
+  let gitdir: string | undefined
+  
+  if (gitBackend) {
+    backend = gitBackend
+    gitdir = backend.getGitdir()
+    // Get fs from backend if available (for GitBackendFs)
+    if ('getFs' in backend && typeof backend.getFs === 'function') {
+      fs = backend.getFs()
+    }
+  } else if (_fs && _gitdir) {
+    // Legacy: create a temporary backend
+    const { GitBackendFs } = await import('../../../backends/GitBackendFs/index.ts')
+    backend = new GitBackendFs(_fs, _gitdir)
+    fs = _fs
+    gitdir = _gitdir
+  } else {
+    throw new Error('Either gitBackend or (fs and gitdir) must be provided')
+  }
   const notesRef = getNotesRef(namespace)
   
   // Check if this is the empty tree OID
@@ -37,8 +63,8 @@ export const writeNote = async ({
   // Convert note to buffer
   const noteBuffer = UniversalBuffer.from(note, 'utf8')
 
-  // Write the note blob using writeBlob
-  const noteOid = await writeBlob({ fs, gitdir, blob: noteBuffer })
+  // Write the note blob using gitBackend.writeObject
+  const noteOid = await backend.writeObject('blob', noteBuffer, 'content', undefined, false, cache)
 
   // Notes are stored in a fanout structure: first 2 hex chars / next 2 hex chars / rest
   const fanout1 = oid.slice(0, 2)
@@ -48,7 +74,7 @@ export const writeNote = async ({
   // Get or create the notes tree
   let notesTreeOid: string
   try {
-    const resolved = await readRef({ fs, gitdir, ref: notesRef })
+    const resolved = await backend.readRef(notesRef, 5, cache)
     if (!resolved) throw new Error('Notes ref not found')
     notesTreeOid = resolved
   } catch {
@@ -62,7 +88,7 @@ export const writeNote = async ({
   
   if (notesTreeOid !== EMPTY_TREE_OID) {
     // Read the notes tree
-    const { object: treeObject } = await readObject({ fs, cache, gitdir, oid: notesTreeOid, format: 'content' })
+    const { object: treeObject } = await readObject({ gitBackend: backend, cache, oid: notesTreeOid, format: 'content' })
     // Handle empty buffer (empty tree)
     const treeBuffer = UniversalBuffer.from(treeObject)
     if (treeBuffer.length === 0) {
@@ -98,7 +124,7 @@ export const writeNote = async ({
   // Check if fanout2TreeOid is the empty tree
   let fanout2Entries: any[] = []
   if (fanout2TreeOid !== EMPTY_TREE_OID) {
-    const { object: fanout2TreeObject } = await readObject({ fs, cache, gitdir, oid: fanout2TreeOid, format: 'content' })
+    const { object: fanout2TreeObject } = await readObject({ gitBackend: backend, cache, oid: fanout2TreeOid, format: 'content' })
     // Handle empty buffer (empty tree)
     const fanout2Buffer = UniversalBuffer.isBuffer(fanout2TreeObject) ? fanout2TreeObject : UniversalBuffer.from(fanout2TreeObject as Uint8Array)
     if (fanout2Buffer.length === 0) {
@@ -127,17 +153,21 @@ export const writeNote = async ({
     fanout2Entries.push({ path: fanout2, oid: noteOid, mode: '100644', type: 'blob' })
   }
 
-  // Write the fanout2 tree using writeTree
-  fanout2TreeOid = await writeTree({ fs, gitdir, tree: fanout2Entries })
+  // Write the fanout2 tree using gitBackend.writeObject
+  const { GitTree } = await import('../../../models/GitTree.ts')
+  const objectFormat = await backend.getObjectFormat(cache)
+  const fanout2TreeBuffer = GitTree.from(fanout2Entries, objectFormat).toObject()
+  fanout2TreeOid = await backend.writeObject('tree', fanout2TreeBuffer, 'content', undefined, false, cache)
 
   // Update fanout1 entry
   fanout1Entry.oid = fanout2TreeOid
 
-  // Write the notes tree using writeTree
-  notesTreeOid = await writeTree({ fs, gitdir, tree: treeEntries })
+  // Write the notes tree using gitBackend.writeObject
+  const notesTreeBuffer = GitTree.from(treeEntries, objectFormat).toObject()
+  notesTreeOid = await backend.writeObject('tree', notesTreeBuffer, 'content', undefined, false, cache)
 
   // Update the notes ref
-  await writeRef({ fs, gitdir, ref: notesRef, value: notesTreeOid })
+  await backend.writeRef(notesRef, notesTreeOid, false, cache)
 
   return notesTreeOid
 }
@@ -146,22 +176,47 @@ export const writeNote = async ({
  * Deletes a note for a given object
  */
 export const removeNote = async ({
-  fs,
-  gitdir,
+  gitBackend,
   oid,
   namespace = 'commits',
   cache = {},
+  // Legacy parameters for backward compatibility
+  fs: _fs,
+  gitdir: _gitdir,
 }: {
-  fs: FileSystemProvider
-  gitdir: string
+  gitBackend?: GitBackend
   oid: string
   namespace?: string
   cache?: Record<string, unknown>
+  // Legacy parameters for backward compatibility
+  fs?: FileSystemProvider
+  gitdir?: string
 }): Promise<string | null> => {
+  // Support both new signature (gitBackend) and legacy signature (fs/gitdir)
+  let backend: GitBackend
+  let fs: FileSystemProvider | undefined
+  let gitdir: string | undefined
+  
+  if (gitBackend) {
+    backend = gitBackend
+    gitdir = backend.getGitdir()
+    // Get fs from backend if available (for GitBackendFs)
+    if ('getFs' in backend && typeof backend.getFs === 'function') {
+      fs = backend.getFs()
+    }
+  } else if (_fs && _gitdir) {
+    // Legacy: create a temporary backend
+    const { GitBackendFs } = await import('../../../backends/GitBackendFs/index.ts')
+    backend = new GitBackendFs(_fs, _gitdir)
+    fs = _fs
+    gitdir = _gitdir
+  } else {
+    throw new Error('Either gitBackend or (fs and gitdir) must be provided')
+  }
   const notesRef = getNotesRef(namespace)
 
   try {
-    const notesTreeOid = await readRef({ fs, gitdir, ref: notesRef })
+    const notesTreeOid = await backend.readRef(notesRef, 5, cache)
     if (!notesTreeOid) return null
 
     // Check if this is the empty tree OID
@@ -173,7 +228,7 @@ export const removeNote = async ({
     const rest = oid.slice(4)
 
     // Read the notes tree
-    const { object: treeObject } = await readObject({ fs, cache, gitdir, oid: notesTreeOid, format: 'content' })
+    const { object: treeObject } = await readObject({ gitBackend: backend, cache, oid: notesTreeOid, format: 'content' })
     const { parse: parseTree } = await import('../../../core-utils/parsers/Tree.ts')
     // Handle empty buffer (empty tree)
     const treeBuffer = UniversalBuffer.from(treeObject)
@@ -199,7 +254,7 @@ export const removeNote = async ({
     // Check if fanout2TreeOid is the empty tree
     let fanout2Entries: any[] = []
     if (fanout1Entry.oid !== EMPTY_TREE_OID) {
-      const { object: fanout2TreeObject } = await readObject({ fs, cache, gitdir, oid: fanout1Entry.oid, format: 'content' })
+      const { object: fanout2TreeObject } = await readObject({ gitBackend: backend, cache, oid: fanout1Entry.oid, format: 'content' })
       // Handle empty buffer (empty tree)
       const fanout2Buffer = UniversalBuffer.isBuffer(fanout2TreeObject) ? fanout2TreeObject : UniversalBuffer.from(fanout2TreeObject as Uint8Array)
       if (fanout2Buffer.length === 0) {
@@ -230,22 +285,28 @@ export const removeNote = async ({
 
       // If notes tree is empty, set ref to empty tree OID instead of deleting
       if (treeEntries.length === 0) {
-        await writeRef({ fs, gitdir, ref: notesRef, value: EMPTY_TREE_OID })
+        await backend.writeRef(notesRef, EMPTY_TREE_OID, false, cache)
         return EMPTY_TREE_OID
       }
     } else {
-      // Write the fanout2 tree using writeTree
-      const fanout2TreeOid = await writeTree({ fs, gitdir, tree: fanout2Entries })
+      // Write the fanout2 tree using gitBackend.writeObject
+      const { GitTree } = await import('../../../models/GitTree.ts')
+      const objectFormat = await backend.getObjectFormat(cache)
+      const fanout2TreeBuffer = GitTree.from(fanout2Entries, objectFormat).toObject()
+      const fanout2TreeOid = await backend.writeObject('tree', fanout2TreeBuffer, 'content', undefined, false, cache)
 
       // Update fanout1 entry
       fanout1Entry.oid = fanout2TreeOid
     }
 
-    // Write the notes tree using writeTree
-    const newNotesTreeOid = await writeTree({ fs, gitdir, tree: treeEntries })
+    // Write the notes tree using gitBackend.writeObject
+    const { GitTree } = await import('../../../models/GitTree.ts')
+    const objectFormat = await backend.getObjectFormat(cache)
+    const notesTreeBuffer = GitTree.from(treeEntries, objectFormat).toObject()
+    const newNotesTreeOid = await backend.writeObject('tree', notesTreeBuffer, 'content', undefined, false, cache)
 
     // Update the notes ref
-    await writeRef({ fs, gitdir, ref: notesRef, value: newNotesTreeOid })
+    await backend.writeRef(notesRef, newNotesTreeOid, false, cache)
 
     return newNotesTreeOid
   } catch {

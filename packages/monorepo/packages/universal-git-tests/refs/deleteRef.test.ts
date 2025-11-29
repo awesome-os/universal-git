@@ -6,7 +6,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('deleteRef', async (t) => {
   await t.test('deletes a loose tag', async () => {
     // Setup
-    const { repo } = await makeFixture('test-deleteRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteRef')
     // Test
     await deleteRef({
       repo,
@@ -18,7 +18,7 @@ test('deleteRef', async (t) => {
 
   await t.test('deletes a packed tag', async () => {
     // Setup
-    const { repo } = await makeFixture('test-deleteRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteRef')
     // Test
     await deleteRef({
       repo,
@@ -30,7 +30,7 @@ test('deleteRef', async (t) => {
 
   await t.test('deletes a packed and loose tag', async () => {
     // Setup
-    const { repo } = await makeFixture('test-deleteRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteRef')
     // Test
     await deleteRef({
       repo,
@@ -45,7 +45,7 @@ test('deleteRef', async (t) => {
 
   await t.test('handles error when deleting non-existent ref', async () => {
     // Test - line 38: catch block when ref doesn't exist
-    const { repo } = await makeFixture('test-deleteRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteRef')
     // Should not throw when deleting non-existent ref
     await deleteRef({
       repo,
@@ -56,7 +56,7 @@ test('deleteRef', async (t) => {
 
   await t.test('handles missing packed-refs file', async () => {
     // Test - lines 47-48: catch block when packed-refs doesn't exist
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Should not throw when packed-refs doesn't exist
     await deleteRef({
       repo,
@@ -67,7 +67,7 @@ test('deleteRef', async (t) => {
 
   await t.test('handles error when ref does not exist for reflog', async () => {
     // Test - lines 87-88: catch block when ref doesn't exist for reflog
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Should not throw when ref doesn't exist
     await deleteRef({
       repo,
@@ -78,7 +78,7 @@ test('deleteRef', async (t) => {
 
   await t.test('handles reflog write errors gracefully', async () => {
     // Test - line 103: catch block for reflog errors
-    const { repo } = await makeFixture('test-deleteRef')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteRef')
     // Delete a ref that might have reflog issues
     await deleteRef({
       repo,

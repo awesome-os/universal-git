@@ -16,9 +16,8 @@ test('isBinary', async (t) => {
   for (const file of binaryFiles) {
     await t.test(`ok:${path.extname(file)}-is-binary`, async () => {
       // Setup
-      const { repo } = await makeFixture('test-isBinary', { init: true })
-      const dir = (await repo.getDir())!
-      const buffer = await repo.fs.read(`${dir}/${file}`)
+      const { repo, fs, dir, gitdir } = await makeFixture('test-isBinary', { init: true })
+      const buffer = await fs.read(`${dir}/${file}`)
       // Test
       if (!buffer) throw new Error('Buffer is null')
       const bufferData = typeof buffer === 'string' 
@@ -33,9 +32,8 @@ test('isBinary', async (t) => {
   for (const file of textFiles) {
     await t.test(`ok:${path.extname(file)}-not-binary`, async () => {
       // Setup
-      const { repo } = await makeFixture('test-isBinary', { init: true })
-      const dir = (await repo.getDir())!
-      const buffer = await repo.fs.read(`${dir}/${file}`)
+      const { repo, fs, dir, gitdir } = await makeFixture('test-isBinary', { init: true })
+      const buffer = await fs.read(`${dir}/${file}`)
       // Test
       if (!buffer) throw new Error('Buffer is null')
       const bufferData = typeof buffer === 'string' 

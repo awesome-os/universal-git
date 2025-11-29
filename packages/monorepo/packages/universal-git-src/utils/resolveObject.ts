@@ -11,6 +11,8 @@ import type { FileSystemProvider } from "../models/FileSystem.ts"
 import type { TagObject } from "../models/GitAnnotatedTag.ts"
 import type { CommitObject } from "../models/GitCommit.ts"
 
+import type { GitBackend } from '../backends/GitBackend.ts'
+
 /**
  * Generic object resolver that handles tag peeling and type checking
  * Reduces redundancy across resolveBlob, resolveCommit, resolveTree
@@ -20,15 +22,17 @@ export async function resolveObject<T>(
     fs,
     cache,
     gitdir,
+    gitBackend,
     oid,
     expectedType,
     parser,
     emptyTreeOid,
     objectFormat,
   }: {
-    fs: FileSystemProvider
+    fs?: FileSystemProvider
     cache: Record<string, unknown>
-    gitdir: string
+    gitdir?: string
+    gitBackend?: GitBackend
     oid: string
     expectedType: 'blob' | 'commit' | 'tree'
     parser: (object: UniversalBuffer) => T
@@ -46,13 +50,25 @@ export async function resolveObject<T>(
   // Detect object format for reading if not provided
   let formatToUse = objectFormat
   if (!formatToUse) {
-    const { detectObjectFormat } = await import('./detectObjectFormat.ts')
-    formatToUse = await detectObjectFormat(fs, gitdir)
+    if (gitBackend) {
+      formatToUse = await gitBackend.getObjectFormat(cache)
+    } else if (fs && gitdir) {
+      const { detectObjectFormat } = await import('./detectObjectFormat.ts')
+      formatToUse = await detectObjectFormat(fs, gitdir)
+    } else {
+      formatToUse = 'sha1'
+    }
   }
   
   let result: any
   try {
-    result = await readObject({ fs, cache, gitdir, oid, format: 'content', objectFormat: formatToUse })
+    if (gitBackend) {
+      result = await gitBackend.readObject(oid, 'content', cache)
+    } else if (fs && gitdir) {
+      result = await readObject({ fs, cache, gitdir, oid, format: 'content', objectFormat: formatToUse })
+    } else {
+      throw new Error('Either gitBackend or fs+gitdir must be provided')
+    }
   } catch (error) {
     // If we're looking for a tree and it doesn't exist, fall back to empty tree
     // This handles cases where tree objects are missing from the repository
@@ -78,6 +94,7 @@ export async function resolveObject<T>(
         fs,
         cache,
         gitdir,
+        gitBackend,
         oid: tag.object,
         expectedType,
         parser,
@@ -95,6 +112,7 @@ export async function resolveObject<T>(
         fs,
         cache,
         gitdir,
+        gitBackend,
         oid: treeOid,
         expectedType,
         parser,

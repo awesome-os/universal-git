@@ -19,10 +19,10 @@ test('isIgnored', async (t) => {
   })
 
   await t.test('param:dir-missing', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     try {
       await isIgnored({
-        fs: repo.fs,
+        fs: fs,
         filepath: 'test.txt',
       } as any)
       assert.fail('Should have thrown an error')
@@ -39,11 +39,10 @@ test('isIgnored', async (t) => {
   })
 
   await t.test('param:gitdir-missing', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     try {
       await isIgnored({
-        fs: repo.fs,
+        fs: fs,
         dir,
         filepath: 'test.txt',
       } as any)
@@ -56,7 +55,7 @@ test('isIgnored', async (t) => {
   })
 
   await t.test('param:filepath-missing', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     try {
       await isIgnored({
         repo,
@@ -69,29 +68,25 @@ test('isIgnored', async (t) => {
   })
 
   await t.test('ok:non-ignored-file', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     
     const result = await isIgnored({ repo, filepath: 'test.txt' })
     assert.strictEqual(result, false, 'Non-ignored file should return false')
   })
 
   await t.test('ok:ignored-file', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Create .gitignore file
-    await repo.fs.write(`${dir}/.gitignore`, 'test.txt\n')
+    await fs.write(`${dir}/.gitignore`, 'test.txt\n')
     
     const result = await isIgnored({ repo, filepath: 'test.txt' })
     assert.strictEqual(result, true, 'Ignored file should return true')
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
-    const dir = await repo.getDir()!
-    
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Create .gitignore file
-    await repo.fs.write(`${dir}/.gitignore`, 'ignored.txt\n')
+    await fs.write(`${dir}/.gitignore`, 'ignored.txt\n')
     
     // Test with repo (gitdir should be derived)
     const result = await isIgnored({ repo, filepath: 'ignored.txt' })

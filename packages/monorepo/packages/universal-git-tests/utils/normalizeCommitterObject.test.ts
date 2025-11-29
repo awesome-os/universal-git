@@ -8,7 +8,7 @@ import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.
 describe('normalizeCommitterObject', () => {
   it('ok:return-committer-all-properties', async () => {
     // Setup
-    const { repo } = await makeFixture('test-normalizeAuthorObject', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-normalizeAuthorObject', { init: true })
 
     await setConfig({
       repo,
@@ -45,7 +45,7 @@ describe('normalizeCommitterObject', () => {
 
   it('ok:return-author-values-no-committer', async () => {
     // Setup
-    const { repo } = await makeFixture('test-normalizeAuthorObject', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-normalizeAuthorObject', { init: true })
 
     await setConfig({
       repo,
@@ -72,7 +72,7 @@ describe('normalizeCommitterObject', () => {
 
   it('ok:return-commit-committer-no-provided', async () => {
     // Setup
-    const { repo } = await makeFixture('test-normalizeAuthorObject', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-normalizeAuthorObject', { init: true })
 
     await setConfig({
       repo,
@@ -110,7 +110,7 @@ describe('normalizeCommitterObject', () => {
 
   it('ok:return-config-values-no-provided', async () => {
     // Setup
-    const { repo } = await makeFixture('test-normalizeAuthorObject', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-normalizeAuthorObject', { init: true })
 
     await setConfig({
       repo,
@@ -133,17 +133,16 @@ describe('normalizeCommitterObject', () => {
   })
 
   it('edge:return-undefined-no-value', async () => {
-    // Setup
-    const { repo: _repo } = await makeFixture('test-normalizeAuthorObject', { init: true })
-    const fs = _repo.fs
+    // Setup - use unique fixture to ensure clean config
+    const { repo: _repo, fs: _fs } = await makeFixture('test-normalizeCommitterObject-clean', { init: true })
+    const fs = _fs
     const gitdir = await _repo.getGitdir()
 
     // Disable auto-detection and ignore system/global config to ensure no config values are found
-    const repo = await Repository.open({ fs, gitdir, cache: {}, autoDetectConfig: false, ignoreSystemConfig: true })
+    const repo = await Repository.open({ fs, gitdir, cache: {} })
 
     // Test
-    // With ignoreSystemConfig: true, only local config is read, so if no local config is set,
-    // normalizeCommitterObject should return undefined
+    // With no local config set, normalizeCommitterObject should return undefined
     assert.strictEqual(await normalizeCommitterObject({ repo }), undefined)
   })
 })

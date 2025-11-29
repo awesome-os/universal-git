@@ -6,7 +6,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('expandOid', async (t) => {
   await t.test('ok:expand-short-oid', async () => {
     // Setup
-    const { repo } = await makeFixture('test-expandOid')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-expandOid')
     let oid = '033417ae'
     // Test
     oid = await expandOid({ repo, oid })
@@ -15,7 +15,7 @@ test('expandOid', async (t) => {
 
   await t.test('error:oid-not-found', async () => {
     // Setup
-    const { repo } = await makeFixture('test-expandOid')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-expandOid')
     const oid = '01234567'
     // Test
     let error: unknown = null
@@ -30,7 +30,7 @@ test('expandOid', async (t) => {
 
   await t.test('error:oid-ambiguous', async () => {
     // Setup
-    const { repo } = await makeFixture('test-expandOid')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-expandOid')
     const oid = '033417a'
     // Test
     let error: unknown = null
@@ -45,7 +45,7 @@ test('expandOid', async (t) => {
 
   await t.test('ok:expand-from-packfile', async () => {
     // Setup
-    const { repo } = await makeFixture('test-expandOid')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-expandOid')
     let oid = '5f1f014'
     // Test
     oid = await expandOid({ repo, oid })
@@ -54,7 +54,7 @@ test('expandOid', async (t) => {
 
   await t.test('ok:expand-from-packfile-and-loose', async () => {
     // Setup
-    const { repo } = await makeFixture('test-expandOid')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-expandOid')
     // This object is in the pack file as well as being available loose
     let oid = '0001c3'
     // Test
@@ -72,7 +72,7 @@ test('expandOid', async (t) => {
 
   await t.test('ok:expand-longer-prefix', async () => {
     // Setup
-    const { repo } = await makeFixture('test-expandOid')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-expandOid')
     // Test
     let oid = '033417ae18b174f078f2f44232cb7a374f4c60c'
     oid = await expandOid({ repo, oid })
@@ -81,7 +81,7 @@ test('expandOid', async (t) => {
 
   await t.test('ok:full-oid-returns-same', async () => {
     // Setup
-    const { repo } = await makeFixture('test-expandOid')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-expandOid')
     // Test
     const fullOid = '033417ae18b174f078f2f44232cb7a374f4c60ce'
     const result = await expandOid({ repo, oid: fullOid })
@@ -90,7 +90,7 @@ test('expandOid', async (t) => {
 
   await t.test('ok:minimum-length-prefix', async () => {
     // Setup
-    const { repo } = await makeFixture('test-expandOid')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-expandOid')
     // Test - use a longer prefix that's unique
     // The error shows "03341" matches multiple OIDs (033417a0... and 033417ae...)
     // We need at least 7 characters to disambiguate: "033417a" is still ambiguous,
@@ -102,7 +102,7 @@ test('expandOid', async (t) => {
 
   await t.test('param:cache', async () => {
     // Setup
-    const { repo } = await makeFixture('test-expandOid')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-expandOid')
     const cache = {}
     // Test
     const oid1 = await expandOid({ repo, oid: '033417ae', cache })
@@ -113,7 +113,7 @@ test('expandOid', async (t) => {
 
   await t.test('error:prefix-too-short', async () => {
     // Setup
-    const { repo } = await makeFixture('test-expandOid')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-expandOid')
     // Test - lines 113-114
     let error: unknown = null
     try {
@@ -128,7 +128,7 @@ test('expandOid', async (t) => {
 
   await t.test('error:invalid-full-oid', async () => {
     // Setup
-    const { repo } = await makeFixture('test-expandOid')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-expandOid')
     // Test - lines 108-109: full length but invalid OID
     let error: unknown = null
     try {
@@ -142,7 +142,7 @@ test('expandOid', async (t) => {
 
   await t.test('edge:missing-objects-dir', async () => {
     // Setup - create a repo without objects directory
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Test - lines 144-145: catch block when objects directory doesn't exist
     let error: unknown = null
     try {
@@ -156,7 +156,7 @@ test('expandOid', async (t) => {
 
   await t.test('edge:missing-packfiles-dir', async () => {
     // Setup - create a repo without packfiles
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // Test - lines 180-181: catch block when packfiles don't exist
     let error: unknown = null
     try {
@@ -170,7 +170,7 @@ test('expandOid', async (t) => {
 
   await t.test('behavior:packfile-deltas', async () => {
     // Setup
-    const { repo } = await makeFixture('test-expandOid')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-expandOid')
     // Test - lines 118-123: getExternalRefDelta function
     // This is tested indirectly through packfile expansion, but we can verify it works
     const oid = await expandOid({ repo, oid: '5f1f014' })

@@ -69,6 +69,17 @@ export async function normalizeCommandArgs<T extends Record<string, unknown>>(
   dir?: string
   cache: Record<string, unknown>
 } & Omit<T, 'repo' | 'gitBackend' | 'worktree' | 'fs' | 'dir' | 'gitdir' | 'cache' | 'autoDetectConfig'>> {
+  /*
+  console.log('normalizeCommandArgs called with:', { 
+    hasRepo: !!args.repo, 
+    hasGitBackend: !!args.gitBackend, 
+    hasWorktree: !!args.worktree, 
+    hasFs: !!args.fs, 
+    dir: args.dir, 
+    gitdir: args.gitdir 
+  })
+  */
+
   let repo: Repository
   let fs: FileSystemProvider
   let gitdir: string
@@ -77,9 +88,13 @@ export async function normalizeCommandArgs<T extends Record<string, unknown>>(
   let gitBackend: GitBackend | undefined = args.gitBackend
   let worktree: GitWorktreeBackend | undefined = args.worktree
 
-  if (args.repo) {
+    if (args.repo) {
     // repo is provided - extract everything from it
     repo = args.repo
+    gitBackend = repo.gitBackend
+    // Prefer repo.worktreeBackend, but allow override/fallback from args.worktree
+    // This is useful when calling checkout(worktreeBackend) where we set the backend but want to ensure it's passed through
+    worktree = repo.worktreeBackend || args.worktree || undefined
     
     // Get filesystem from backend if available (needed for legacy code paths that still use fs directly)
     // If args.fs is provided, use it (for backward compatibility)
@@ -206,5 +221,7 @@ export async function normalizeCommandArgs<T extends Record<string, unknown>>(
     gitdir,
     dir,
     cache,
+    gitBackend,
+    worktreeBackend: worktree,
   } as any
 }

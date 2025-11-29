@@ -29,6 +29,7 @@ export type ObjectFormat = 'deflated' | 'wrapped' | 'content'
  * @param oid - Object ID (SHA-1 or SHA-256)
  * @param format - Format to return object in ('deflated', 'wrapped', or 'content')
  * @param objectFormat - Object format ('sha1' or 'sha256'), will detect if not provided
+ * @param gitBackend - Optional GitBackend to use for reading objects
  * @returns Promise resolving to the read object result
  */
 const ObjectCache = Symbol('ObjectCache')
@@ -40,14 +41,34 @@ export async function readObject({
   oid,
   format = 'content',
   objectFormat,
+  gitBackend,
 }: {
-  fs: FileSystemProvider
+  fs?: FileSystemProvider
   cache: Record<string | symbol, unknown>
-  gitdir: string
+  gitdir?: string
   oid: string
   format?: ObjectFormat
   objectFormat?: HashObjectFormat
+  gitBackend?: import('../../backends/GitBackend.ts').GitBackend
 }): Promise<ReadResult> {
+  // Delegate to gitBackend if provided
+  if (gitBackend) {
+    // If cache is provided, use it. Otherwise use the cache from parameters if it matches.
+    // gitBackend.readObject takes cache as last argument.
+    const result = await gitBackend.readObject(oid, format, cache as Record<string, unknown>)
+    // Convert backend result to internal ReadResult if needed
+    // The types should match or be compatible
+    return result as ReadResult
+  }
+
+  // Fallback to fs/gitdir checks
+  if (!fs) {
+    throw new InternalError('readObject: fs is required if gitBackend is not provided')
+  }
+  if (!gitdir) {
+    throw new InternalError('readObject: gitdir is required if gitBackend is not provided')
+  }
+
   // OPTIMIZATION: Cache read objects to avoid re-reading the same object multiple times
   // This is especially beneficial during merge operations where the same tree objects
   // are read multiple times (ours, base, theirs)

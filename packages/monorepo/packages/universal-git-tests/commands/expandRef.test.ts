@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { expandRef, writeRef } from '@awesome-os/universal-git-src/index.ts'
+import { expandRef } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { MissingParameterError } from '@awesome-os/universal-git-src/errors/MissingParameterError.ts'
 import { NotFoundError } from '@awesome-os/universal-git-src/errors/NotFoundError.ts'
@@ -9,7 +9,7 @@ test('expandRef', async (t) => {
 
 
   await t.test('param:gitdir-missing', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // When repo is provided, dir/gitdir are not required
     // This test verifies that expandRef works with just repo (new pattern)
     // If main doesn't exist, it will throw NotFoundError, which is expected
@@ -27,7 +27,7 @@ test('expandRef', async (t) => {
   })
 
   await t.test('param:ref-missing', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     try {
       await expandRef({
         repo,
@@ -40,70 +40,70 @@ test('expandRef', async (t) => {
   })
 
   await t.test('ok:full-sha-40-chars', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const sha = 'a'.repeat(40)
     const result = await expandRef({ repo, ref: sha })
     assert.strictEqual(result, sha)
   })
 
   await t.test('ok:full-sha-alphanumeric', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     const sha = '0123456789abcdef0123456789abcdef01234567'
     const result = await expandRef({ repo, ref: sha })
     assert.strictEqual(result, sha)
   })
 
   await t.test('ok:expands-branch-name', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     await repo.gitBackend.writeRef('refs/heads/main', 'a'.repeat(40))
     const result = await repo.gitBackend.expandRef('main')
     assert.strictEqual(result, 'refs/heads/main')
   })
 
   await t.test('ok:expands-tag-name', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     await repo.gitBackend.writeRef('refs/tags/v1.0.0', 'a'.repeat(40))
     const result = await repo.gitBackend.expandRef('v1.0.0')
     assert.strictEqual(result, 'refs/tags/v1.0.0')
   })
 
   await t.test('ok:expands-refs-heads', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     await repo.gitBackend.writeRef('refs/heads/main', 'a'.repeat(40))
     const result = await repo.gitBackend.expandRef('refs/heads/main')
     assert.strictEqual(result, 'refs/heads/main')
   })
 
   await t.test('ok:expands-refs-tags', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     await repo.gitBackend.writeRef('refs/tags/v1.0.0', 'a'.repeat(40))
     const result = await repo.gitBackend.expandRef('refs/tags/v1.0.0')
     assert.strictEqual(result, 'refs/tags/v1.0.0')
   })
 
   await t.test('ok:expands-refs-remotes', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     await repo.gitBackend.writeRef('refs/remotes/origin/main', 'a'.repeat(40))
     const result = await repo.gitBackend.expandRef('refs/remotes/origin/main')
     assert.strictEqual(result, 'refs/remotes/origin/main')
   })
 
   await t.test('ok:expands-remote-branch', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     await repo.gitBackend.writeRef('refs/remotes/origin/main', 'a'.repeat(40))
     const result = await repo.gitBackend.expandRef('origin/main')
     assert.strictEqual(result, 'refs/remotes/origin/main')
   })
 
   await t.test('ok:expands-refs-remotes-HEAD', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     await repo.gitBackend.writeRef('refs/remotes/origin/HEAD', 'a'.repeat(40))
     const result = await repo.gitBackend.expandRef('origin/HEAD')
     assert.strictEqual(result, 'refs/remotes/origin/HEAD')
   })
 
   await t.test('error:NotFoundError', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     try {
       await expandRef({ repo, ref: 'nonexistent' })
       assert.fail('Should have thrown NotFoundError')
@@ -114,7 +114,7 @@ test('expandRef', async (t) => {
   })
 
   await t.test('ok:expands-packed-refs', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a packed ref using backend method
     const packedRefsContent = `# pack-refs with: peeled fully-peeled sorted
 ${'a'.repeat(40)} refs/heads/packed-branch
@@ -125,7 +125,7 @@ ${'a'.repeat(40)} refs/heads/packed-branch
   })
 
   await t.test('behavior:prefers-loose-refs', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a loose ref using backend method
     await repo.gitBackend.writeRef('refs/heads/test-branch', 'b'.repeat(40))
     // Create a packed ref with same name but different value
@@ -141,14 +141,14 @@ ${'a'.repeat(40)} refs/heads/test-branch
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     await repo.gitBackend.writeRef('refs/heads/main', 'a'.repeat(40))
     const result = await repo.gitBackend.expandRef('main')
     assert.strictEqual(result, 'refs/heads/main')
   })
 
   await t.test('error:caller-property', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     try {
       await expandRef({ repo, ref: 'nonexistent-ref' })
       assert.fail('Should have thrown NotFoundError')
@@ -158,7 +158,7 @@ ${'a'.repeat(40)} refs/heads/test-branch
   })
 
   await t.test('rejects partial SHA (less than 40 characters)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Partial SHA should not be treated as complete SHA
     try {
       await expandRef({ repo, ref: 'a'.repeat(39) })
@@ -170,7 +170,7 @@ ${'a'.repeat(40)} refs/heads/test-branch
   })
 
   await t.test('rejects invalid SHA format (non-hex characters)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Invalid SHA with non-hex characters
     const invalidSha = 'g'.repeat(40)
     try {
@@ -182,7 +182,7 @@ ${'a'.repeat(40)} refs/heads/test-branch
   })
 
   await t.test('handles refs with special characters', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a ref with special characters using backend method
     await repo.gitBackend.writeRef('refs/heads/feature/branch-name', 'a'.repeat(40))
     const result = await repo.gitBackend.expandRef('feature/branch-name')
@@ -190,7 +190,7 @@ ${'a'.repeat(40)} refs/heads/test-branch
   })
 
   await t.test('handles HEAD ref expansion', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // HEAD should be found directly (first in refpaths is exact match)
     // After init, HEAD should already exist, but let's ensure it does
     if (!(await repo.gitBackend.existsFile('HEAD'))) {
@@ -203,7 +203,7 @@ ${'a'.repeat(40)} refs/heads/test-branch
   })
 
   await t.test('handles corrupted packed-refs gracefully', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create corrupted packed-refs (invalid format)
     const corruptedContent = 'This is not a valid packed-refs file\n'
     await repo.gitBackend.writePackedRefs(corruptedContent)
@@ -219,7 +219,7 @@ ${'a'.repeat(40)} refs/heads/test-branch
   })
 
   await t.test('handles empty packed-refs file', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create empty packed-refs
     await repo.gitBackend.writePackedRefs('')
     
@@ -233,7 +233,7 @@ ${'a'.repeat(40)} refs/heads/test-branch
   })
 
   await t.test('handles fs.exists throwing error', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // This test verifies that errors from backend methods are caught
     // We can't easily simulate errors, but we can verify
     // normal behavior when ref doesn't exist
@@ -246,21 +246,21 @@ ${'a'.repeat(40)} refs/heads/test-branch
   })
 
   await t.test('handles refs/remotes/ with multiple slashes', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     await repo.gitBackend.writeRef('refs/remotes/origin/feature/branch', 'a'.repeat(40))
     const result = await repo.gitBackend.expandRef('origin/feature/branch')
     assert.strictEqual(result, 'refs/remotes/origin/feature/branch')
   })
 
   await t.test('handles refs/remotes/HEAD expansion with multiple slashes', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     await repo.gitBackend.writeRef('refs/remotes/origin/feature/HEAD', 'a'.repeat(40))
     const result = await repo.gitBackend.expandRef('origin/feature/HEAD')
     assert.strictEqual(result, 'refs/remotes/origin/feature/HEAD')
   })
 
   await t.test('handles packed-refs with peeled tags', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create packed-refs with peeled tag
     const packedRefsContent = `# pack-refs with: peeled fully-peeled sorted
 ${'a'.repeat(40)} refs/tags/v1.0.0
@@ -272,7 +272,7 @@ ${'b'.repeat(40)} refs/tags/v1.0.0^{}
   })
 
   await t.test('handles refs/refs/ prefix (double prefix)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // refs/refs/heads/main should be checked in refpaths
     await repo.gitBackend.writeRef('refs/refs/heads/main', 'a'.repeat(40))
     const result = await repo.gitBackend.expandRef('refs/heads/main')
@@ -280,7 +280,7 @@ ${'b'.repeat(40)} refs/tags/v1.0.0^{}
   })
 
   await t.test('handles packed-refs when fs.read returns Buffer', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create packed-refs file
     const packedRefsContent = `# pack-refs with: peeled fully-peeled sorted
 ${'a'.repeat(40)} refs/heads/packed-from-buffer
@@ -293,7 +293,7 @@ ${'a'.repeat(40)} refs/heads/packed-from-buffer
   })
 
   await t.test('handles ref found in packed-refs when loose ref does not exist', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create packed-refs with a ref that doesn't exist as loose ref
     const packedRefsContent = `# pack-refs with: peeled fully-peeled sorted
 ${'a'.repeat(40)} refs/heads/only-in-packed
@@ -306,7 +306,7 @@ ${'a'.repeat(40)} refs/heads/only-in-packed
   })
 
   await t.test('checks refpaths in correct order (refs/tags/ before refs/heads/)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create both a branch and tag with the same name using backend methods directly
     await repo.gitBackend.writeRef('refs/heads/test', 'a'.repeat(40))
     await repo.gitBackend.writeRef('refs/tags/test', 'b'.repeat(40))
@@ -317,7 +317,7 @@ ${'a'.repeat(40)} refs/heads/only-in-packed
   })
 
   await t.test('checks refs/ before refs/tags/ and refs/heads/', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create refs/test (direct refs/ path) - comes after exact match but before tags/heads
     await repo.gitBackend.writeRef('refs/test', 'a'.repeat(40))
     await repo.gitBackend.writeRef('refs/heads/test', 'b'.repeat(40))
@@ -334,7 +334,7 @@ ${'a'.repeat(40)} refs/heads/only-in-packed
   })
 
   await t.test('checks exact ref match before other paths', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create exact ref match (first in refpaths) using backend methods directly
     await repo.gitBackend.writeRef('test', 'a'.repeat(40))
     await repo.gitBackend.writeRef('refs/test', 'b'.repeat(40))
@@ -346,7 +346,7 @@ ${'a'.repeat(40)} refs/heads/only-in-packed
   })
 
   await t.test('handles SHA with uppercase hex characters', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // SHA with uppercase should not match the regex (lowercase only)
     const sha = 'A'.repeat(40)
     try {
@@ -360,7 +360,7 @@ ${'a'.repeat(40)} refs/heads/only-in-packed
   })
 
   await t.test('handles SHA validation edge case (exactly 40 chars but invalid)', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     // 40 characters but contains invalid hex character
     const invalidSha = 'a'.repeat(39) + 'g'
     try {
@@ -373,7 +373,7 @@ ${'a'.repeat(40)} refs/heads/only-in-packed
   })
 
   await t.test('handles packed-refs read error gracefully', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a ref that exists as loose ref using backend method
     await repo.gitBackend.writeRef('refs/heads/test', 'a'.repeat(40))
     
@@ -383,7 +383,7 @@ ${'a'.repeat(40)} refs/heads/only-in-packed
   })
 
   await t.test('handles ref found in packed-refs when fs.exists returns false', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create packed-refs with a ref
     const packedRefsContent = `# pack-refs with: peeled fully-peeled sorted
 ${'a'.repeat(40)} refs/tags/packed-tag

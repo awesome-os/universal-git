@@ -6,7 +6,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('deleteTag', async (t) => {
   await t.test('ok:basic', async () => {
     // Setup
-    const { repo } = await makeFixture('test-deleteTag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteTag')
     // Test
     await deleteTag({
       repo,
@@ -20,7 +20,7 @@ test('deleteTag', async (t) => {
 
   await t.test('param:ref-missing', async () => {
     // Setup
-    const { repo } = await makeFixture('test-deleteTag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteTag')
     const { Errors } = await import('@awesome-os/universal-git-src/index.ts')
     let error = null
     // Test
@@ -49,21 +49,21 @@ test('deleteTag', async (t) => {
   })
 
   await t.test('param:repo-provided', async () => {
-    const { repo } = await makeFixture('test-deleteTag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteTag')
     await deleteTag({ repo, ref: 'latest' })
     const tags = await listTags({ repo })
     assert.deepStrictEqual(tags, ['prev'])
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-deleteTag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteTag')
     await deleteTag({ repo, ref: 'latest' })
     const tags = await listTags({ repo })
     assert.deepStrictEqual(tags, ['prev'])
   })
 
   await t.test('error:caller-property', async () => {
-    const { repo } = await makeFixture('test-deleteTag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteTag')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await deleteTag({
@@ -78,7 +78,7 @@ test('deleteTag', async (t) => {
   })
 
   await t.test('edge:non-existent-tag', async () => {
-    const { repo } = await makeFixture('test-deleteTag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-deleteTag')
     const { Errors } = await import('@awesome-os/universal-git-src/index.ts')
     try {
       await deleteTag({ repo, ref: 'nonexistent-tag' })

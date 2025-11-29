@@ -150,8 +150,8 @@ export async function checkout({
     
     // Always use _checkout() to ensure consistent behavior and support for onPostCheckout
     // Repository.checkout() doesn't support onPostCheckout, so we use _checkout() for all cases
-    if (!effectiveDir) {
-      // If dir is missing, throw MissingParameterError immediately
+    if (!effectiveDir && !repo?.worktreeBackend) {
+      // If dir is missing AND we don't have a worktree backend, throw MissingParameterError
       // The bare repository check will happen in _checkout() if needed
       throw new MissingParameterError('dir')
     }
@@ -246,8 +246,9 @@ export async function _checkout({
         if (value) return value
       }
     }
-    if (fallback) return fallback
-    throw new MissingParameterError('dir (required when worktreeBackend does not provide getDirectory())')
+    // Fallback to empty string if fallback is not provided, assuming relative paths or CWD
+    if (fallback !== undefined) return fallback
+    return '' 
   }
 
   const resolveWorktreeGitdir = (
@@ -257,7 +258,11 @@ export async function _checkout({
     if (backend && typeof (backend as any).getGitdir === 'function') {
       return (backend as any).getGitdir()
     }
-    if (fallback) return fallback
+    // Fallback to empty string if fallback is not provided, but gitdir is usually required
+    if (fallback !== undefined) return fallback
+    // If no gitdir can be resolved, we might be in trouble for FS operations
+    // But for abstract backend operations it might be okay?
+    // Let's assume fallback is required if backend doesn't provide it
     throw new MissingParameterError('gitdir (required when gitBackend does not provide getGitdir())')
   }
 
@@ -282,6 +287,7 @@ export async function _checkout({
     // Create Worktree from Repository
   } else if (fs && dir && gitdir) {
     // Fallback: create Repository to get backends (for backward compatibility)
+    // Dynamic import to avoid circular dependency
     const { createRepository } = await import('../core-utils/createRepository.ts')
     repo = await createRepository({ fs, dir, gitdir, cache, autoDetectConfig: true })
     const worktree = repo.getWorktree()
@@ -292,8 +298,13 @@ export async function _checkout({
     gitBackend = repo.gitBackend
     // Get worktree backend from repository (it has a getter property)
     worktreeBackend = repo.worktreeBackend
-    worktreeGitdir = await worktree.getGitdir()
-    worktreeDir = worktree.dir
+    if (worktree.getGitdir) {
+      worktreeGitdir = await worktree.getGitdir()
+    } else {
+      // Fallback if worktree.getGitdir is missing (e.g. if worktree is just the backend)
+      worktreeGitdir = await repo.getGitdir()
+    }
+    worktreeDir = worktree.dir || (worktreeBackend.getDirectory ? worktreeBackend.getDirectory() : undefined) || dir
   } else {
     throw new MissingParameterError('gitBackend and worktreeBackend, or fs, dir, and gitdir')
   }

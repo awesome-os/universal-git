@@ -218,44 +218,8 @@ export async function hasMultiPackIndex(this: GitBackendFs): Promise<boolean> {
 
 export async function getObjectFormat(this: GitBackendFs, cache?: Record<string, unknown>): Promise<'sha1' | 'sha256'> {
   // OPTIMIZATION: Cache object format per gitdir to avoid repeated config reads
-  const cacheKey = 'objectFormat'
-  if (cache && cache[cacheKey]) {
-    return cache[cacheKey] as 'sha1' | 'sha256'
-  }
-  
-  try {
-    const configBuffer = await this.readConfig()
-    if (configBuffer.length === 0) {
-      const format: 'sha1' | 'sha256' = 'sha1'
-      if (cache) cache[cacheKey] = format
-      return format
-    }
-    
-    const configContent = configBuffer.toString('utf8')
-    const lines = configContent.split('\n')
-    let inExtensions = false
-    for (const line of lines) {
-      const trimmed = line.trim()
-      if (trimmed === '[extensions]') {
-        inExtensions = true
-      } else if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-        inExtensions = false
-      } else if (inExtensions && trimmed.startsWith('objectformat')) {
-        const match = trimmed.match(/objectformat\s*=\s*(\w+)/i)
-        if (match && match[1].toLowerCase() === 'sha256') {
-          const format: 'sha1' | 'sha256' = 'sha256'
-          if (cache) cache[cacheKey] = format
-          return format
-        }
-      }
-    }
-  } catch {
-    // Config file doesn't exist or can't be read, default to SHA-1
-  }
-  
-  const format: 'sha1' | 'sha256' = 'sha1'
-  if (cache) cache[cacheKey] = format
-  return format
+  const { detectObjectFormat } = await import('../../utils/detectObjectFormat.ts')
+  return detectObjectFormat(this.getFs(), this.getGitdir(), cache, this)
 }
 
 export async function setObjectFormat(this: GitBackendFs, objectFormat: 'sha1' | 'sha256'): Promise<void> {

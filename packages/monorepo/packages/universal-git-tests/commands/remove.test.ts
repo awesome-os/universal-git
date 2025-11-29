@@ -6,7 +6,7 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 describe('remove', () => {
   it('ok:file', async () => {
     // Setup
-    const { repo } = await makeFixture('test-remove', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-remove', { init: true })
     // Test
     const before = await listFiles({ repo })
     assert.ok(before.length > 0)
@@ -19,7 +19,7 @@ describe('remove', () => {
   
   it('ok:dir', async () => {
     // Setup
-    const { repo } = await makeFixture('test-remove', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-remove', { init: true })
     // Test
     const before = await listFiles({ repo })
     assert.ok(before.length > 0)
@@ -45,7 +45,7 @@ describe('remove', () => {
   })
 
   it('param:filepath-missing', async () => {
-    const { repo } = await makeFixture('test-remove', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-remove', { init: true })
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await remove({
@@ -59,7 +59,7 @@ describe('remove', () => {
   })
 
   it('param:repo-provided', async () => {
-    const { repo } = await makeFixture('test-remove', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-remove', { init: true })
     const before = await listFiles({ repo })
     assert.ok(before.includes('LICENSE.md'))
     await remove({ repo, filepath: 'LICENSE.md' })
@@ -68,7 +68,7 @@ describe('remove', () => {
   })
 
   it('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-remove', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-remove', { init: true })
     const before = await listFiles({ repo })
     // Check if LICENSE.md exists in this fixture
     if (before.includes('LICENSE.md')) {
@@ -82,7 +82,7 @@ describe('remove', () => {
   })
 
   it('error:caller-property', async () => {
-    const { repo } = await makeFixture('test-remove', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-remove', { init: true })
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await remove({
@@ -96,7 +96,7 @@ describe('remove', () => {
   })
 
   it('edge:non-existent-file', async () => {
-    const { repo } = await makeFixture('test-remove', { init: true })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-remove', { init: true })
     // Try to remove a file that doesn't exist
     try {
       await remove({ repo, filepath: 'non-existent-file.txt' })
@@ -108,11 +108,10 @@ describe('remove', () => {
   })
 
   it('edge:special-chars-path', async () => {
-    const { repo } = await makeFixture('test-remove', { init: true })
-    const dir = await repo.getDir()!
+    const { repo, fs, dir, gitdir } = await makeFixture('test-remove', { init: true })
     // First add a file with special characters
     const { add } = await import('@awesome-os/universal-git-src/index.ts')
-    await repo.fs.write(`${dir}/file-with-special-chars.txt`, 'content')
+    await fs.write(`${dir}/file-with-special-chars.txt`, 'content')
     await add({ repo, filepath: 'file-with-special-chars.txt' })
     // Then remove it
     await remove({ repo, filepath: 'file-with-special-chars.txt' })

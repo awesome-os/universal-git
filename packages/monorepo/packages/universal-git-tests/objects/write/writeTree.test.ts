@@ -7,7 +7,7 @@ import { computeTreeOid } from '@awesome-os/universal-git-test-helpers/helpers/d
 test('writeTree', async (t) => {
   await t.test('ok:tree', async () => {
     // Setup
-    const { repo } = await makeFixture('test-writeTree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeTree')
     // Test
     const oid = await writeTree({
       repo,
@@ -128,7 +128,7 @@ test('writeTree', async (t) => {
 
   await t.test('ok:tree-entries-sorted', async () => {
     // Setup
-    const { repo } = await makeFixture('test-writeTree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeTree')
     // Test
     const oid = await writeTree({
       repo,
@@ -184,7 +184,7 @@ test('writeTree', async (t) => {
   })
 
   await t.test('param:tree-missing', async () => {
-    const { repo } = await makeFixture('test-writeTree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeTree')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await writeTree({
@@ -198,7 +198,7 @@ test('writeTree', async (t) => {
   })
 
   await t.test('param:dryRun', async () => {
-    const { repo } = await makeFixture('test-writeTree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeTree')
     const oid = await writeTree({
       repo,
       tree: [{ mode: '100644', path: 'file.txt', oid: 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', type: 'blob' }],
@@ -218,7 +218,7 @@ test('writeTree', async (t) => {
   })
 
   await t.test('param:repo-provided', async () => {
-    const { repo } = await makeFixture('test-writeTree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeTree')
     const oid = await writeTree({
       repo,
       tree: [{ mode: '100644', path: 'file.txt', oid: 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', type: 'blob' }],
@@ -229,10 +229,9 @@ test('writeTree', async (t) => {
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { repo } = await makeFixture('test-writeTree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeTree')
     // Using helper function for OID computation only
-    const dir = (await repo.getDir())!
-    const oid = await computeTreeOid(repo.fs, {
+    const oid = await computeTreeOid(fs, {
       dir,
       tree: [{ mode: '100644', path: 'file.txt', oid: 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', type: 'blob' }],
     })
@@ -241,7 +240,7 @@ test('writeTree', async (t) => {
   })
 
   await t.test('error:caller-property', async () => {
-    const { repo } = await makeFixture('test-writeTree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeTree')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await writeTree({
@@ -255,10 +254,9 @@ test('writeTree', async (t) => {
   })
 
   await t.test('edge:empty-tree', async () => {
-    const { repo } = await makeFixture('test-writeTree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeTree')
     // Using helper function for OID computation only
-    const gitdir = await repo.getGitdir()
-    const oid = await computeTreeOid(repo.fs, {
+    const oid = await computeTreeOid(fs, {
       gitdir,
       tree: [],
     })
@@ -267,7 +265,7 @@ test('writeTree', async (t) => {
   })
 
   await t.test('param:objectFormat', async () => {
-    const { repo } = await makeFixture('test-writeTree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeTree')
     const oid = await writeTree({
       repo,
       tree: [{ mode: '100644', path: 'file.txt', oid: 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', type: 'blob' }],
@@ -279,10 +277,9 @@ test('writeTree', async (t) => {
   })
 
   await t.test('ok:tree-nested-directories', async () => {
-    const { repo } = await makeFixture('test-writeTree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-writeTree')
     // Using helper function for OID computation only
-    const gitdir = await repo.getGitdir()
-    const oid = await computeTreeOid(repo.fs, {
+    const oid = await computeTreeOid(fs, {
       gitdir,
       tree: [
         { mode: '100644', path: 'file1.txt', oid: 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', type: 'blob' },

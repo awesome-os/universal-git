@@ -3,11 +3,15 @@ import assert from 'node:assert'
 import { acquireLock, writeTreeChanges, applyTreeChanges } from '@awesome-os/universal-git-src/utils/walkerToTreeEntryMap.ts'
 import { TREE } from '@awesome-os/universal-git-src/commands/TREE.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { init, add, commit, readCommit, listFiles } from '@awesome-os/universal-git-src/index.ts'
+import { init, add, listFiles } from '@awesome-os/universal-git-src/index.ts'
+import { parse as parseCommit } from '@awesome-os/universal-git-src/core-utils/parsers/Commit.ts'
+import { GitTree } from '@awesome-os/universal-git-src/models/GitTree.ts'
+
+const testAuthor = { name: 'Test User', email: 'test@example.com' }
 
 test('walkerToTreeEntryMap', async (t) => {
   await t.test('behavior:acquireLock-serializes-concurrent', async () => {
-    const { repo } = await makeFixture('test-lock')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-lock')
     await init({ repo })
     
     let executionOrder: number[] = []
@@ -36,7 +40,7 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('behavior:acquireLock-different-keys-parallel', async () => {
-    const { repo } = await makeFixture('test-lock-parallel')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-lock-parallel')
     await init({ repo })
     
     let executionOrder: number[] = []
@@ -69,7 +73,7 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('param:acquireLock-filepath-object', async () => {
-    const { repo } = await makeFixture('test-lock-filepath')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-lock-filepath')
     await init({ repo })
     
     const result = await acquireLock({ filepath: 'test.txt' }, async () => {
@@ -80,12 +84,12 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:writeTreeChanges-returns-null-no-changes', async () => {
-    const { repo } = await makeFixture('test-write-tree-no-changes')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-write-tree-no-changes')
     await init({ repo })
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    await commit({ repo, message: 'initial commit' })
+    await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // HEAD vs STAGE with no changes
     const result = await writeTreeChanges({
@@ -97,12 +101,12 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:writeTreeChanges-creates-tree-staged', async () => {
-    const { repo } = await makeFixture('test-write-tree-staged')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-write-tree-staged')
     await init({ repo })
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    await commit({ repo, message: 'initial commit' })
+    await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Modify and stage
     await repo.worktreeBackend!.write('test.txt', 'modified')
@@ -120,12 +124,12 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:writeTreeChanges-creates-tree-workdir', async () => {
-    const { repo } = await makeFixture('test-write-tree-workdir')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-write-tree-workdir')
     await init({ repo })
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    await commit({ repo, message: 'initial commit' })
+    await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Modify workdir (but don't stage)
     await repo.worktreeBackend!.write('test.txt', 'modified')
@@ -142,12 +146,12 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:writeTreeChanges-handles-deletions', async () => {
-    const { repo } = await makeFixture('test-write-tree-delete')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-write-tree-delete')
     await init({ repo })
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    await commit({ repo, message: 'initial commit' })
+    await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Delete file from workdir
     await repo.worktreeBackend!.rm('test.txt')
@@ -163,12 +167,12 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:writeTreeChanges-handles-new-files', async () => {
-    const { repo } = await makeFixture('test-write-tree-new')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-write-tree-new')
     await init({ repo })
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    await commit({ repo, message: 'initial commit' })
+    await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Add new file
     await repo.worktreeBackend!.write('new.txt', 'new file')
@@ -185,13 +189,13 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:writeTreeChanges-handles-nested-dirs', async () => {
-    const { repo } = await makeFixture('test-write-tree-nested')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-write-tree-nested')
     await init({ repo })
     
     await repo.worktreeBackend!.mkdir('nested', { recursive: true })
     await repo.worktreeBackend!.write('nested/file.txt', 'nested file')
     await add({ repo, filepath: 'nested/file.txt' })
-    await commit({ repo, message: 'initial commit' })
+    await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Modify nested file
     await repo.worktreeBackend!.write('nested/file.txt', 'modified nested')
@@ -206,17 +210,17 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:applyTreeChanges-applies-to-workdir', async () => {
-    const { repo } = await makeFixture('test-apply-tree')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-apply-tree')
     await init({ repo })
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    const commit1 = await commit({ repo, message: 'initial commit' })
+    const commit1 = await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Create a stash commit with changes
     await repo.worktreeBackend!.write('test.txt', 'stashed')
     await add({ repo, filepath: 'test.txt' })
-    const stashCommit = await commit({ repo, message: 'stash commit' })
+    const stashCommit = await repo.gitBackend.commit(repo.worktreeBackend!, 'stash commit', { author: testAuthor })
     
     // Reset to initial commit
     await repo.worktreeBackend!.write('test.txt', 'initial')
@@ -235,17 +239,17 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('param:applyTreeChanges-wasStaged', async () => {
-    const { repo } = await makeFixture('test-apply-tree-staged')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-apply-tree-staged')
     await init({ repo })
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    const commit1 = await commit({ repo, message: 'initial commit' })
+    const commit1 = await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Create a stash commit with staged changes
     await repo.worktreeBackend!.write('test.txt', 'stashed')
     await add({ repo, filepath: 'test.txt' })
-    const stashCommit = await commit({ repo, message: 'stash commit' })
+    const stashCommit = await repo.gitBackend.commit(repo.worktreeBackend!, 'stash commit', { author: testAuthor })
     
     // Reset to initial commit
     await repo.worktreeBackend!.write('test.txt', 'initial')
@@ -269,30 +273,29 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:applyTreeChanges-handles-deletions', async () => {
-    const { repo } = await makeFixture('test-apply-tree-delete')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-apply-tree-delete')
     await init({ repo })
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    const commit1 = await commit({ repo, message: 'initial commit' })
+    const commit1 = await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Create a stash commit that deletes the file
     // Instead of trying to commit an empty index, create a commit with an empty tree
     // This simulates a stash that deletes all files
-    const { readCommit, writeTree, commit: commitCmd } = await import('@awesome-os/universal-git-src/index.ts')
-    const parentCommitObj = await readCommit({ repo, oid: commit1 })
+    const { object: parentCommitBuffer } = await repo.gitBackend.readObject(commit1, 'content', repo.cache)
+    const parentCommitObj = parseCommit(parentCommitBuffer)
+
     // Create an empty tree (no entries)
-    const emptyTreeOid = await writeTree({ repo, tree: [] })
+    const emptyTreeBuf = GitTree.from([], await repo.gitBackend.getObjectFormat(repo.cache)).toObject()
+    const emptyTreeOid = await repo.gitBackend.writeObject('tree', emptyTreeBuf, 'content', undefined, false, repo.cache)
+
     // Create a commit with the empty tree
-    const stashCommit = await commitCmd({
-      fs,
-      dir,
-      gitdir,
+    const stashCommit = await repo.gitBackend.commit(repo.worktreeBackend!, 'stash delete', {
       tree: emptyTreeOid,
       parent: [commit1],
-      message: 'stash delete',
-      author: parentCommitObj.commit.author,
-      committer: parentCommitObj.commit.committer,
+      author: parentCommitObj.author,
+      committer: parentCommitObj.committer,
     })
     
     // Restore file
@@ -312,17 +315,17 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:applyTreeChanges-handles-new-files', async () => {
-    const { repo } = await makeFixture('test-apply-tree-new')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-apply-tree-new')
     await init({ repo })
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    const commit1 = await commit({ repo, message: 'initial commit' })
+    const commit1 = await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Create a stash commit with new file
     await repo.worktreeBackend!.write('new.txt', 'new file')
     await add({ repo, filepath: 'new.txt' })
-    const stashCommit = await commit({ repo, message: 'stash new' })
+    const stashCommit = await repo.gitBackend.commit(repo.worktreeBackend!, 'stash new', { author: testAuthor })
     
     // Remove new file
     await repo.worktreeBackend!.rm('new.txt')
@@ -341,7 +344,7 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('edge:writeTreeChanges-empty-repo', async () => {
-    const { repo } = await makeFixture('test-write-tree-empty')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-write-tree-empty')
     await init({ repo })
     
     // Empty repo - HEAD doesn't exist
@@ -355,28 +358,27 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:applyTreeChanges-handles-rmdir', async () => {
-    const { repo } = await makeFixture('test-apply-tree-rmdir')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-apply-tree-rmdir')
     await init({ repo })
     
     // Create a directory with a file
     await repo.worktreeBackend!.mkdir(`subdir`, { recursive: true })
     await repo.worktreeBackend!.write('subdir/file.txt', 'content')
     await add({ repo, filepath: 'subdir/file.txt' })
-    const commit1 = await commit({ repo, message: 'initial commit' })
+    const commit1 = await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Create a stash commit that removes the directory
-    const { readCommit, writeTree, commit: commitCmd } = await import('@awesome-os/universal-git-src/index.ts')
-    const parentCommitObj = await readCommit({ repo, oid: commit1 })
-    const emptyTreeOid = await writeTree({ repo, tree: [] })
-    const stashCommit = await commitCmd({
-      fs,
-      dir,
-      gitdir,
+    const { object: parentCommitBuffer } = await repo.gitBackend.readObject(commit1, 'content', repo.cache)
+    const parentCommitObj = parseCommit(parentCommitBuffer)
+    
+    const emptyTreeBuf = GitTree.from([], await repo.gitBackend.getObjectFormat(repo.cache)).toObject()
+    const emptyTreeOid = await repo.gitBackend.writeObject('tree', emptyTreeBuf, 'content', undefined, false, repo.cache)
+    
+    const stashCommit = await repo.gitBackend.commit(repo.worktreeBackend!, 'remove directory', {
       tree: emptyTreeOid,
       parent: [commit1],
-      message: 'remove directory',
-      author: parentCommitObj.commit.author,
-      committer: parentCommitObj.commit.committer,
+      author: parentCommitObj.author,
+      committer: parentCommitObj.committer,
     })
     
     // Apply tree changes (should remove directory)
@@ -393,18 +395,18 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('ok:applyTreeChanges-handles-mkdir', async () => {
-    const { repo } = await makeFixture('test-apply-tree-mkdir')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-apply-tree-mkdir')
     await init({ repo })
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    const commit1 = await commit({ repo, message: 'initial commit' })
+    const commit1 = await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Create a stash commit with a new directory and file
     await repo.worktreeBackend!.mkdir(`newdir`, { recursive: true })
     await repo.worktreeBackend!.write('newdir/file.txt', 'new content')
     await add({ repo, filepath: 'newdir/file.txt' })
-    const stashCommit = await commit({ repo, message: 'add directory' })
+    const stashCommit = await repo.gitBackend.commit(repo.worktreeBackend!, 'add directory', { author: testAuthor })
     
     // Remove directory
     await repo.worktreeBackend!.rm('newdir', { recursive: true })
@@ -425,7 +427,7 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('behavior:applyTreeChanges-skips-removed-dirs', async () => {
-    const { repo } = await makeFixture('test-apply-tree-skip-removed-dir')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-apply-tree-skip-removed-dir')
     await init({ repo })
     
     // Create a directory structure
@@ -434,22 +436,21 @@ test('walkerToTreeEntryMap', async (t) => {
     await repo.worktreeBackend!.write('subdir/file2.txt', 'file2')
     await add({ repo, filepath: 'subdir/file1.txt' })
     await add({ repo, filepath: 'subdir/file2.txt' })
-    const commit1 = await commit({ repo, message: 'initial commit' })
+    const commit1 = await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Create a stash that removes subdir but also has a file in it
     // This tests the startsWith check that prevents writing to removed directories
-    const { readCommit, writeTree, commit: commitCmd } = await import('@awesome-os/universal-git-src/index.ts')
-    const parentCommitObj = await readCommit({ repo, oid: commit1 })
-    const emptyTreeOid = await writeTree({ repo, tree: [] })
-    const stashCommit = await commitCmd({
-      fs,
-      dir,
-      gitdir,
+    const { object: parentCommitBuffer } = await repo.gitBackend.readObject(commit1, 'content', repo.cache)
+    const parentCommitObj = parseCommit(parentCommitBuffer)
+    
+    const emptyTreeBuf = GitTree.from([], await repo.gitBackend.getObjectFormat(repo.cache)).toObject()
+    const emptyTreeOid = await repo.gitBackend.writeObject('tree', emptyTreeBuf, 'content', undefined, false, repo.cache)
+    
+    const stashCommit = await repo.gitBackend.commit(repo.worktreeBackend!, 'remove directory', {
       tree: emptyTreeOid,
       parent: [commit1],
-      message: 'remove directory',
-      author: parentCommitObj.commit.author,
-      committer: parentCommitObj.commit.committer,
+      author: parentCommitObj.author,
+      committer: parentCommitObj.committer,
     })
     
     // Apply tree changes
@@ -466,12 +467,12 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('edge:applyTreeChanges-missing-OID', async () => {
-    const { repo } = await makeFixture('test-apply-tree-missing-oid')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-apply-tree-missing-oid')
     await init({ repo })
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    const commit1 = await commit({ repo, message: 'initial commit' })
+    const commit1 = await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // This test is tricky - we need to create a scenario where op.oid is missing
     // This would happen if the map function returns an operation without an oid
@@ -482,7 +483,7 @@ test('walkerToTreeEntryMap', async (t) => {
     // Create a normal stash commit
     await repo.worktreeBackend!.write('test.txt', 'modified')
     await add({ repo, filepath: 'test.txt' })
-    const stashCommit = await commit({ repo, message: 'stash commit' })
+    const stashCommit = await repo.gitBackend.commit(repo.worktreeBackend!, 'stash commit', { author: testAuthor })
     
     // Apply should work normally
     await applyTreeChanges({
@@ -498,41 +499,34 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('error:applyTreeChanges-NotFoundError', async () => {
-    const { repo } = await makeFixture('test-apply-tree-missing-object')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-apply-tree-missing-object')
     await init({ repo })
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    const commit1 = await commit({ repo, message: 'initial commit' })
+    const commit1 = await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Create a stash commit with a fake OID that doesn't exist
     // This simulates repository corruption or a missing object
-    const { readCommit, writeTree, commit: commitCmd } = await import('@awesome-os/universal-git-src/index.ts')
-    const parentCommitObj = await readCommit({ repo, oid: commit1 })
+    const { object: parentCommitBuffer } = await repo.gitBackend.readObject(commit1, 'content', repo.cache)
+    const parentCommitObj = parseCommit(parentCommitBuffer)
     
     // Create a tree with a fake OID (40 zeros for sha1)
     const fakeOid = '0'.repeat(40)
-    const badTreeOid = await writeTree({
-      fs,
-      dir,
-      gitdir,
-      tree: [{
+    const badTreeBuf = GitTree.from([{
         mode: '100644',
         path: 'test.txt',
         oid: fakeOid, // This OID doesn't exist
         type: 'blob',
-      }],
-    })
+      }], await repo.gitBackend.getObjectFormat(repo.cache)).toObject()
     
-    const stashCommit = await commitCmd({
-      fs,
-      dir,
-      gitdir,
+    const badTreeOid = await repo.gitBackend.writeObject('tree', badTreeBuf, 'content', undefined, false, repo.cache)
+    
+    const stashCommit = await repo.gitBackend.commit(repo.worktreeBackend!, 'bad stash', {
       tree: badTreeOid,
       parent: [commit1],
-      message: 'bad stash',
-      author: parentCommitObj.commit.author,
-      committer: parentCommitObj.commit.committer,
+      author: parentCommitObj.author,
+      committer: parentCommitObj.committer,
     })
     
     // Apply should throw NotFoundError
@@ -553,26 +547,25 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('applyTreeChanges handles index deletion when wasStaged is true', async () => {
-    const { repo } = await makeFixture('test-apply-tree-index-delete')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-apply-tree-index-delete')
     await init({ repo })
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    const commit1 = await commit({ repo, message: 'initial commit' })
+    const commit1 = await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Create a stash commit that deletes the file (staged deletion)
-    const { readCommit, writeTree, commit: commitCmd } = await import('@awesome-os/universal-git-src/index.ts')
-    const parentCommitObj = await readCommit({ repo, oid: commit1 })
-    const emptyTreeOid = await writeTree({ repo, tree: [] })
-    const stashCommit = await commitCmd({
-      fs,
-      dir,
-      gitdir,
+    const { object: parentCommitBuffer } = await repo.gitBackend.readObject(commit1, 'content', repo.cache)
+    const parentCommitObj = parseCommit(parentCommitBuffer)
+    
+    const emptyTreeBuf = GitTree.from([], await repo.gitBackend.getObjectFormat(repo.cache)).toObject()
+    const emptyTreeOid = await repo.gitBackend.writeObject('tree', emptyTreeBuf, 'content', undefined, false, repo.cache)
+    
+    const stashCommit = await repo.gitBackend.commit(repo.worktreeBackend!, 'delete file', {
       tree: emptyTreeOid,
       parent: [commit1],
-      message: 'delete file',
-      author: parentCommitObj.commit.author,
-      committer: parentCommitObj.commit.committer,
+      author: parentCommitObj.author,
+      committer: parentCommitObj.committer,
     })
     
     // Restore file in workdir
@@ -598,17 +591,17 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('applyTreeChanges uses fallback stats when file missing after write', async () => {
-    const { repo } = await makeFixture('test-apply-tree-fallback-stats')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-apply-tree-fallback-stats')
     await init({ repo })
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    const commit1 = await commit({ repo, message: 'initial commit' })
+    const commit1 = await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Create a stash commit with changes
     await repo.worktreeBackend!.write('test.txt', 'modified')
     await add({ repo, filepath: 'test.txt' })
-    const stashCommit = await commit({ repo, message: 'stash commit' })
+    const stashCommit = await repo.gitBackend.commit(repo.worktreeBackend!, 'stash commit', { author: testAuthor })
     
     // Reset file
     await repo.worktreeBackend!.write('test.txt', 'initial')
@@ -653,7 +646,7 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('applyTreeChanges handles special file types (not tree or blob)', async () => {
-    const { repo } = await makeFixture('test-apply-tree-special-types')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-apply-tree-special-types')
     await init({ repo })
     
     // This test covers line 668 - when type is not 'tree' or 'blob'
@@ -663,12 +656,12 @@ test('walkerToTreeEntryMap', async (t) => {
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    const commit1 = await commit({ repo, message: 'initial commit' })
+    const commit1 = await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Create a normal stash commit (no special types)
     await repo.worktreeBackend!.write('test.txt', 'modified')
     await add({ repo, filepath: 'test.txt' })
-    const stashCommit = await commit({ repo, message: 'stash commit' })
+    const stashCommit = await repo.gitBackend.commit(repo.worktreeBackend!, 'stash commit', { author: testAuthor })
     
     // Apply should work normally (special types are filtered out in the map function)
     await applyTreeChanges({
@@ -684,17 +677,17 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('applyTreeChanges gets stats from stash entry when file not in workdir', async () => {
-    const { repo } = await makeFixture('test-apply-tree-stash-stats')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-apply-tree-stash-stats')
     await init({ repo })
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    const commit1 = await commit({ repo, message: 'initial commit' })
+    const commit1 = await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Create a stash commit with a new file that doesn't exist in workdir
     await repo.worktreeBackend!.write('new.txt', 'new file')
     await add({ repo, filepath: 'new.txt' })
-    const stashCommit = await commit({ repo, message: 'stash new file' })
+    const stashCommit = await repo.gitBackend.commit(repo.worktreeBackend!, 'stash new file', { author: testAuthor })
     
     // Remove the file from workdir (so it doesn't exist when we try to get stats)
     await repo.worktreeBackend!.rm('new.txt')
@@ -717,17 +710,17 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('applyTreeChanges creates minimal stats when stash entry has no stats', async () => {
-    const { repo } = await makeFixture('test-apply-tree-minimal-stats')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-apply-tree-minimal-stats')
     await init({ repo })
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    const commit1 = await commit({ repo, message: 'initial commit' })
+    const commit1 = await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Create a stash commit
     await repo.worktreeBackend!.write('test.txt', 'modified')
     await add({ repo, filepath: 'test.txt' })
-    const stashCommit = await commit({ repo, message: 'stash commit' })
+    const stashCommit = await repo.gitBackend.commit(repo.worktreeBackend!, 'stash commit', { author: testAuthor })
     
     // Remove file from workdir
     await repo.worktreeBackend!.rm('test.txt')
@@ -747,19 +740,19 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('applyTreeChanges handles non-NotFoundError during object read', async () => {
-    const { repo } = await makeFixture('test-apply-tree-other-error')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-apply-tree-other-error')
     await init({ repo })
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    const commit1 = await commit({ repo, message: 'initial commit' })
+    const commit1 = await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Create a stash commit
     await repo.worktreeBackend!.write('test.txt', 'modified')
     await add({ repo, filepath: 'test.txt' })
-    const stashCommit = await commit({ repo, message: 'stash commit' })
+    const stashCommit = await repo.gitBackend.commit(repo.worktreeBackend!, 'stash commit', { author: testAuthor })
     
-    // Note: Previously this test mocked repo.fs to test error handling
+    // Note: Previously this test mocked fs to test error handling
     // Since we now use backend methods (gitBackend.readObject), we can't easily mock the filesystem
     // The error handling is still tested through normal operation
     
@@ -777,7 +770,7 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('applyTreeChanges handles file in removed directory (startsWith check)', async () => {
-    const { repo } = await makeFixture('test-apply-tree-removed-dir-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-apply-tree-removed-dir-file')
     await init({ repo })
     
     // Create a directory with multiple files
@@ -786,26 +779,24 @@ test('walkerToTreeEntryMap', async (t) => {
     await repo.worktreeBackend!.write('subdir/file2.txt', 'file2')
     await add({ repo, filepath: 'subdir/file1.txt' })
     await add({ repo, filepath: 'subdir/file2.txt' })
-    const commit1 = await commit({ repo, message: 'initial commit' })
+    const commit1 = await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Create a stash that removes the directory but also has a file in it
     // This tests the startsWith check that prevents writing to removed directories
-    const { readCommit, writeTree, commit: commitCmd } = await import('@awesome-os/universal-git-src/index.ts')
-    const parentCommitObj = await readCommit({ repo, oid: commit1 })
+    const { object: parentCommitBuffer } = await repo.gitBackend.readObject(commit1, 'content', repo.cache)
+    const parentCommitObj = parseCommit(parentCommitBuffer)
     
     // Create a tree that removes subdir but has a file in subdir
     // This creates a scenario where dirRemoved contains 'subdir' and
     // we try to write 'subdir/file.txt' which should be skipped
-    const emptyTreeOid = await writeTree({ repo, tree: [] })
-    const stashCommit = await commitCmd({
-      fs,
-      dir,
-      gitdir,
+    const emptyTreeBuf = GitTree.from([], await repo.gitBackend.getObjectFormat(repo.cache)).toObject()
+    const emptyTreeOid = await repo.gitBackend.writeObject('tree', emptyTreeBuf, 'content', undefined, false, repo.cache)
+    
+    const stashCommit = await repo.gitBackend.commit(repo.worktreeBackend!, 'remove directory', {
       tree: emptyTreeOid,
       parent: [commit1],
-      message: 'remove directory',
-      author: parentCommitObj.commit.author,
-      committer: parentCommitObj.commit.committer,
+      author: parentCommitObj.author,
+      committer: parentCommitObj.committer,
     })
     
     // Ensure subdir exists before applying
@@ -828,7 +819,7 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('applyTreeChanges handles missing OID in write operation', async () => {
-    const { repo } = await makeFixture('test-apply-tree-missing-oid-write')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-apply-tree-missing-oid-write')
     await init({ repo })
     
     // This test is designed to trigger the missing OID check in the write case
@@ -837,12 +828,12 @@ test('walkerToTreeEntryMap', async (t) => {
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    const commit1 = await commit({ repo, message: 'initial commit' })
+    const commit1 = await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Create a normal stash commit (with valid OIDs)
     await repo.worktreeBackend!.write('test.txt', 'modified')
     await add({ repo, filepath: 'test.txt' })
-    const stashCommit = await commit({ repo, message: 'stash commit' })
+    const stashCommit = await repo.gitBackend.commit(repo.worktreeBackend!, 'stash commit', { author: testAuthor })
     
     // Apply should work normally
     await applyTreeChanges({
@@ -858,17 +849,17 @@ test('walkerToTreeEntryMap', async (t) => {
   })
 
   await t.test('applyTreeChanges uses fallback stats when finalStats is null', async () => {
-    const { repo } = await makeFixture('test-apply-tree-null-final-stats')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-apply-tree-null-final-stats')
     await init({ repo })
     
     await repo.worktreeBackend!.write('test.txt', 'initial')
     await add({ repo, filepath: 'test.txt' })
-    const commit1 = await commit({ repo, message: 'initial commit' })
+    const commit1 = await repo.gitBackend.commit(repo.worktreeBackend!, 'initial commit', { author: testAuthor })
     
     // Create a stash commit
     await repo.worktreeBackend!.write('test.txt', 'modified')
     await add({ repo, filepath: 'test.txt' })
-    const stashCommit = await commit({ repo, message: 'stash commit' })
+    const stashCommit = await repo.gitBackend.commit(repo.worktreeBackend!, 'stash commit', { author: testAuthor })
     
     // Remove file from workdir
     await repo.worktreeBackend!.rm('test.txt')

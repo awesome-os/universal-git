@@ -8,38 +8,35 @@ import { _walk } from '@awesome-os/universal-git-src/commands/walk.ts'
 
 describe('GitWalkerIndex', () => {
   it('should detect staged changes after add() with shared cache', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-stash')
+    const { repo } = await makeFixture('test-stash')
     
     // Set up user config
-    await setConfig({ fs, dir, gitdir, path: 'user.name', value: 'test user' })
-    await setConfig({ fs, dir, gitdir, path: 'user.email', value: 'test@example.com' })
+    await setConfig({ repo, path: 'user.name', value: 'test user' })
+    await setConfig({ repo, path: 'user.email', value: 'test@example.com' })
     
     // Use a shared cache
-    const cache = {}
+    const cache = repo.cache
     
     // Make changes and stage them - use unique content to ensure it differs from HEAD
     const uniqueContent = `staged changes - a - ${Date.now()}`
-    await fs.write(`${dir}/a.txt`, uniqueContent)
-    await fs.write(`${dir}/b.js`, `staged changes - b - ${Date.now()}`)
-    await add({ fs, dir, gitdir, filepath: ['a.txt', 'b.js'], cache })
+    await repo.worktreeBackend?.write('a.txt', uniqueContent)
+    await repo.worktreeBackend?.write('b.js', `staged changes - b - ${Date.now()}`)
+    await add({ repo, filepath: ['a.txt', 'b.js'], cache })
     
     // Verify files are staged
-    const aStatus = await status({ fs, dir, gitdir, filepath: 'a.txt' })
+    const aStatus = await status({ repo, filepath: 'a.txt' })
     assert.strictEqual(aStatus, 'modified', `Expected 'modified', got '${aStatus}'`)
     
-    const bStatus = await status({ fs, dir, gitdir, filepath: 'b.js' })
+    const bStatus = await status({ repo, filepath: 'b.js' })
     assert.strictEqual(bStatus, 'modified', `Expected 'modified', got '${bStatus}'`)
-    
-    // Create STAGE walker and check what it sees
-    // CRITICAL: Create Repository instance to pass to _walk
-    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
     
     const stageWalker = STAGE()
     const entries: Array<{ filepath: string; headOid: string | null; stageOid: string | null }> = []
     
     await _walk({
-      repo, // Pass Repository instance
+      gitBackend: repo.gitBackend,
+      worktreeBackend: repo.worktreeBackend || undefined,
+      cache: repo.cache,
       trees: [TREE({ ref: 'HEAD' }), stageWalker],
       map: async (filepath: string, [head, stage]: any[]) => {
         if (stage) {
@@ -62,36 +59,34 @@ describe('GitWalkerIndex', () => {
   })
 
   it('should invalidate cache when index is written after walker creation', async () => {
-    const { fs, dir, gitdir } = await makeFixture('test-stash')
+    const { repo } = await makeFixture('test-stash')
     
     // Set up user config
-    await setConfig({ fs, dir, gitdir, path: 'user.name', value: 'test user' })
-    await setConfig({ fs, dir, gitdir, path: 'user.email', value: 'test@example.com' })
+    await setConfig({ repo, path: 'user.name', value: 'test user' })
+    await setConfig({ repo, path: 'user.email', value: 'test@example.com' })
     
     // Use a shared cache
-    const cache = {}
-    
-    // CRITICAL: Create Repository instance to pass to _walk
-    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
+    const cache = repo.cache
     
     // Create STAGE walker BEFORE staging changes
     const stageWalker = STAGE()
     
     // Now stage changes - use unique content to ensure it differs from HEAD
     const uniqueContent = `staged changes - a - ${Date.now()}`
-    await fs.write(`${dir}/a.txt`, uniqueContent)
-    await add({ fs, dir, gitdir, filepath: ['a.txt'], cache })
+    await repo.worktreeBackend?.write('a.txt', uniqueContent)
+    await add({ repo, filepath: ['a.txt'], cache })
     
     // Verify file is staged
-    const aStatus = await status({ fs, dir, gitdir, filepath: 'a.txt' })
+    const aStatus = await status({ repo, filepath: 'a.txt' })
     assert.strictEqual(aStatus, 'modified', `Expected 'modified', got '${aStatus}'`)
     
     // Now use the walker - it should see the staged changes
     const entries: Array<{ filepath: string; headOid: string | null; stageOid: string | null }> = []
     
     await _walk({
-      repo, // Pass Repository instance
+      gitBackend: repo.gitBackend,
+      worktreeBackend: repo.worktreeBackend || undefined,
+      cache: repo.cache,
       trees: [TREE({ ref: 'HEAD' }), stageWalker],
       map: async (filepath: string, [head, stage]: any[]) => {
         if (stage) {

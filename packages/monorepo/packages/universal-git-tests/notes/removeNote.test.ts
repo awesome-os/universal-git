@@ -6,16 +6,14 @@ import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixt
 test('removeNote', async (t) => {
   await t.test('ok:default-branch', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-removeNote')
+    const { repo } = await makeFixture('test-removeNote')
     // Test
     let notes = await listNotes({
-      fs,
-      gitdir,
+      repo,
     })
     assert.strictEqual(notes.length, 3)
     const oid = await removeNote({
-      fs,
-      gitdir,
+      repo,
       author: {
         name: 'William Hilton',
         email: 'wmhilton@gmail.com',
@@ -25,8 +23,7 @@ test('removeNote', async (t) => {
       oid: '199948939a0b95c6f27668689102496574b2c332',
     })
     notes = await listNotes({
-      fs,
-      gitdir,
+      repo,
     })
     assert.strictEqual(notes.length, 2)
     assert.strictEqual(oid, '7f186442042a2d1dcdfeb56619c5d700168801e9')
@@ -34,17 +31,15 @@ test('removeNote', async (t) => {
 
   await t.test('ok:alternate-branch', async () => {
     // Setup
-    const { fs, gitdir } = await makeFixture('test-removeNote')
+    const { repo } = await makeFixture('test-removeNote')
     // Test
     let notes = await listNotes({
-      fs,
-      gitdir,
+      repo,
       ref: 'refs/notes/alt',
     })
     assert.strictEqual(notes.length, 1)
     const oid = await removeNote({
-      fs,
-      gitdir,
+      repo,
       author: {
         name: 'William Hilton',
         email: 'wmhilton@gmail.com',
@@ -55,8 +50,7 @@ test('removeNote', async (t) => {
       oid: 'f6d51b1f9a449079f6999be1fb249c359511f164',
     })
     notes = await listNotes({
-      fs,
-      gitdir,
+      repo,
       ref: 'refs/notes/alt',
     })
     assert.strictEqual(notes.length, 0)
@@ -79,12 +73,11 @@ test('removeNote', async (t) => {
   })
 
   await t.test('param:oid-missing', async () => {
-    const { fs, gitdir } = await makeFixture('test-removeNote')
+    const { repo } = await makeFixture('test-removeNote')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await removeNote({
-        fs,
-        gitdir,
+        repo,
         author: { name: 'Test', email: 'test@example.com', timestamp: 1578937310, timezoneOffset: 300 },
       } as any)
       assert.fail('Should have thrown MissingParameterError')
@@ -95,13 +88,9 @@ test('removeNote', async (t) => {
   })
 
   await t.test('param:repo-provided', async () => {
-    const { fs, gitdir, dir } = await makeFixture('test-removeNote')
-    const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-    const repo = await Repository.open({ fs, dir, gitdir })
-    // Provide gitdir explicitly to avoid default parameter evaluation issue
+    const { repo } = await makeFixture('test-removeNote')
     const oid = await removeNote({
       repo,
-      gitdir, // Explicitly provide to avoid default parameter evaluation
       author: {
         name: 'William Hilton',
         email: 'wmhilton@gmail.com',
@@ -115,10 +104,9 @@ test('removeNote', async (t) => {
   })
 
   await t.test('param:dir-derives-gitdir', async () => {
-    const { fs, dir } = await makeFixture('test-removeNote')
+    const { repo } = await makeFixture('test-removeNote')
     const oid = await removeNote({
-      fs,
-      dir,
+      repo,
       author: {
         name: 'William Hilton',
         email: 'wmhilton@gmail.com',
@@ -132,12 +120,11 @@ test('removeNote', async (t) => {
   })
 
   await t.test('error:caller-property', async () => {
-    const { fs, gitdir } = await makeFixture('test-removeNote')
+    const { repo } = await makeFixture('test-removeNote')
     const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
     try {
       await removeNote({
-        fs,
-        gitdir,
+        repo,
         author: { name: 'Test', email: 'test@example.com', timestamp: 1578937310, timezoneOffset: 300 },
       } as any)
       assert.fail('Should have thrown MissingParameterError')
@@ -148,11 +135,10 @@ test('removeNote', async (t) => {
   })
 
   await t.test('edge:non-existent-note', async () => {
-    const { fs, gitdir } = await makeFixture('test-removeNote')
+    const { repo } = await makeFixture('test-removeNote')
     try {
       await removeNote({
-        fs,
-        gitdir,
+        repo,
         author: {
           name: 'William Hilton',
           email: 'wmhilton@gmail.com',

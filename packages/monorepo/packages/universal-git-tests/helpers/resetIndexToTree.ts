@@ -76,9 +76,9 @@ export async function resetIndexToTree({
         if (treeResult.type !== 'tree') {
           throw new Error(`Expected tree object, got ${treeResult.type}`)
         }
-        const { parseTree } = await import('@awesome-os/universal-git-src/git/objects/parseTree.ts')
-        const tree = parseTree(treeResult.object)
-        const entry = tree.find(e => e.path === part)
+        const { GitTree } = await import('@awesome-os/universal-git-src/models/GitTree.ts')
+        const tree = new GitTree(treeResult.object)
+        const entry = tree.entries().find(e => e.path === part)
         
         if (!entry) {
           throw new Error(`Path part ${part} not found in tree`)

@@ -6,7 +6,7 @@ import { join } from '@awesome-os/universal-git-src/utils/join.ts'
 
 describe('log', () => {
   it('ok:HEAD', async () => {
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     const commits = await log({ repo, ref: 'HEAD' })
     assert.strictEqual(commits.length, 5)
     // Verify commit structure
@@ -22,13 +22,13 @@ describe('log', () => {
   })
 
   it('ok:HEAD-depth', async () => {
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     const commits = await log({ repo, ref: 'HEAD', depth: 1 })
     assert.strictEqual(commits.length, 1)
   })
 
   it('ok:HEAD-since', async () => {
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     const commits = await log({
       repo,
       ref: 'HEAD',
@@ -38,7 +38,7 @@ describe('log', () => {
   })
 
   it('ok:shallow-branch', async () => {
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     // Shallow branches may not have all parent commits available
     // This test may fail if parent commits are missing (expected for shallow clones)
     try {
@@ -59,7 +59,7 @@ describe('log', () => {
 
   it('ok:has-correct-payloads-and-gpgsig', async () => {
     // Setup
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     // Test
     const commits = await log({ repo, ref: 'HEAD' })
     assert.strictEqual(commits.length, 5)
@@ -77,7 +77,7 @@ describe('log', () => {
   })
 
   it('ok:with-complex-merging-history', async () => {
-    const { repo } = await makeFixture('test-log-complex')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-complex')
     const commits = await log({ repo, ref: 'master' })
     assert.ok(commits.length > 0)
     // Verify merge commits are present
@@ -96,7 +96,7 @@ describe('log', () => {
   })
 
   it('ok:a-newly-added-file', async () => {
-    const { repo } = await makeFixture('test-log-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-file')
     const commits = await log({
       repo,
       ref: 'HEAD',
@@ -117,7 +117,7 @@ describe('log', () => {
   })
 
   it('ok:a-file-only', async () => {
-    const { repo } = await makeFixture('test-log-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-file')
     const commits = await log({
       repo,
       ref: 'HEAD',
@@ -138,7 +138,7 @@ describe('log', () => {
   })
 
   it('error:a-deleted-file-without-force-should-throw-error', async () => {
-    const { repo } = await makeFixture('test-log-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-file')
     let err: unknown = null
     try {
       await log({
@@ -162,7 +162,7 @@ describe('log', () => {
   })
 
   it('ok:a-deleted-file-forced', async () => {
-    const { repo } = await makeFixture('test-log-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-file')
     const commits = await log({
       repo,
       ref: 'HEAD',
@@ -184,7 +184,7 @@ describe('log', () => {
   })
 
   it('ok:a-rename-file-with-follow', async () => {
-    const { repo } = await makeFixture('test-log-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-file')
     const commits = await log({
       repo,
       ref: 'HEAD',
@@ -206,7 +206,7 @@ describe('log', () => {
   })
 
   it('ok:a-rename-file-forced-without-follow', async () => {
-    const { repo } = await makeFixture('test-log-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-file')
     const commits = await log({
       repo,
       ref: 'HEAD',
@@ -228,7 +228,7 @@ describe('log', () => {
   })
 
   it('ok:a-rename-file-with-follow-multi-same-content-files', async () => {
-    const { repo } = await makeFixture('test-log-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-file')
     const commits = await log({
       repo,
       ref: 'HEAD',
@@ -253,7 +253,7 @@ describe('log', () => {
   })
 
   it('ok:a-rename-file2-with-follow-multi-same-content-files', async () => {
-    const { repo } = await makeFixture('test-log-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-file')
     const commits = await log({
       repo,
       ref: 'HEAD',
@@ -278,7 +278,7 @@ describe('log', () => {
   })
 
   it('ok:handles-empty-repository', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     
     // Empty repository without commits should throw error for HEAD
     try {
@@ -291,7 +291,7 @@ describe('log', () => {
   })
 
   it('error:handles-non-existent-ref', async () => {
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     
     try {
       await log({ repo, ref: 'nonexistent-ref' })
@@ -303,13 +303,13 @@ describe('log', () => {
   })
 
   it('ok:handles-depth-0', async () => {
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     const commits = await log({ repo, ref: 'HEAD', depth: 0 })
     assert.strictEqual(commits.length, 0, 'Should return empty array when depth is 0')
   })
 
   it('ok:handles-since-date-that-excludes-all-commits', async () => {
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     // Use a future date that excludes all commits
     const futureDate = new Date('2100-01-01')
     const commits = await log({ repo, ref: 'HEAD', since: futureDate })
@@ -317,7 +317,7 @@ describe('log', () => {
   })
 
   it('ok:handles-since-date-that-includes-all-commits', async () => {
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     // Use a past date that includes all commits
     const pastDate = new Date('2000-01-01')
     const commits = await log({ repo, ref: 'HEAD', since: pastDate })
@@ -325,7 +325,7 @@ describe('log', () => {
   })
 
   it('ok:combines-depth-and-since-correctly', async () => {
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     const pastDate = new Date('2000-01-01')
     const commits = await log({ 
       repo, 
@@ -338,7 +338,7 @@ describe('log', () => {
   })
 
   it('error:handles-filepath-with-non-existent-file-and-force-false', async () => {
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     const commits = await log({ 
       repo, 
       ref: 'HEAD', 
@@ -352,7 +352,7 @@ describe('log', () => {
   })
 
   it('ok:handles-filepath-with-non-existent-file-and-force-true', async () => {
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     const commits = await log({ 
       repo, 
       ref: 'HEAD', 
@@ -364,7 +364,7 @@ describe('log', () => {
   })
 
   it('ok:handles-dir-parameter', async () => {
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     
     // Test with repo parameter (dir is computed from repo)
     const commits1 = await log({ repo, ref: 'HEAD' })
@@ -375,7 +375,7 @@ describe('log', () => {
   })
 
   it('ok:handles-cache-parameter', async () => {
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     const cache: Record<string, unknown> = {}
     
     const commits1 = await log({ repo, ref: 'HEAD', cache })
@@ -386,7 +386,7 @@ describe('log', () => {
   })
 
   it('ok:handles-different-ref-types', async () => {
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     
     // Test with branch name
     const commits1 = await log({ repo, ref: 'master' })
@@ -398,7 +398,7 @@ describe('log', () => {
   })
 
   it('ok:handles-visited-set-to-prevent-cycles', async () => {
-    const { repo } = await makeFixture('test-log-complex')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-complex')
     // Complex history may have merge commits that create cycles
     const commits = await log({ repo, ref: 'master' })
     
@@ -409,7 +409,7 @@ describe('log', () => {
   })
 
   it('ok:handles-filepath-in-nested-directory', async () => {
-    const { repo } = await makeFixture('test-log-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-file')
     const commits = await log({ 
       repo, 
       ref: 'HEAD', 
@@ -420,7 +420,7 @@ describe('log', () => {
   })
 
   it('edge:handles-since-timestamp-edge-case-exact-match', async () => {
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     // Use exact timestamp from a commit
     const exactDate = new Date(1501462174000)
     const commits = await log({ repo, ref: 'HEAD', since: exactDate })
@@ -429,7 +429,7 @@ describe('log', () => {
   })
 
   it('ok:sets-caller-property-on-errors', async () => {
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     
     try {
       await log({ repo, ref: 'nonexistent-ref' })
@@ -441,7 +441,7 @@ describe('log', () => {
   })
 
   it('ok:handles-filepath-with-follow-true-when-file-does-not-exist-initially', async () => {
-    const { repo } = await makeFixture('test-log-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-file')
     const commits = await log({ 
       repo, 
       ref: 'HEAD', 
@@ -454,7 +454,7 @@ describe('log', () => {
   })
 
   it('ok:handles-filepath-with-force-true-when-file-does-not-exist', async () => {
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     const commits = await log({ 
       repo, 
       ref: 'HEAD', 
@@ -466,7 +466,7 @@ describe('log', () => {
   })
 
   it('ok:handles-filepath-with-follow-false-and-force-false-skip-missing-files', async () => {
-    const { repo } = await makeFixture('test-log-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-file')
     const commits = await log({ 
       repo, 
       ref: 'HEAD', 
@@ -479,7 +479,7 @@ describe('log', () => {
   })
 
   it('ok:handles-filepath-with-follow-true-and-force-true', async () => {
-    const { repo } = await makeFixture('test-log-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-file')
     const commits = await log({ 
       repo, 
       ref: 'HEAD', 
@@ -492,7 +492,7 @@ describe('log', () => {
   })
 
   it('ok:handles-queue-with-multiple-parents-merge-commits', async () => {
-    const { repo } = await makeFixture('test-log-complex')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-complex')
     const commits = await log({ repo, ref: 'master' })
     
     // Verify merge commits are included
@@ -510,7 +510,7 @@ describe('log', () => {
   })
 
   it('ok:handles-visited-set-preventing-duplicate-commits-in-complex-history', async () => {
-    const { repo } = await makeFixture('test-log-complex')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-complex')
     const commits = await log({ repo, ref: 'master', depth: 10 })
     
     // Verify no duplicates
@@ -520,7 +520,7 @@ describe('log', () => {
   })
 
   it('ok:handles-since-timestamp-that-stops-traversal-early', async () => {
-    const { repo } = await makeFixture('test-log')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log')
     // Use a date that's in the middle of the commit history
     const midDate = new Date(1501462175000) // Slightly after one commit
     const commits = await log({ repo, ref: 'HEAD', since: midDate })
@@ -535,7 +535,7 @@ describe('log', () => {
   })
 
   it('ok:handles-filepath-resolution-in-deeply-nested-directory', async () => {
-    const { repo } = await makeFixture('test-log-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-file')
     const commits = await log({ 
       repo, 
       ref: 'HEAD', 
@@ -547,7 +547,7 @@ describe('log', () => {
   })
 
   it('ok:handles-filepath-that-resolves-to-a-tree-directory', async () => {
-    const { repo } = await makeFixture('test-log-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-file')
     // Try to log a directory path - should return empty or handle gracefully
     const commits = await log({ 
       repo, 
@@ -560,7 +560,7 @@ describe('log', () => {
   })
 
   it('ok:handles-depth-limit-with-filepath-filtering', async () => {
-    const { repo } = await makeFixture('test-log-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-file')
     const commits = await log({ 
       repo, 
       ref: 'HEAD', 
@@ -572,7 +572,7 @@ describe('log', () => {
   })
 
   it('ok:handles-empty-queue-no-commits-to-process', async () => {
-    const { repo } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
+    const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     
     // Should throw error for empty repo
     try {
@@ -584,7 +584,7 @@ describe('log', () => {
   })
 
   it('error:handles-filepath-with-error-in-resolveFilepathInTree-catch-block', async () => {
-    const { repo } = await makeFixture('test-log-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-file')
     // Use a filepath that might cause an error in tree resolution
     const commits = await log({ 
       repo, 
@@ -598,7 +598,7 @@ describe('log', () => {
   })
 
   it('ok:handles-filepath-with-force-true-when-file-does-not-exist-continues-on-error', async () => {
-    const { repo } = await makeFixture('test-log-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-file')
     // When force=true, errors in resolveFilepathInTree should continue (not skip)
     const commits = await log({ 
       repo, 
@@ -612,7 +612,7 @@ describe('log', () => {
   })
 
   it('ok:handles-filepath-with-follow-true-when-file-does-not-exist-continues-on-error', async () => {
-    const { repo } = await makeFixture('test-log-file')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-file')
     // When follow=true, errors in resolveFilepathInTree should continue (not skip)
     const commits = await log({ 
       repo, 
@@ -626,7 +626,7 @@ describe('log', () => {
   })
 
   it('ok:handles-visited-set-preventing-duplicate-parents-in-merge-commits', async () => {
-    const { repo } = await makeFixture('test-log-complex')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-complex')
     // Merge commits have multiple parents that might be visited multiple times
     const commits = await log({ repo, ref: 'master', depth: 20 })
     
@@ -650,7 +650,7 @@ describe('log', () => {
   })
 
   it('ok:handles-parent-already-visited-skips-adding-to-queue', async () => {
-    const { repo } = await makeFixture('test-log-complex')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-log-complex')
     // In complex history, same parent might be reached via different paths
     const commits = await log({ repo, ref: 'master' })
     

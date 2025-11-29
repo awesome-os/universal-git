@@ -7,7 +7,7 @@ import { verifyReflogEntry } from '@awesome-os/universal-git-test-helpers/helper
 test('tag', async (t) => {
   await t.test('ok:creates-lightweight-tag', async () => {
     // Setup
-    const { repo } = await makeFixture('test-tag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-tag')
     const headOid = await resolveRef({ repo, ref: 'HEAD' })
     // Test
     await tag({ repo, ref: 'latest' })
@@ -20,7 +20,7 @@ test('tag', async (t) => {
 
   await t.test('error:tag-already-exists', async () => {
     // Setup
-    const { repo } = await makeFixture('test-tag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-tag')
     // Test
     let error = null
     try {
@@ -34,7 +34,7 @@ test('tag', async (t) => {
 
   await t.test('error:tag-already-exists-packed', async () => {
     // Setup
-    const { repo } = await makeFixture('test-tag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-tag')
     // Test
     let error = null
     try {
@@ -48,7 +48,7 @@ test('tag', async (t) => {
 
   await t.test('param:force', async () => {
     // Setup
-    const { repo } = await makeFixture('test-tag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-tag')
     // Test
     let error = null
     try {
@@ -61,7 +61,7 @@ test('tag', async (t) => {
 
   await t.test('param:force-packed', async () => {
     // Setup
-    const { repo } = await makeFixture('test-tag')
+    const { repo, fs, dir, gitdir } = await makeFixture('test-tag')
     // Test
     let error = null
     try {

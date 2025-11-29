@@ -78,8 +78,8 @@ export async function worktree({
       reason,
     })
 
-    // dir is required for worktree operations
-    if (!effectiveDir) {
+    // dir is required for worktree operations, unless we have a repo with worktree backend (for add operation)
+    if (!effectiveDir && !repo?.worktreeBackend) {
       throw new Error('dir is required for worktree operations')
     }
 

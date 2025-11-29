@@ -4,17 +4,15 @@ import type { GitBackendFs } from './GitBackendFs.ts'
  * Config operations for GitBackendFs
  */
 
-let _configProvider: import('../../git/config/LocalConfigProvider.ts').LocalConfigProvider | null = null
-
 /**
  * Get or create LocalConfigProvider (lazy initialization)
  */
 async function getConfigProvider(this: GitBackendFs): Promise<import('../../git/config/LocalConfigProvider.ts').LocalConfigProvider> {
-  if (!_configProvider) {
+  if (!this._configProvider) {
     const { LocalConfigProvider } = await import('../../git/config/LocalConfigProvider.ts')
-    _configProvider = new LocalConfigProvider(this)
+    this._configProvider = new LocalConfigProvider(this)
   }
-  return _configProvider
+  return this._configProvider
 }
 
 export async function getConfig(this: GitBackendFs, path: string): Promise<unknown> {
@@ -67,5 +65,15 @@ export async function getConfigSections(this: GitBackendFs): Promise<string[]> {
 export async function reloadConfig(this: GitBackendFs): Promise<void> {
   const configProvider = await getConfigProvider.call(this)
   return configProvider.reload()
+}
+
+/**
+ * Returns the configuration as a plain JavaScript object
+ * This provides a unified view of the configuration
+ */
+export async function getConfigFile(this: GitBackendFs): Promise<any> {
+  const configProvider = await getConfigProvider.call(this)
+  // Access internal config object if available, otherwise return empty
+  return (configProvider as any).config || {}
 }
 

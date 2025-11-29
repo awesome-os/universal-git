@@ -134,6 +134,9 @@ export async function writeRef({
     
     // Write the ref file with ONLY the OID followed by a newline
     // This ensures we never write concatenated OIDs
+    if (process.env.DEBUG_REFS === 'true' || true) {
+      console.log(`[writeRef] Writing to ${path}: ${trimmedValue}`)
+    }
     await normalizedFs.write(path, `${trimmedValue}\n`, 'utf8')
     
     // Record the mutation in StateMutationStream

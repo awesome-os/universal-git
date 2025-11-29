@@ -36,6 +36,9 @@ import fs from "node:fs"
 export class GitBackendFs implements GitBackend {
   private readonly fs: FileSystem
   private readonly gitdir: string
+  
+  // Cache for config provider (internal use by config module)
+  _configProvider: any | null = null
 
   constructor(
     fs: RawFileSystemProvider | FileSystemProvider,
@@ -165,6 +168,8 @@ export class GitBackendFs implements GitBackend {
   getConfigSubsections = config.getConfigSubsections.bind(this)
   getConfigSections = config.getConfigSections.bind(this)
   reloadConfig = config.reloadConfig.bind(this)
+  getConfigFile = config.getConfigFile.bind(this)
+
 
   // Hooks
   readHook = hooks.readHook.bind(this)
@@ -182,6 +187,11 @@ export class GitBackendFs implements GitBackend {
   getSubmoduleByPath = submodules.getSubmoduleByPath.bind(this)
   readSubmoduleConfig = submodules.readSubmoduleConfig.bind(this)
   writeSubmoduleConfig = submodules.writeSubmoduleConfig.bind(this)
+  initSubmodule = submodules.initSubmodule.bind(this)
+  updateSubmodule = submodules.updateSubmodule.bind(this)
+  updateSubmoduleUrl = submodules.updateSubmoduleUrl.bind(this)
+  isSubmodule = submodules.isSubmodule.bind(this)
+  getSubmoduleGitdir = submodules.getSubmoduleGitdir.bind(this)
 
   // Worktrees
   readWorktreeConfig = worktrees.readWorktreeConfig.bind(this)
@@ -223,6 +233,7 @@ export class GitBackendFs implements GitBackend {
 
   // Checkout
   checkout = checkout.checkout.bind(this)
+  checkoutTree = checkout.checkoutTree.bind(this)
 
   // Walkers
   createTreeWalker = walkers.createTreeWalker.bind(this)

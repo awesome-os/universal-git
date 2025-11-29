@@ -64,7 +64,26 @@ export async function makeNodeFixture(fixture: string, options?: { init?: boolea
   const fs = new FileSystem(_fs)
 
   const dir = await useTempDir(fixture)
-  const gitdir = await useTempDir(`${fixture}.git`)
+  let gitdir = await useTempDir(`${fixture}.git`)
+
+  // If the .git fixture specific directory is empty, it means it wasn't found.
+  // In that case, check if the main fixture directory has a .git folder and use that.
+  try {
+    const gitdirFiles = await _fs.promises.readdir(gitdir)
+    if (gitdirFiles.length === 0) {
+      const dotGitPath = join(dir, '.git')
+      try {
+        const stats = await _fs.promises.stat(dotGitPath)
+        if (stats.isDirectory()) {
+          gitdir = dotGitPath
+        }
+      } catch {
+        // .git directory not found in worktree, stick with the empty gitdir (bare/fresh repo)
+      }
+    }
+  } catch (err) {
+    // Ignore errors reading gitdir
+  }
 
   // Create backends explicitly
   const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')

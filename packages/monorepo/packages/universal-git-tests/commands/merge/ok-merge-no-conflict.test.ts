@@ -128,7 +128,6 @@ describe('merge', () => {
   it('ok:merge-no-conflict', async () => {
         // Setup: Create repo with native git
         const { createTestRepo, createInitialCommit, createBranch, createCommit, nativeMerge, isGitAvailable, getBackendDir } = await import('@awesome-os/universal-git-test-helpers/helpers/nativeGit.ts')
-        const { execSync } = await import('child_process')
 
         if (!isGitAvailable()) {
         // Fallback to fixture-based test if git is not available
