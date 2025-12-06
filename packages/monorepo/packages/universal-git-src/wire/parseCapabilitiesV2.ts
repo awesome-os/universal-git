@@ -1,5 +1,5 @@
 import { GitPktLine } from "../models/GitPktLine.ts"
-import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
+import { UniversalBuffer } from "../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
 
 type ReadFunction = () => Promise<UniversalBuffer | null | true>
 

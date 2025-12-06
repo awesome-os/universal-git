@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { compareStats } from '@awesome-os/universal-git-src/utils/compareStats.ts'
+import { compareStats } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/compareStats.ts'
 import type { Stat } from '@awesome-os/universal-git-src/models/FileSystem.ts'
 
 test('compareStats', async (t) => {

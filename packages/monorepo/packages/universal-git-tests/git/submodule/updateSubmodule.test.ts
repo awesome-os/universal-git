@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { makeNodeFixture } from '../../helpers/makeNodeFixture.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
+import { join } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts'
 
 test('updateSubmodule', async (t) => {
   await t.test('ok:updates-submodule', async () => {
@@ -18,7 +18,7 @@ test('updateSubmodule', async (t) => {
     await repo.gitBackend.updateSubmodule(repo.worktreeBackend, 'lib', 'abc123')
     
     // Verify submodule was initialized (updateSubmodule calls initSubmodule)
-    const { ConfigAccess } = await import('@awesome-os/universal-git-src/utils/configAccess.ts')
+    const { ConfigAccess } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/configAccess.ts')
     const configAccess = new ConfigAccess(fs, gitdir)
     const url = await configAccess.getConfigValue('submodule.lib.url', 'local')
     assert.strictEqual(url, 'https://github.com/user/lib.git')

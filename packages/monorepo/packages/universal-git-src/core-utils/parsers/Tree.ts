@@ -1,10 +1,10 @@
-import { InternalError } from "../../errors/InternalError.ts"
-import { UnsafeFilepathError } from "../../errors/UnsafeFilepathError.ts"
-import { comparePath } from "../../utils/comparePath.ts"
-import { compareTreeEntryPath } from "../../utils/compareTreeEntryPath.ts"
-import { getOidLength, type ObjectFormat } from "../../utils/detectObjectFormat.ts"
+import { InternalError } from "../../git/errors/InternalError.ts"
+import { UnsafeFilepathError } from "../../git/errors/UnsafeFilepathError.ts"
+import { comparePath } from "../../git/backends/GitBackendFs/utils/comparePath.ts"
+import { compareTreeEntryPath } from "../../git/backends/GitBackendFs/utils/compareTreeEntryPath.ts"
+import { getOidLength, type ObjectFormat } from "../../git/backends/GitBackendFs/utils/detectObjectFormat.ts"
 import type { TreeEntry } from "../../models/GitTree.ts"
-import { UniversalBuffer } from "../../utils/UniversalBuffer.ts"
+import { UniversalBuffer } from "../../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
 
 const mode2type = (mode: string): 'tree' | 'blob' | 'commit' => {
   // prettier-ignore

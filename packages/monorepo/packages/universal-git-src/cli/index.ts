@@ -35,7 +35,7 @@ export const cli = async (args: string[], options: CliOptions = {} as CliOptions
   if (!command) {
     // No command provided, show help or version
     if (flags.version || flags.v) {
-      const { version } = await import('../utils/version.ts')
+      const { version } = await import('../git/backends/GitBackendFs/utils/version.ts')
       return version()
     }
     // Show help

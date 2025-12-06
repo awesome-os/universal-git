@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { normalizeMode } from '@awesome-os/universal-git-src/utils/normalizeMode.ts'
+import { normalizeMode } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/normalizeMode.ts'
 
 test('normalizeMode', async (t) => {
   await t.test('ok:normalizes-directory-mode', () => {

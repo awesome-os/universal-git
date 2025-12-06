@@ -66,7 +66,7 @@ test('readNote', async (t) => {
   })
 
   await t.test('param:fs-missing', async () => {
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await readNote({
         gitdir: '/tmp/test.git',
@@ -81,7 +81,7 @@ test('readNote', async (t) => {
 
   await t.test('param:oid-missing', async () => {
     const { fs, gitdir } = await makeFixture('test-readNote')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await readNote({
         fs,
@@ -126,7 +126,7 @@ test('readNote', async (t) => {
 
   await t.test('error:caller-property', async () => {
     const { fs, gitdir } = await makeFixture('test-readNote')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await readNote({
         fs,
@@ -141,7 +141,7 @@ test('readNote', async (t) => {
 
   await t.test('error:note-not-exist', async () => {
     const { fs, gitdir } = await makeFixture('test-readNote')
-    const { NotFoundError } = await import('@awesome-os/universal-git-src/errors/NotFoundError.ts')
+    const { NotFoundError } = await import('@awesome-os/universal-git-src/git/errors/NotFoundError.ts')
     try {
       await readNote({
         fs,

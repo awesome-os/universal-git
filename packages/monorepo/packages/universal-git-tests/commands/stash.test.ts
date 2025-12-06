@@ -1079,7 +1079,7 @@ describe('stash', () => {
     // Note: If ignoreSystemConfig is false, system/global config might provide author
     // So we use ignoreSystemConfig: true to ensure we test the error path
     assert.notStrictEqual(error, null)
-    const { MissingNameError } = await import('@awesome-os/universal-git-src/errors/MissingNameError.ts')
+    const { MissingNameError } = await import('@awesome-os/universal-git-src/git/errors/MissingNameError.ts')
     assert.ok(error instanceof MissingNameError)
   })
 

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { filterCapabilities } from '@awesome-os/universal-git-src/utils/filterCapabilities.ts'
+import { filterCapabilities } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/filterCapabilities.ts'
 
 test('filterCapabilities', async (t) => {
   await t.test('ok:filters-client-to-server', () => {

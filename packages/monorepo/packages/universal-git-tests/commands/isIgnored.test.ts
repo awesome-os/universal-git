@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { isIgnored } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { MissingParameterError } from '@awesome-os/universal-git-src/errors/MissingParameterError.ts'
+import { MissingParameterError } from '@awesome-os/universal-git-src/git/errors/MissingParameterError.ts'
 
 test('isIgnored', async (t) => {
   await t.test('param:fs-missing', async () => {
@@ -70,7 +70,7 @@ test('isIgnored', async (t) => {
   await t.test('ok:non-ignored-file', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
     
-    const result = await isIgnored({ repo, filepath: 'test.txt' })
+    const result = await isIgnored({ repo, dir, filepath: 'test.txt' })
     assert.strictEqual(result, false, 'Non-ignored file should return false')
   })
 
@@ -79,7 +79,7 @@ test('isIgnored', async (t) => {
     // Create .gitignore file
     await fs.write(`${dir}/.gitignore`, 'test.txt\n')
     
-    const result = await isIgnored({ repo, filepath: 'test.txt' })
+    const result = await isIgnored({ repo, dir, filepath: 'test.txt' })
     assert.strictEqual(result, true, 'Ignored file should return true')
   })
 
@@ -88,8 +88,8 @@ test('isIgnored', async (t) => {
     // Create .gitignore file
     await fs.write(`${dir}/.gitignore`, 'ignored.txt\n')
     
-    // Test with repo (gitdir should be derived)
-    const result = await isIgnored({ repo, filepath: 'ignored.txt' })
+    // Test with repo and dir (gitdir should be derived from dir)
+    const result = await isIgnored({ repo, dir, filepath: 'ignored.txt' })
     assert.strictEqual(result, true, 'Ignored file should return true')
   })
 })

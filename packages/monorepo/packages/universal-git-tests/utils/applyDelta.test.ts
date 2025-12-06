@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { applyDelta } from '@awesome-os/universal-git-src/utils/applyDelta.ts'
-import { InternalError } from '@awesome-os/universal-git-src/errors/InternalError.ts'
+import { applyDelta } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/applyDelta.ts'
+import { InternalError } from '@awesome-os/universal-git-src/git/errors/InternalError.ts'
 
 // Helper to encode variable-length integer (little-endian)
 function encodeVarInt(value: number): number[] {

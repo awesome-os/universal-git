@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { fromStream } from '@awesome-os/universal-git-src/utils/fromStream.ts'
+import { fromStream } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/fromStream.ts'
 
 test('fromStream', async (t) => {
   await t.test('ok:convert-ReadableStream-to-iterator', async () => {

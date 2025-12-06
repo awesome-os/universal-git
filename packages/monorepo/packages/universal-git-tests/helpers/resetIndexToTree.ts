@@ -1,6 +1,6 @@
 import { listFiles } from '@awesome-os/universal-git-src/index.ts'
 import { GitIndex } from '@awesome-os/universal-git-src/git/index/GitIndex.ts'
-import { resolveFilepath } from '@awesome-os/universal-git-src/utils/resolveFilepath.ts'
+import { resolveFilepath } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/resolveFilepath.ts'
 import { normalize as normalizePath } from '@awesome-os/universal-git-src/core-utils/GitPath.ts'
 import type { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 
@@ -60,7 +60,7 @@ export async function resetIndexToTree({
     try {
       // Resolve the OID for this filepath in the tree
       // Use a helper that works with gitBackend instead of requiring fs
-      const { resolveFilepathInTree } = await import('@awesome-os/universal-git-src/utils/resolveFilepath.ts')
+      const { resolveFilepathInTree } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/resolveFilepath.ts')
       // For now, we'll need to read the tree and traverse it manually
       // Since resolveFilepath requires fs, we need a different approach
       // Let's use gitBackend.readObject to read tree objects

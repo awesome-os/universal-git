@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { normalizeStats } from '@awesome-os/universal-git-src/utils/normalizeStats.ts'
+import { normalizeStats } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/normalizeStats.ts'
 
 test('normalizeStats', async (t) => {
   await t.test('ok:normalizes-seconds-nanoseconds', () => {

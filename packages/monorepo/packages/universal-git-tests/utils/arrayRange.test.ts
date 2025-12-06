@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { arrayRange } from '@awesome-os/universal-git-src/utils/arrayRange.ts'
+import { arrayRange } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/arrayRange.ts'
 
 test('arrayRange', async (t) => {
   await t.test('ok:creates-range-start-to-end-1', () => {

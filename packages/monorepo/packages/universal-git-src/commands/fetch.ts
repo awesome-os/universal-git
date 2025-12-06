@@ -1,18 +1,18 @@
 import { _currentBranch } from './currentBranch.ts'
-import { MissingParameterError } from "../errors/MissingParameterError.ts"
-import { RemoteCapabilityError } from "../errors/RemoteCapabilityError.ts"
+import { MissingParameterError } from "../../../../git/errors/MissingParameterError.ts"
+import { RemoteCapabilityError } from "../../../../git/errors/RemoteCapabilityError.ts"
 import { ConfigAccess } from "../utils/configAccess.ts"
-import { expandRef, resolveRefAgainstMap } from "../git/refs/expandRef.ts"
-import { resolveRef } from "../git/refs/readRef.ts"
-import { listRefs } from "../git/refs/listRefs.ts"
-import { updateRemoteRefs } from "../git/refs/updateRemoteRefs.ts"
-import { readShallow, writeShallow } from "../git/shallow.ts"
-import { getRemoteHelperFor } from "../git/remote/getRemoteHelper.ts"
-import { RemoteBackendRegistry } from "../git/remote/RemoteBackendRegistry.ts"
-import { GitCommit } from "../models/GitCommit.ts"
-import { GitPackIndex } from "../models/GitPackIndex.ts"
-import { hasObject } from "../git/objects/hasObject.ts"
-import { readObject } from "../git/objects/readObject.ts"
+import { expandRef, resolveRefAgainstMap } from "../../../refs/expandRef.ts"
+import { resolveRef } from "../../../refs/readRef.ts"
+import { listRefs } from "../../../refs/listRefs.ts"
+import { updateRemoteRefs } from "../../../refs/updateRemoteRefs.ts"
+import { readShallow, writeShallow } from "../../../shallow.ts"
+import { getRemoteHelperFor } from "../../../remote/getRemoteHelper.ts"
+import { RemoteBackendRegistry } from "../../../remote/RemoteBackendRegistry.ts"
+import { GitCommit } from "../../../../models/GitCommit.ts"
+import { GitPackIndex } from "../../../../models/GitPackIndex.ts"
+import { hasObject } from "../../../objects/hasObject.ts"
+import { readObject } from "../../../objects/readObject.ts"
 import { abbreviateRef } from "../utils/abbreviateRef.ts"
 import { collect } from "../utils/collect.ts"
 import { emptyPackfile } from "../utils/emptyPackfile.ts"
@@ -22,27 +22,27 @@ import { fromValue } from "../utils/fromValue.ts"
 import { normalizeCommandArgs } from '../utils/commandHelpers.ts'
 import { pkg } from "../utils/pkg.ts"
 import { splitLines } from "../utils/splitLines.ts"
-import { parseUploadPackResponse } from "../wire/parseUploadPackResponse.ts"
-import { writeUploadPackRequest } from "../wire/writeUploadPackRequest.ts"
+import { parseUploadPackResponse } from "../../../../wire/parseUploadPackResponse.ts"
+import { writeUploadPackRequest } from "../../../../wire/writeUploadPackRequest.ts"
 import { assertParameter } from "../utils/assertParameter.ts"
 import { join } from "../utils/join.ts"
 import { createFileSystem } from "../utils/createFileSystem.ts"
-import { Repository } from "../core-utils/Repository.ts"
+import { Repository } from "../../../../core-utils/Repository.ts"
 import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
-import type { FileSystem } from "../models/FileSystem.ts"
+import type { FileSystem } from "../../../../models/FileSystem.ts"
 import type {
   HttpClient,
   ProgressCallback,
   AuthCallback,
   AuthFailureCallback,
   AuthSuccessCallback,
-} from "../git/remote/types.ts"
-import type { GitRemoteBackend } from "../git/remote/GitRemoteBackend.ts"
-import type { TcpClient, TcpProgressCallback } from "../daemon/TcpClient.ts"
+} from "../../../remote/types.ts"
+import type { GitRemoteBackend } from "../../../remote/GitRemoteBackend.ts"
+import type { TcpClient, TcpProgressCallback } from "../../../../daemon/TcpClient.ts"
 import type { SshClient, SshProgressCallback } from "../ssh/SshClient.ts"
-import { GitRemoteDaemon } from "../git/remote/GitRemoteDaemon.ts"
-import { GitRemoteHTTP } from "../git/remote/GitRemoteHTTP.ts"
-import { GitRemoteSSH } from "../git/remote/GitRemoteSSH.ts"
+import { GitRemoteDaemon } from "../../../remote/GitRemoteDaemon.ts"
+import { GitRemoteHTTP } from "../../../remote/GitRemoteHTTP.ts"
+import { GitRemoteSSH } from "../../../remote/GitRemoteSSH.ts"
 
 // ============================================================================
 // FETCH TYPES
@@ -97,6 +97,7 @@ export async function fetch({
   prune = false,
   pruneTags = false,
   cache = {},
+  filter = null,
 }: {
   repo?: Repository
   fs?: FileSystem
@@ -126,6 +127,7 @@ export async function fetch({
   prune?: boolean
   pruneTags?: boolean
   cache?: Record<string, unknown>
+  filter?: string | null
 }): Promise<FetchResult> {
   try {
     const { repo, fs, gitdir: effectiveGitdir, cache: effectiveCache } = await normalizeCommandArgs({
@@ -156,6 +158,7 @@ export async function fetch({
       headers,
       prune,
       pruneTags,
+      filter,
     })
 
     return await _fetch({
@@ -186,6 +189,7 @@ export async function fetch({
       headers,
       prune,
       pruneTags,
+      filter,
     })
   } catch (err) {
     ;(err as { caller?: string }).caller = 'git.fetch'
@@ -226,6 +230,7 @@ export async function _fetch({
   prune = false,
   pruneTags = false,
   protocolVersion = 2,
+  filter = null,
 }: {
   repo?: Repository
   fs?: FileSystem
@@ -255,6 +260,7 @@ export async function _fetch({
   prune?: boolean
   pruneTags?: boolean
   protocolVersion?: 1 | 2
+  filter?: string | null
 }): Promise<FetchResult> {
   // Backward compatibility: Create Repository if not provided
   let repo: Repository
@@ -264,7 +270,7 @@ export async function _fetch({
 
   if (_repo) {
     repo = _repo
-    fs = repo.fs
+    fs = repo.gitBackend.getFs()
     cache = repo.cache
     gitdir = await repo.getGitdir()
   } else {
@@ -338,7 +344,7 @@ export async function _fetch({
     // For git:// protocol, try to get default TCP client if not provided
     if (url.startsWith('git://') && !tcp) {
       try {
-        const { tcpClient } = await import('../daemon/node/index.ts')
+        const { tcpClient } = await import('../../../../daemon/node/index.ts')
         tcp = tcpClient
       } catch {
         // If we can't import TCP client, let RemoteBackendRegistry handle the error
@@ -401,10 +407,30 @@ export async function _fetch({
     console.log(`[Git Protocol] Server responded with v2, fetching refs separately using ls-refs command`)
     
     // Protocol v2 requires separate ls-refs command to get refs
-    const { writeListRefsRequest } = await import('../wire/writeListRefsRequest.ts')
-    const { parseListRefsResponse } = await import('../wire/parseListRefsResponse.ts')
+    const { writeListRefsRequest } = await import('../../../../wire/writeListRefsRequest.ts')
+    const { parseListRefsResponse } = await import('../../../../wire/parseListRefsResponse.ts')
     
-    const body = await writeListRefsRequest({ symrefs: true })
+    // OPTIMIZATION: If singleBranch is true, only fetch relevant refs
+    let prefixes: string[] | undefined
+    if (singleBranch) {
+      if (_ref) {
+        // If a specific ref is requested, only fetch that ref and HEAD
+        prefixes = [_ref]
+        if (!_ref.startsWith('refs/')) {
+          prefixes.push(`refs/heads/${_ref}`)
+          prefixes.push(`refs/tags/${_ref}`)
+        }
+        prefixes.push('HEAD')
+      } else {
+        // If no specific ref, we need HEAD to determine default branch
+        // We also fetch refs/heads/ to be able to resolve HEAD if it's a symref
+        // But fetching all refs/heads/ can be expensive (50k refs in vscode)
+        // Heuristic: Fetch HEAD and common branch names
+        prefixes = ['HEAD', 'refs/heads/main', 'refs/heads/master', 'refs/heads/trunk', 'refs/heads/develop']
+      }
+    }
+
+    const body = await writeListRefsRequest({ symrefs: true, prefixes })
     
     // Create an async iterator that yields individual buffers as Uint8Array
     const bodyIterator = (async function* () {
@@ -605,6 +631,7 @@ export async function _fetch({
     since: since === null || since === undefined ? undefined : since,
     exclude: exclude as never[],
     protocolVersion: remoteHTTP.protocolVersion,
+    filter,
   })
   // CodeCommit will hang up if we don't send a Content-Length header
   // Collect all pkt-line buffers into a single request body buffer

@@ -1,8 +1,8 @@
-import { InvalidOidError } from "../errors/InvalidOidError.ts"
+import { InvalidOidError } from "../git/errors/InvalidOidError.ts"
 import { GitSideBand } from "../models/GitSideBand.ts"
-import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
-import { forAwait } from "../utils/forAwait.ts"
-import type { FIFO } from "../utils/FIFO.ts"
+import { UniversalBuffer } from "../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
+import { forAwait } from "../git/backends/GitBackendFs/utils/forAwait.ts"
+import type { FIFO } from "../git/backends/GitBackendFs/utils/FIFO.ts"
 
 export type ParseUploadPackResponseResult = {
   shallows: string[]

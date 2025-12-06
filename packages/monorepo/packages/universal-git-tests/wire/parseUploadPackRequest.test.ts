@@ -4,7 +4,7 @@ import { parseUploadPackRequest } from '@awesome-os/universal-git-src/wire/parse
 import { GitPktLine } from '@awesome-os/universal-git-src/models/GitPktLine.ts'
 
 // Helper function to create an async iterable from an array of buffers
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 const createStream = UniversalBuffer.createStream
 
 test('parseUploadPackRequest', async (t) => {

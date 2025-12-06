@@ -1,14 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { resolveObject } from '@awesome-os/universal-git-src/utils/resolveObject.ts'
+import { resolveObject } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/resolveObject.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { writeBlob, writeCommit, writeTree, writeTag } from '@awesome-os/universal-git-src/index.ts'
 import { parse as parseBlob } from '@awesome-os/universal-git-src/core-utils/parsers/Blob.ts'
 import { parse as parseTree } from '@awesome-os/universal-git-src/core-utils/parsers/Tree.ts'
 import { parse as parseCommit } from '@awesome-os/universal-git-src/core-utils/parsers/Commit.ts'
-import { ObjectTypeError } from '@awesome-os/universal-git-src/errors/ObjectTypeError.ts'
-import { NotFoundError } from '@awesome-os/universal-git-src/errors/NotFoundError.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { ObjectTypeError } from '@awesome-os/universal-git-src/git/errors/ObjectTypeError.ts'
+import { NotFoundError } from '@awesome-os/universal-git-src/git/errors/NotFoundError.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 test('resolveObject', async (t) => {
   await t.test('ok:resolves-blob', async () => {

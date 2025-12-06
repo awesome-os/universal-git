@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { listCommitsAndTags } from '@awesome-os/universal-git-src/commands/listCommitsAndTags.ts'
+import { listCommitsAndTags } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/listCommitsAndTags.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { init, commit, writeBlob, writeTree, writeCommit, writeRef, tag } from '@awesome-os/universal-git-src/index.ts'
 

@@ -1,5 +1,5 @@
-import { UniversalBuffer } from '../utils/UniversalBuffer.ts'
-import { deflate as pakoDeflate, inflate as pakoInflate } from '../utils/pako-stream.ts'
+import { UniversalBuffer } from '../git/backends/GitBackendFs/utils/UniversalBuffer.ts'
+import { deflate as pakoDeflate, inflate as pakoInflate } from '../git/backends/GitBackendFs/utils/pako-stream.ts'
 
 /**
  * Compresses a buffer using zlib deflate

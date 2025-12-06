@@ -383,6 +383,6 @@ export abstract class GitForgeAdapter {
 }
 
 // Helper imports for apiRequest
-import { fromValue } from '../../utils/fromValue.ts'
-import { collect } from '../../utils/collect.ts'
+import { fromValue } from '../backends/GitBackendFs/utils/fromValue.ts'
+import { collect } from '../backends/GitBackendFs/utils/collect.ts'
 

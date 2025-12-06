@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { createApiWrapper } from '@awesome-os/universal-git-src/utils/apiWrapper.ts'
+import { createApiWrapper } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/apiWrapper.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import type { FileSystemProvider } from '@awesome-os/universal-git-src/models/FileSystem.ts'
 

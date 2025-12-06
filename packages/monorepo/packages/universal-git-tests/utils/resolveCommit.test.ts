@@ -1,11 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { resolveCommit } from '@awesome-os/universal-git-src/utils/resolveCommit.ts'
+import { resolveCommit } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/resolveCommit.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { writeCommit, writeTag, writeBlob, writeTree } from '@awesome-os/universal-git-src/index.ts'
-import { ObjectTypeError } from '@awesome-os/universal-git-src/errors/ObjectTypeError.ts'
-import { NotFoundError } from '@awesome-os/universal-git-src/errors/NotFoundError.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { ObjectTypeError } from '@awesome-os/universal-git-src/git/errors/ObjectTypeError.ts'
+import { NotFoundError } from '@awesome-os/universal-git-src/git/errors/NotFoundError.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 test('resolveCommit', async (t) => {
   await t.test('ok:resolves-commit', async () => {

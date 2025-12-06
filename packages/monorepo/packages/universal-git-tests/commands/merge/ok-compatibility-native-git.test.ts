@@ -24,7 +24,7 @@ import { execSync } from 'child_process'
 import { join } from 'path'
 import { mkdirSync, rmSync, existsSync } from 'fs'
 import { tmpdir } from 'os'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 /**
  * Helper function to read and compare git config before merge
@@ -139,7 +139,7 @@ describe('merge', () => {
 
         // Open repository using Repository class (new constructor pattern)
         const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-        const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+        const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
         const { GitWorktreeFs } = await import('@awesome-os/universal-git-src/git/worktree/fs/GitWorktreeFs.ts')
         const gitBackend = new GitBackendFs(fs, join(sourceRepoPath, '.git'))
         const worktreeBackend = new GitWorktreeFs(fs, sourceRepoPath)
@@ -155,7 +155,7 @@ describe('merge', () => {
         await configService.set('user.email', 'test@example.com')
 
         // Create initial commit
-        const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+        const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
         const normalizedFs = createFileSystem(fs)
         await normalizedFs.write(join(sourceRepoPath, 'file1.txt'), 'content 1\n')
         await normalizedFs.write(join(sourceRepoPath, 'file2.txt'), 'content 2\n')
@@ -193,7 +193,7 @@ describe('merge', () => {
 
         // Switch back to main (or master) and make another commit
         console.log('Checking out main...')
-        const branches = await fs.promises.readdir(join(sourceRepoPath, '.git/refs/heads'))
+        const branches = await normalizedFs.readdir(join(sourceRepoPath, '.git/refs/heads'))
         const mainBranch = branches.includes('main') ? 'main' : 'master'
         console.log(`Detected main branch: ${mainBranch}`)
         await checkout({ fs, dir: sourceRepoPath, ref: mainBranch })
@@ -232,7 +232,7 @@ describe('merge', () => {
         // Note: sourceRepoPath is a separate repo, not using NativeGitBackend
         // So we need to use execSync here or create a Repository instance
         const { Repository: RepoClass } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
-        const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+        const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
         const { GitWorktreeFs } = await import('@awesome-os/universal-git-src/git/worktree/fs/GitWorktreeFs.ts')
         const sourceGitBackend = new GitBackendFs(fs, join(sourceRepoPath, '.git'))
         const sourceWorktreeBackend = new GitWorktreeFs(fs, sourceRepoPath)

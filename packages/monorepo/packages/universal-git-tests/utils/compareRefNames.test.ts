@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { compareRefNames } from '@awesome-os/universal-git-src/utils/compareRefNames.ts'
+import { compareRefNames } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/compareRefNames.ts'
 
 test('compareRefNames', async (t) => {
   await t.test('ok:compare-refs-a-lt-b', () => {

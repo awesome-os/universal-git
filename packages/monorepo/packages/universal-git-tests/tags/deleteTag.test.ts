@@ -35,7 +35,7 @@ test('deleteTag', async (t) => {
   })
 
   await t.test('param:fs-missing', async () => {
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await deleteTag({
         gitdir: '/tmp/test.git',
@@ -64,7 +64,7 @@ test('deleteTag', async (t) => {
 
   await t.test('error:caller-property', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-deleteTag')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await deleteTag({
         repo: undefined as any,

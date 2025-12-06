@@ -3,7 +3,7 @@ import { readObject } from '../../objects/readObject.ts'
 import { parse as parseBlob } from '../../../core-utils/parsers/Blob.ts'
 import type { FileSystemProvider } from "../../../models/FileSystem.ts"
 import type { GitBackend } from '../../../backends/GitBackend.ts'
-import { UniversalBuffer } from '../../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 /**
  * Gets the notes ref for a given namespace

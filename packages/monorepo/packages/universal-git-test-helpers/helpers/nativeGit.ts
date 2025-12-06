@@ -109,7 +109,7 @@ export async function createTestRepo(objectFormat: 'sha1' | 'sha256' = 'sha1'): 
     console.log(`  backendDir: ${backendDir}`)
 
     // CRITICAL: Create NativeGitBackend - uses native git CLI for operations
-    const { NativeGitBackend } = await import('@awesome-os/universal-git-src/backends/NativeGitBackend.ts')
+    const { NativeGitBackend } = await import('@awesome-os/universal-git-src/git/backends/NativeGitBackend.ts')
     const gitBackend = new NativeGitBackend(fs, gitdir, backendDir)
 
     // Query native git for actual config file locations to ensure Repository can read them
@@ -627,7 +627,7 @@ export async function nativeMerge(
   const dir = getBackendDir(repo)
   
   // Checkout our branch using universal-git checkout
-  const { checkout } = await import('@awesome-os/universal-git-src/commands/checkout.ts')
+  const { checkout } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/checkout.ts')
   await checkout({ repo: repo.repo, ref: ours, force: true })
   
   // Ensure all objects are accessible before merge
@@ -660,7 +660,7 @@ export async function nativeMerge(
     })
 
     // Check if merge result is a MergeConflictError
-    const { MergeConflictError } = await import('@awesome-os/universal-git-src/errors/MergeConflictError.ts')
+    const { MergeConflictError } = await import('@awesome-os/universal-git-src/git/errors/MergeConflictError.ts')
     const isConflictError = (mergeResult as any)?.code === 'MergeConflictError' || (mergeResult && typeof mergeResult === 'object' && (mergeResult as any).code === 'MergeConflictError')
     
     if (isConflictError) {
@@ -674,7 +674,7 @@ export async function nativeMerge(
         const ourOid = await repo.repo.gitBackend.readRef(`refs/heads/${ours}`) || ''
         if (ourOid) {
           await repo.repo.gitBackend.writeRef(`refs/heads/${ours}`, ourOid)
-          const { checkout } = await import('@awesome-os/universal-git-src/commands/checkout.ts')
+          const { checkout } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/checkout.ts')
           await checkout({ repo: repo.repo, ref: ours, force: true })
         }
       } else {

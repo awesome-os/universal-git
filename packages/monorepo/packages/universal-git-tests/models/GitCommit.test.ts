@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { GitCommit } from '@awesome-os/universal-git-src/models/GitCommit.ts'
-import { InternalError } from '@awesome-os/universal-git-src/errors/InternalError.ts'
+import { InternalError } from '@awesome-os/universal-git-src/git/errors/InternalError.ts'
 
 test('GitCommit', async (t) => {
   await t.test('constructor with string', () => {

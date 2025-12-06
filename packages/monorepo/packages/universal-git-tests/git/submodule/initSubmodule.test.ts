@@ -17,7 +17,7 @@ test('initSubmodule', async (t) => {
     await repo.gitBackend.initSubmodule(repo.worktreeBackend, 'lib')
     
     // Verify URL was copied to config
-    const { ConfigAccess } = await import('@awesome-os/universal-git-src/utils/configAccess.ts')
+    const { ConfigAccess } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/configAccess.ts')
     const configAccess = new ConfigAccess(fs, gitdir)
     const url = await configAccess.getConfigValue('submodule.lib.url', 'local')
     
@@ -53,7 +53,7 @@ test('initSubmodule', async (t) => {
     await fs.write(join(dir, '.gitmodules'), gitmodulesContent)
     
     // Set URL in config first
-    const { ConfigAccess } = await import('@awesome-os/universal-git-src/utils/configAccess.ts')
+    const { ConfigAccess } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/configAccess.ts')
     const configAccess = new ConfigAccess(fs, gitdir)
     await configAccess.setConfigValue('submodule.lib.url', 'https://github.com/user/custom-lib.git', 'local')
     

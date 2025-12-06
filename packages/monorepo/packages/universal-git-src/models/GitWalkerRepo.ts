@@ -1,12 +1,12 @@
-import { NotFoundError } from '../errors/NotFoundError.ts'
-import { ObjectTypeError } from '../errors/ObjectTypeError.ts'
+import { NotFoundError } from '../git/errors/NotFoundError.ts'
+import { ObjectTypeError } from '../git/errors/ObjectTypeError.ts'
 import { GitTree } from './GitTree.ts'
-import { join } from "../utils/join.ts"
-import { normalizeMode } from "../utils/normalizeMode.ts"
-import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
+import { join } from "../git/backends/GitBackendFs/utils/join.ts"
+import { normalizeMode } from "../git/backends/GitBackendFs/utils/normalizeMode.ts"
+import { UniversalBuffer } from "../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
 import type { Stat } from './FileSystem.ts'
 import type { TreeEntry } from './GitTree.ts'
-import type { GitBackend } from '../backends/GitBackend.ts'
+import type { GitBackend } from '../git/backends/GitBackend.ts'
 
 type TreeEntryEntry = {
   _fullpath: string

@@ -1,7 +1,7 @@
 import { parse as parseConfig, type ConfigObject } from '../../core-utils/ConfigParser.ts'
 import { join } from '../../core-utils/GitPath.ts'
 import type { FileSystemProvider } from '../../models/FileSystem.ts'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 /**
  * Loads system config from the specified path.

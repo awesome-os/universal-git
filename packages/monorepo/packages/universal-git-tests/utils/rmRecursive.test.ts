@@ -1,9 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { rmRecursive } from '@awesome-os/universal-git-src/utils/rmRecursive.ts'
+import { rmRecursive } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/rmRecursive.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
-import { createFileSystem } from '@awesome-os/universal-git-src/utils/createFileSystem.ts'
+import { join } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts'
+import { createFileSystem } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts'
 
 test('rmRecursive', async (t) => {
   await t.test('ok:removes-single-file', async () => {

@@ -2,8 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { NotFoundError } from '@awesome-os/universal-git-src/errors/NotFoundError.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
+import { NotFoundError } from '@awesome-os/universal-git-src/git/errors/NotFoundError.ts'
+import { join } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts'
 
 test('Repository', async (t) => {
   await t.test('detectConfigPaths with GIT_CONFIG_SYSTEM env var', async () => {

@@ -1,4 +1,4 @@
-import type { UniversalBuffer } from '../utils/UniversalBuffer.ts'
+import type { UniversalBuffer } from '../git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 /**
  * Normalizes a filepath to use forward slashes (Git convention)
@@ -16,8 +16,8 @@ export const normalizeBuffer = (buffer: Uint8Array | UniversalBuffer): Uint8Arra
   return buffer
 }
 
-import type { ObjectFormat } from '../utils/detectObjectFormat.ts'
-import { getOidLength } from '../utils/detectObjectFormat.ts'
+import type { ObjectFormat } from '../git/backends/GitBackendFs/utils/detectObjectFormat.ts'
+import { getOidLength } from '../git/backends/GitBackendFs/utils/detectObjectFormat.ts'
 
 /**
  * Converts a full SHA OID to its object path components

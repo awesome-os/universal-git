@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { GitRemoteDaemon } from '@awesome-os/universal-git-src/git/remote/GitRemoteDaemon.ts'
-import { ParseError } from '@awesome-os/universal-git-src/errors/ParseError.ts'
+import { ParseError } from '@awesome-os/universal-git-src/git/errors/ParseError.ts'
 
 test('GitRemoteDaemon', async (t) => {
   await t.test('capabilities returns discover and connect', async () => {

@@ -7,9 +7,9 @@
  */
 
 // worktree is not exported correctly, use relative path
-import { worktree } from '@awesome-os/universal-git-src/commands/worktree.ts'
+import { worktree } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/worktree.ts'
 // join is not exported as subpath, use relative path
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
+import { join } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts'
 // FileSystemProvider is not exported as subpath, use relative path
 import type { FileSystemProvider } from '@awesome-os/universal-git-src/models/FileSystem.ts'
 import { tmpdir } from 'os'
@@ -100,8 +100,9 @@ export async function commitInWorktree({
   const mainGitdir = await repo.getGitdir()
   
   // Create repository for the worktree
+  const fs = repo.gitBackend.getFs()
   const worktreeRepo = await createRepository({
-    fs: repo.fs!,
+    fs: fs,
     dir: worktreePath,
     gitdir: mainGitdir,
     cache: repo.cache,
@@ -111,9 +112,9 @@ export async function commitInWorktree({
   // Get branch name from worktree or use provided branch
   let branchName = branch
   if (!branchName) {
-    const { currentBranch } = await import('@awesome-os/universal-git-src/commands/currentBranch.ts')
+    const { currentBranch } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/currentBranch.ts')
     const currentBranchName = await currentBranch({
-      fs: repo.fs,
+      fs: fs,
       dir: worktreePath,
       gitdir: mainGitdir,
     })
@@ -135,12 +136,12 @@ export async function commitInWorktree({
       const branchOid = await worktreeRepo.resolveRef(fullBranchRef)
       
       // Write HEAD symbolic ref to worktree gitdir (HEAD is worktree-specific)
-      // worktreeRepo.writeSymbolicRefDirect() automatically handles this worktree context
-      await worktreeRepo.writeSymbolicRefDirect('HEAD', fullBranchRef, branchOid)
+      // Use gitBackend.writeSymbolicRef() which automatically handles worktree context
+      await worktreeRepo.gitBackend.writeSymbolicRef('HEAD', fullBranchRef, branchOid)
     } catch {
       // If branch doesn't exist yet, that's okay - it will be created by the commit
       // Still set the symbolic ref so the commit updates the branch
-      await worktreeRepo.writeSymbolicRefDirect('HEAD', fullBranchRef)
+      await worktreeRepo.gitBackend.writeSymbolicRef('HEAD', fullBranchRef)
     }
   }
 
@@ -150,7 +151,7 @@ export async function commitInWorktree({
   // This ensures:
   // 1. Commit reads HEAD from worktree gitdir (where we set the symbolic ref)
   // 2. Commit writes branch refs to main gitdir (via Repository.writeRef worktree handling)
-  const { commit } = await import('@awesome-os/universal-git-src/commands/commit.ts')
+  const { commit } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/commit.ts')
   return await commit({
     repo: worktreeRepo,
     message,

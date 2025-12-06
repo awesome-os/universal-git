@@ -2,8 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { deleteRef, init } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { MissingParameterError } from '@awesome-os/universal-git-src/errors/MissingParameterError.ts'
-import { NotFoundError } from '@awesome-os/universal-git-src/errors/NotFoundError.ts'
+import { MissingParameterError } from '@awesome-os/universal-git-src/git/errors/MissingParameterError.ts'
+import { NotFoundError } from '@awesome-os/universal-git-src/git/errors/NotFoundError.ts'
 
 test('deleteRef', async (t) => {
   await t.test('param:fs-missing', async () => {

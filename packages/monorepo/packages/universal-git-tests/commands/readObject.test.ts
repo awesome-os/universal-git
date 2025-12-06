@@ -372,7 +372,7 @@ describe('readObject', () => {
       error = err
     }
     assert.notStrictEqual(error, null)
-    const { InternalError } = await import('@awesome-os/universal-git-src/errors/InternalError.ts')
+    const { InternalError } = await import('@awesome-os/universal-git-src/git/errors/InternalError.ts')
     assert.ok(error instanceof InternalError)
     assert.ok((error as Error).message.includes('invalid requested format'))
   })

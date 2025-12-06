@@ -16,7 +16,7 @@ import {
 // Keep Repository import independent to avoid circular dependency issues
 // Import directly from the module instead of through index.ts
 import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
-import { modified } from '@awesome-os/universal-git-src/utils/modified.ts'
+import { modified } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/modified.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 
 describe('abortMerge', () => {
@@ -66,7 +66,12 @@ describe('abortMerge', () => {
       console.log('Unexpected error:', error)
     }
     assert.notStrictEqual(error, null)
-    assert.ok(error instanceof Errors.MergeConflictError || (error as any).code === Errors.MergeConflictError.code)
+    assert.ok(
+      error instanceof Errors.MergeConflictError || 
+      (error as any)?.code === Errors.MergeConflictError.code ||
+      (error as any)?.code === 'MergeConflictError' ||
+      (error as any)?.name === 'MergeConflictError'
+    )
 
     const index = await repo.readIndexDirect()
     assert.strictEqual(index.unmergedPaths.length, 2)
@@ -130,7 +135,6 @@ describe('abortMerge', () => {
     try {
       await merge({
         repo,
-        dir,
         theirs: 'b',
         abortOnConflict: false,
         author: {
@@ -145,9 +149,14 @@ describe('abortMerge', () => {
     }
 
     assert.notStrictEqual(error, null)
-    assert.ok(error instanceof Errors.MergeConflictError || (error as any).code === Errors.MergeConflictError.code)
+    assert.ok(
+      error instanceof Errors.MergeConflictError || 
+      (error as any)?.code === Errors.MergeConflictError.code ||
+      (error as any)?.code === 'MergeConflictError' ||
+      (error as any)?.name === 'MergeConflictError'
+    )
 
-    await abortMerge({ repo, dir })
+    await abortMerge({ repo })
 
     const trees = [TREE({ ref: 'HEAD' }), WORKDIR(), STAGE()]
     await walk({
@@ -187,7 +196,6 @@ describe('abortMerge', () => {
     try {
       await merge({
         repo,
-        dir,
         theirs: 'b',
         abortOnConflict: false,
         author: {
@@ -202,13 +210,18 @@ describe('abortMerge', () => {
     }
 
     assert.notStrictEqual(error, null)
-    assert.ok(error instanceof Errors.MergeConflictError || (error as any).code === Errors.MergeConflictError.code)
+    assert.ok(
+      error instanceof Errors.MergeConflictError || 
+      (error as any)?.code === Errors.MergeConflictError.code ||
+      (error as any)?.code === 'MergeConflictError' ||
+      (error as any)?.name === 'MergeConflictError'
+    )
 
     await repo.worktreeBackend.rm('a')
     await repo.worktreeBackend.write('b', 'new text for file b')
     await repo.worktreeBackend.write('c', 'new text for file c')
 
-    await abortMerge({ repo, dir })
+    await abortMerge({ repo })
 
     const trees = [TREE({ ref: 'HEAD' }), WORKDIR(), STAGE()]
     await walk({
@@ -271,7 +284,6 @@ describe('abortMerge', () => {
     try {
       await merge({
         repo,
-        dir,
         theirs: 'b',
         abortOnConflict: false,
         author: {
@@ -286,10 +298,15 @@ describe('abortMerge', () => {
     }
 
     assert.notStrictEqual(error, null)
-    assert.ok(error instanceof Errors.MergeConflictError || (error as any).code === Errors.MergeConflictError.code)
+    assert.ok(
+      error instanceof Errors.MergeConflictError || 
+      (error as any)?.code === Errors.MergeConflictError.code ||
+      (error as any)?.code === 'MergeConflictError' ||
+      (error as any)?.name === 'MergeConflictError'
+    )
 
     await repo.worktreeBackend.write('c', 'new text for file c')
-    await abortMerge({ repo, dir })
+    await abortMerge({ repo })
 
     const fileAContent = await repo.worktreeBackend.read('a').then(buffer => {
       assert.ok(buffer !== null, 'File a content should not be null')

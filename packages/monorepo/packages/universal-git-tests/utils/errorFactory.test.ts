@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { createErrorClass, createTypedErrorClass } from '@awesome-os/universal-git-src/utils/errorFactory.ts'
-import { BaseError } from '@awesome-os/universal-git-src/errors/BaseError.ts'
+import { createErrorClass, createTypedErrorClass } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/errorFactory.ts'
+import { BaseError } from '@awesome-os/universal-git-src/git/errors/BaseError.ts'
 
 test('errorFactory', async (t) => {
   await t.test('ok:createErrorClass-string-message', () => {

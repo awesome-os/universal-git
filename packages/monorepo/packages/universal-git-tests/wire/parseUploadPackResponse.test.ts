@@ -2,10 +2,10 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { parseUploadPackResponse } from '@awesome-os/universal-git-src/wire/parseUploadPackResponse.ts'
 import { GitPktLine } from '@awesome-os/universal-git-src/models/GitPktLine.ts'
-import { InvalidOidError } from '@awesome-os/universal-git-src/errors/InvalidOidError.ts'
+import { InvalidOidError } from '@awesome-os/universal-git-src/git/errors/InvalidOidError.ts'
 
 // Helper function to create an async iterable from an array of buffers
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 const createStream = UniversalBuffer.createStream
 
 test('parseUploadPackResponse', async (t) => {

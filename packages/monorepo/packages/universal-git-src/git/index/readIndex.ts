@@ -11,10 +11,10 @@
  * @returns The parsed GitIndex object
  */
 import { GitIndex } from './GitIndex.ts'
-import { createFileSystem } from '../../utils/createFileSystem.ts'
+import { createFileSystem } from '../backends/GitBackendFs/utils/createFileSystem.ts'
 import { join } from '../../core-utils/GitPath.ts'
-import { detectObjectFormat, type ObjectFormat } from '../../utils/detectObjectFormat.ts'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { detectObjectFormat, type ObjectFormat } from '../backends/GitBackendFs/utils/detectObjectFormat.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 import type { FileSystemProvider } from '../../models/FileSystem.ts'
 
 export async function readIndex({

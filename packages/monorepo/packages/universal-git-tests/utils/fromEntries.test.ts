@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { fromEntries } from '@awesome-os/universal-git-src/utils/fromEntries.ts'
+import { fromEntries } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/fromEntries.ts'
 
 test('fromEntries', async (t) => {
   await t.test('ok:convert-map-to-object', () => {

@@ -1,5 +1,5 @@
 // detectObjectFormat is not exported from main package, use relative path
-import { detectObjectFormat, getOidLength, validateOid, type ObjectFormat } from '@awesome-os/universal-git-src/utils/detectObjectFormat.ts'
+import { detectObjectFormat, getOidLength, validateOid, type ObjectFormat } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/detectObjectFormat.ts'
 // FileSystemProvider is not exported as subpath, use relative path
 import type { FileSystemProvider } from '@awesome-os/universal-git-src/models/FileSystem.ts'
 

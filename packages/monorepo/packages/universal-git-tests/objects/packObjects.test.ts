@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { packObjects, indexPack, readObject } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
+import { join } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts'
 import { read } from '@awesome-os/universal-git-src/git/objects/pack.ts'
 import type { ReadResult } from '@awesome-os/universal-git-src/git/objects/readObject.ts'
 

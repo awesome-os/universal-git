@@ -1,5 +1,5 @@
 import { getConfig } from '../config.ts'
-import { join } from '../../utils/join.ts'
+import { join } from '../backends/GitBackendFs/utils/join.ts'
 import type { FileSystemProvider } from '../../models/FileSystem.ts'
 import type { GitBackend } from '../../backends/GitBackend.ts'
 

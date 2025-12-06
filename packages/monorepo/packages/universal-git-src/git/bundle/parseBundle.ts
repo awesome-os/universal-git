@@ -9,8 +9,8 @@
  */
 
 import { GitPktLine } from '../../models/GitPktLine.ts'
-import { collect } from '../../utils/collect.ts'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { collect } from '../backends/GitBackendFs/utils/collect.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 export interface BundleRef {
   ref: string

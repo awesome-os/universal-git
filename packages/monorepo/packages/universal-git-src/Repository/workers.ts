@@ -109,8 +109,8 @@ export async function getProxiedRepository(this: Repository): Promise<ProxiedRep
   try {
     const gitdir = await this.getGitdir()
     repo._proxiedRepository = await worker.call('createRepository', {
-      fs: repo._fs, // Note: fs will need to be proxied via Comlink
-      dir: repo._dir,
+      fs: (repo as any).__fs, // Note: fs will need to be proxied via Comlink
+      dir: (repo as any).__dir,
       gitdir,
       cache: this.cache,
     })

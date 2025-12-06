@@ -46,7 +46,7 @@ dBWrLc3kdnemrlhSRzR2
   })
 
   await t.test('param:fs-missing', async () => {
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await writeTag({
         gitdir: '/tmp/test.git',
@@ -67,7 +67,7 @@ dBWrLc3kdnemrlhSRzR2
 
   await t.test('param:tag-missing-parsed-format', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-writeTag')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await writeTag({
         repo,
@@ -82,7 +82,7 @@ dBWrLc3kdnemrlhSRzR2
 
   await t.test('param:tagBuffer-missing-content-format', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-writeTag')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await writeTag({
         repo,
@@ -157,7 +157,7 @@ dBWrLc3kdnemrlhSRzR2
 
   await t.test('error:caller-property', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-writeTag')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await writeTag({
         repo,

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { normalizeNewlines } from '@awesome-os/universal-git-src/utils/normalizeNewlines.ts'
+import { normalizeNewlines } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/normalizeNewlines.ts'
 
 test('normalizeNewlines', async (t) => {
   await t.test('ok:removes-carriage-returns', () => {

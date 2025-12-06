@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { MissingParameterError } from '@awesome-os/universal-git-src/errors/MissingParameterError.ts'
+import { MissingParameterError } from '@awesome-os/universal-git-src/git/errors/MissingParameterError.ts'
 
 test('MissingParameterError', async (t) => {
   await t.test('creates error with parameter name', () => {

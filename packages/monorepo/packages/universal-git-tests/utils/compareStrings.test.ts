@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { compareStrings } from '@awesome-os/universal-git-src/utils/compareStrings.ts'
+import { compareStrings } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/compareStrings.ts'
 
 test('compareStrings', async (t) => {
   await t.test('ok:compares-strings-correctly', () => {

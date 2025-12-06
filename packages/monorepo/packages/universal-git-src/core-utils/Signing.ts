@@ -1,6 +1,6 @@
-import { normalizeNewlines } from "../utils/normalizeNewlines.ts"
-import { indent } from "../utils/indent.ts"
-import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
+import { normalizeNewlines } from "../git/backends/GitBackendFs/utils/normalizeNewlines.ts"
+import { indent } from "../git/backends/GitBackendFs/utils/indent.ts"
+import { UniversalBuffer } from "../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
 
 // ============================================================================
 // SIGNING TYPES

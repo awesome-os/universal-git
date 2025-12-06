@@ -1,4 +1,4 @@
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../../git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 type LooseRef = {
   oid?: string

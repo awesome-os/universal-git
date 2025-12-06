@@ -2,9 +2,9 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import { add, setConfig, status } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { STAGE } from '@awesome-os/universal-git-src/commands/STAGE.ts'
-import { TREE } from '@awesome-os/universal-git-src/commands/TREE.ts'
-import { _walk } from '@awesome-os/universal-git-src/commands/walk.ts'
+import { STAGE } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/STAGE.ts'
+import { TREE } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/TREE.ts'
+import { _walk } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/walk.ts'
 
 describe('GitWalkerIndex', () => {
   it('should detect staged changes after add() with shared cache', async () => {

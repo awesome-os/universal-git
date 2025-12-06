@@ -58,10 +58,14 @@ export async function commit(
   if (await this.isBare()) {
     throw new Error('Cannot commit: repository is bare')
   }
-  if (!repo.fs) {
+  // Get filesystem from gitBackend
+  const fs = this.gitBackend && 'getFs' in this.gitBackend && typeof this.gitBackend.getFs === 'function'
+    ? this.gitBackend.getFs()
+    : undefined
+  if (!fs) {
     throw new Error('Cannot commit: filesystem is required. Checkout to a WorktreeBackend first.')
   }
-  const { commit: _commit } = await import('../commands/commit.ts')
+  const { commit: _commit } = await import('../git/backends/GitBackendFs/commands/commit.ts')
   const gitdir = await this.getGitdir()
   if (!repo._worktreeBackend) {
     throw new Error('Cannot commit: worktreeBackend is required. Checkout to a WorktreeBackend first.')
@@ -69,8 +73,8 @@ export async function commit(
   // worktreeBackend is a black box - pass repo directly to commit command
   return _commit({
     repo: this,
-    fs: repo.fs,
-    dir: repo._dir || undefined,
+    fs,
+    dir: (repo as any).__dir || undefined,
     gitdir,
     cache: this.cache,
     message,
@@ -84,7 +88,7 @@ export async function commit(
 export async function status(
   this: Repository,
   filepath?: string
-): Promise<import('../commands/status.ts').FileStatus> {
+): Promise<import('../git/backends/GitBackendFs/commands/status.ts').FileStatus> {
   if (await this.isBare()) {
     throw new Error('Cannot get status: repository is bare')
   }
@@ -92,7 +96,7 @@ export async function status(
   if (!repo._worktreeBackend) {
     throw new Error('Cannot get status: worktreeBackend is required. Checkout to a WorktreeBackend first.')
   }
-  const { status: _status } = await import('../commands/status.ts')
+  const { status: _status } = await import('../git/backends/GitBackendFs/commands/status.ts')
   // worktreeBackend is a black box - pass repo directly to status command
   // status command will use repo.worktreeBackend for file operations
   return _status({
@@ -110,21 +114,28 @@ export async function statusMatrix(
   options: {
     filepaths?: string[]
   } = {}
-): Promise<import('../commands/statusMatrix.ts').StatusRow[]> {
+): Promise<import('../git/backends/GitBackendFs/commands/statusMatrix.ts').StatusRow[]> {
   const repo = this as any
   if (await this.isBare()) {
     throw new Error('Cannot get status matrix: repository is bare')
   }
-  const { statusMatrix: _statusMatrix } = await import('../commands/statusMatrix.ts')
+  const { statusMatrix: _statusMatrix } = await import('../git/backends/GitBackendFs/commands/statusMatrix.ts')
   const gitdir = await this.getGitdir()
   if (!repo._worktreeBackend) {
     throw new Error('Cannot get status matrix: worktreeBackend is required. Checkout to a WorktreeBackend first.')
   }
+  // Get filesystem from gitBackend
+  const fs = this.gitBackend && 'getFs' in this.gitBackend && typeof this.gitBackend.getFs === 'function'
+    ? this.gitBackend.getFs()
+    : undefined
+  if (!fs) {
+    throw new Error('Cannot get status matrix: filesystem is required.')
+  }
   // worktreeBackend is a black box - pass repo directly to statusMatrix command
   return _statusMatrix({
     repo: this,
-    fs: repo.fs,
-    dir: repo._dir || undefined,
+    fs,
+    dir: (repo as any).__dir || undefined,
     gitdir,
     cache: this.cache,
     filepaths: options.filepaths,
@@ -149,7 +160,7 @@ export async function remove(
   if (!this.worktreeBackend) {
     throw new Error('Cannot remove files: repo.worktreeBackend is required. Checkout to a WorktreeBackend first.')
   }
-  const { remove: _remove } = await import('../commands/remove.ts')
+  const { remove: _remove } = await import('../git/backends/GitBackendFs/commands/remove.ts')
   const filepathArray = Array.isArray(filepaths) ? filepaths : [filepaths]
   for (const filepath of filepathArray) {
     await _remove({
@@ -175,7 +186,7 @@ export async function reset(
   if (!this.worktreeBackend) {
     throw new Error('Cannot reset: repo.worktreeBackend is required. Checkout to a WorktreeBackend first.')
   }
-  const { resetToCommit } = await import('../commands/reset.ts')
+  const { resetToCommit } = await import('../git/backends/GitBackendFs/commands/reset.ts')
   return resetToCommit({
     repo: this,
     ref,

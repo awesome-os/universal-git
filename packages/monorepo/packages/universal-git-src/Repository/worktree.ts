@@ -1,5 +1,5 @@
 import type { Repository } from './Repository.ts'
-import type { GitBackend } from '../backends/GitBackend.ts'
+import type { GitBackend } from '../git/backends/GitBackend.ts'
 import type { GitWorktreeBackend } from '../git/worktree/GitWorktreeBackend.ts'
 import { Worktree } from '../core-utils/Worktree.ts'
 
@@ -22,13 +22,13 @@ export function getWorktreeSync(this: Repository): Worktree | null {
     let dir = ''
     if (repo._worktreeBackend.getDirectory) {
       dir = repo._worktreeBackend.getDirectory() || ''
-    } else if (repo._dir) {
-      dir = repo._dir
+    } else if ((repo as any).__dir) {
+      dir = (repo as any).__dir
     }
     
     // We need gitdir for Worktree constructor (legacy requirement)
     // Try to get it from cache or backend
-    let gitdir = repo._gitdir || ''
+    let gitdir = (repo as any).__gitdir || ''
     if (!gitdir && repo._gitBackend && 'getGitdir' in repo._gitBackend) {
       gitdir = (repo._gitBackend as any).getGitdir()
     }

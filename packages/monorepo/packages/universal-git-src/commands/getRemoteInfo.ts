@@ -1,9 +1,9 @@
-import { GitRemoteHTTP } from "../git/remote/GitRemoteHTTP.ts"
-import { GitRemoteDaemon } from "../git/remote/GitRemoteDaemon.ts"
-import { RemoteBackendRegistry } from "../git/remote/RemoteBackendRegistry.ts"
+import { GitRemoteHTTP } from "../../../remote/GitRemoteHTTP.ts"
+import { GitRemoteDaemon } from "../../../remote/GitRemoteDaemon.ts"
+import { RemoteBackendRegistry } from "../../../remote/RemoteBackendRegistry.ts"
 import { assertParameter } from "../utils/assertParameter.ts"
 import { formatInfoRefs } from "../utils/formatInfoRefs.ts"
-import type { Repository } from "../core-utils/Repository.ts"
+import type { Repository } from "../../../../core-utils/Repository.ts"
 import type {
   HttpClient,
   AuthCallback,
@@ -11,10 +11,10 @@ import type {
   AuthSuccessCallback,
   GitAuth,
   SshClient,
-} from "../git/remote/types.ts"
-import type { GitRemoteBackend } from "../git/remote/GitRemoteBackend.ts"
-import type { ServerRef } from "../git/refs/types.ts"
-import type { TcpClient, TcpProgressCallback } from "../daemon/TcpClient.ts"
+} from "../../../remote/types.ts"
+import type { GitRemoteBackend } from "../../../remote/GitRemoteBackend.ts"
+import type { ServerRef } from "../../../refs/types.ts"
+import type { TcpClient, TcpProgressCallback } from "../../../../daemon/TcpClient.ts"
 
 /**
  * This object has the following schema:
@@ -92,7 +92,7 @@ export async function getRemoteInfo({
   onAuth?: AuthCallback
   onAuthSuccess?: AuthSuccessCallback
   onAuthFailure?: AuthFailureCallback
-  onProgress?: TcpProgressCallback | import('../git/remote/types.ts').ProgressCallback | import('../ssh/SshClient.ts').SshProgressCallback
+  onProgress?: TcpProgressCallback | import('../../../remote/types.ts').ProgressCallback | import('../ssh/SshClient.ts').SshProgressCallback
   corsProxy?: string
   url: string
   headers?: Record<string, string>

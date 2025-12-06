@@ -1,12 +1,12 @@
 import type { FileSystem, FileSystemProvider } from '../../../models/FileSystem.ts'
-import type { ExtendedStat } from '../../../utils/statHelpers.ts'
+import type { ExtendedStat } from '../../backends/GitBackendFs/utils/statHelpers.ts'
 import type { GitWorktreeBackend } from '../GitWorktreeBackend.ts'
 import type { Repository } from '../../../core-utils/Repository.ts'
-import type { GitBackend } from '../../../backends/GitBackend.ts'
+import type { GitBackend } from '../../../git/backends/GitBackend.ts'
 import type { Walker } from '../../../models/Walker.ts'
 import { join, normalize } from '../../../core-utils/GitPath.ts'
-import { UniversalBuffer } from '../../../utils/UniversalBuffer.ts'
-import { createFileSystem } from '../../../utils/createFileSystem.ts'
+import { UniversalBuffer } from '../../backends/GitBackendFs/utils/UniversalBuffer.ts'
+import { createFileSystem } from '../../backends/GitBackendFs/utils/createFileSystem.ts'
 import { SubmoduleCache, addSubmoduleToBackend, getSubmoduleFromBackend } from '../SubmoduleManager.ts'
 import AsyncLock from 'async-lock'
 
@@ -92,7 +92,7 @@ export class GitWorktreeFs implements GitWorktreeBackend {
    */
   async findGitBackend(): Promise<string | null> {
     try {
-      const { findRoot } = await import('../../../commands/findRoot.ts')
+      const { findRoot } = await import('../../backends/GitBackendFs/commands/findRoot.ts')
       const root = await findRoot({ fs: this.fs, filepath: this.dir })
       const gitdir = join(root, '.git')
       // Verify it exists

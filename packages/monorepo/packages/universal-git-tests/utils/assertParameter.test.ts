@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { assertParameter } from '@awesome-os/universal-git-src/utils/assertParameter.ts'
-import { MissingParameterError } from '@awesome-os/universal-git-src/errors/MissingParameterError.ts'
+import { assertParameter } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/assertParameter.ts'
+import { MissingParameterError } from '@awesome-os/universal-git-src/git/errors/MissingParameterError.ts'
 
 test('assertParameter', async (t) => {
   await t.test('ok:does-not-throw-valid-values', () => {

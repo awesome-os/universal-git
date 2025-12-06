@@ -9,7 +9,7 @@
 import path from 'path'
 import * as _fs from 'fs'
 import { FileSystem, type RawFileSystemProvider } from '@awesome-os/universal-git-src/models/FileSystem.ts'
-import { createFileSystem } from '@awesome-os/universal-git-src/utils/createFileSystem.ts'
+import { createFileSystem } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts'
 import * as git from '@awesome-os/universal-git-src/index.ts'
 import http from '@awesome-os/universal-git-src/http/node/index.ts'
 

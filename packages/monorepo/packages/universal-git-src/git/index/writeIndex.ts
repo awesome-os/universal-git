@@ -11,10 +11,10 @@
  * @param objectFormat - Object format ('sha1' or 'sha256'), will detect if not provided
  */
 import { GitIndex } from './GitIndex.ts'
-import { createFileSystem } from '../../utils/createFileSystem.ts'
+import { createFileSystem } from '../backends/GitBackendFs/utils/createFileSystem.ts'
 import { join } from '../../core-utils/GitPath.ts'
 import { normalize } from '../../core-utils/GitPath.ts'
-import { detectObjectFormat, type ObjectFormat } from '../../utils/detectObjectFormat.ts'
+import { detectObjectFormat, type ObjectFormat } from '../backends/GitBackendFs/utils/detectObjectFormat.ts'
 import type { FileSystemProvider } from '../../models/FileSystem.ts'
 
 export async function writeIndex({

@@ -1,30 +1,30 @@
 import { _commit } from './commit.ts'
 import { _currentBranch } from './currentBranch.ts'
-import { FastForwardError } from "../errors/FastForwardError.ts"
-import { MergeConflictError } from "../errors/MergeConflictError.ts"
-import { MergeNotSupportedError } from "../errors/MergeNotSupportedError.ts"
-import { NotFoundError } from "../errors/NotFoundError.ts"
-import { UnmergedPathsError } from "../errors/UnmergedPathsError.ts"
-import { expandRef } from "../git/refs/expandRef.ts"
-import { findMergeBase } from "../core-utils/algorithms/CommitGraphWalker.ts"
+import { FastForwardError } from "../../../../git/errors/FastForwardError.ts"
+import { MergeConflictError } from "../../../../git/errors/MergeConflictError.ts"
+import { MergeNotSupportedError } from "../../../../git/errors/MergeNotSupportedError.ts"
+import { NotFoundError } from "../../../../git/errors/NotFoundError.ts"
+import { UnmergedPathsError } from "../../../../git/errors/UnmergedPathsError.ts"
+import { expandRef } from "../../../refs/expandRef.ts"
+import { findMergeBase } from "../../../../core-utils/algorithms/CommitGraphWalker.ts"
 // mergeTree is now used via MergeStream
-import { parse as parseCommit } from "../core-utils/parsers/Commit.ts"
-import { readObject } from "../git/objects/readObject.ts"
+import { parse as parseCommit } from "../../../../core-utils/parsers/Commit.ts"
+import { readObject } from "../../../objects/readObject.ts"
 import { detectObjectFormat } from "../utils/detectObjectFormat.ts"
-import { Repository } from "../core-utils/Repository.ts"
+import { Repository } from "../../../../core-utils/Repository.ts"
 // UnifiedConfigService refactored to capability modules in git/config/
 import { abbreviateRef } from "../utils/abbreviateRef.ts"
-import { MissingNameError } from "../errors/MissingNameError.ts"
-import { MissingParameterError } from "../errors/MissingParameterError.ts"
+import { MissingNameError } from "../../../../git/errors/MissingNameError.ts"
+import { MissingParameterError } from "../../../../git/errors/MissingParameterError.ts"
 import { assertParameter } from "../utils/assertParameter.ts"
 import { normalizeCommandArgs } from "../utils/commandHelpers.ts"
 import { join } from "../utils/join.ts"
 import { normalizeAuthorObject } from "../utils/normalizeAuthorObject.ts"
 import { normalizeCommitterObject } from "../utils/normalizeCommitterObject.ts"
 // Merge state files are now handled via GitBackend.writeStateFile/deleteStateFile
-import type { FileSystem } from "../models/FileSystem.ts"
-import type { SignCallback } from "../core-utils/Signing.ts"
-import type { Author, CommitObject } from "../models/GitCommit.ts"
+import type { FileSystem } from "../../../../models/FileSystem.ts"
+import type { SignCallback } from "../../../../core-utils/Signing.ts"
+import type { Author, CommitObject } from "../../../../models/GitCommit.ts"
 
 // ============================================================================
 // MERGE TYPES
@@ -74,7 +74,7 @@ export async function merge({
 }: {
   ours?: string | { gitBackend: import('../backends/GitBackend.ts').GitBackend, ref: string }
   theirs: string | { gitBackend: import('../backends/GitBackend.ts').GitBackend, ref: string }
-  mergeDriver?: import('../git/merge/types.ts').MergeDriverCallback
+  mergeDriver?: import('../../../merge/types.ts').MergeDriverCallback
   fastForward?: boolean
   fastForwardOnly?: boolean
   dryRun?: boolean
@@ -114,7 +114,7 @@ export async function merge({
       
       // Create a Repository wrapper for the "ours" backend to access config, index, etc.
       // This is needed for author/committer normalization and other operations
-      const { Repository } = await import('../core-utils/Repository.ts')
+      const { Repository } = await import('../../../../core-utils/Repository.ts')
       repo = new Repository({
         gitBackend: oursBackend,
         worktreeBackend: undefined, // No worktree needed for merge operations
@@ -264,7 +264,7 @@ async function _mergeBackends({
   signingKey?: string
   onSign?: SignCallback
   allowUnrelatedHistories?: boolean
-  mergeDriver?: import('../git/merge/types.ts').MergeDriverCallback
+  mergeDriver?: import('../../../merge/types.ts').MergeDriverCallback
   cache?: Record<string, unknown>
 }): Promise<MergeResult> {
   // For now, delegate to the existing _merge implementation
@@ -323,7 +323,7 @@ export async function _merge({
   signingKey?: string
   onSign?: SignCallback
   allowUnrelatedHistories?: boolean
-  mergeDriver?: import('../git/merge/types.ts').MergeDriverCallback
+  mergeDriver?: import('../../../merge/types.ts').MergeDriverCallback
 }): Promise<MergeResult> {
   // Extract components from Repository for consistent state
   const cache = repo.cache
@@ -340,7 +340,7 @@ export async function _merge({
   // This MUST happen before any other operations to match native git behavior
   if (repo.gitBackend) {
     try {
-      const { GitIndex } = await import('../git/index/GitIndex.ts')
+      const { GitIndex } = await import('../../../index/GitIndex.ts')
       const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
       const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
       
@@ -461,7 +461,7 @@ export async function _merge({
   
   // Find most recent common ancestor
   // Use GitBackend.readObject if available, otherwise fall back to fs/gitdir
-  const { parse: parseCommit } = await import('../core-utils/parsers/Commit.ts')
+  const { parse: parseCommit } = await import('../../../../core-utils/parsers/Commit.ts')
   const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
   
   // findMergeBase requires readCommit from GitBackend - no fs needed
@@ -568,7 +568,7 @@ export async function _merge({
       // Add descriptive reflog entry for fast-forward merge
       if (oldBranchOid && oldBranchOid !== theirOid) {
         const { abbreviateRef } = await import('../utils/abbreviateRef.ts')
-        const { REFLOG_MESSAGES } = await import('../git/logs/messages.ts')
+        const { REFLOG_MESSAGES } = await import('../../../logs/messages.ts')
         // Use GitBackend.appendReflog for reflog updates
         // Format: <oldOid> <newOid> <author> <timestamp> <timezoneOffset>\t<message>\n
         if (gitBackend) {
@@ -669,13 +669,13 @@ export async function _merge({
     
     // Perform three-way merge using MergeStream for proper error handling and state tracking
     // MergeStream will check for unmerged paths and handle conflicts properly
-    const { MergeStream } = await import('../core-utils/MergeStream.ts')
+    const { MergeStream } = await import('../../../../core-utils/MergeStream.ts')
     
     // Read index directly using gitBackend.readIndex() - works for both bare and non-bare repos
     if (!repo.gitBackend) {
       throw new MissingParameterError('gitBackend (required for merge operation)')
     }
-    const { GitIndex } = await import('../git/index/GitIndex.ts')
+    const { GitIndex } = await import('../../../index/GitIndex.ts')
     const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
     const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
     

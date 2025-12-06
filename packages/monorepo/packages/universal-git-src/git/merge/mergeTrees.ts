@@ -1,8 +1,8 @@
 import { parse as parseTree } from '../../core-utils/parsers/Tree.ts'
 import { readObject } from '../objects/readObject.ts'
-import { writeBlob } from '../../commands/writeBlob.ts'
-import { writeTree } from '../../commands/writeTree.ts'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { writeBlob } from '../backends/GitBackendFs/commands/writeBlob.ts'
+import { writeTree } from '../backends/GitBackendFs/commands/writeTree.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 import { mergeBlobs } from './mergeBlobs.ts'
 import type { FileSystemProvider } from "../../models/FileSystem.ts"
 import type { TreeEntry } from "../../models/GitTree.ts"

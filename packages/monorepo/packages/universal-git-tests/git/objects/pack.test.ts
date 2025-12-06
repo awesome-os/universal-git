@@ -2,10 +2,10 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { read, findPackfile, loadIndexFromPack } from '@awesome-os/universal-git-src/git/objects/pack.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
+import { join } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts'
 import { readObject } from '@awesome-os/universal-git-src/git/objects/readObject.ts'
-import { createFileSystem } from '@awesome-os/universal-git-src/utils/createFileSystem.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { createFileSystem } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 import type { ReadResult } from '@awesome-os/universal-git-src/git/objects/pack.ts'
 
 test('pack.read', async (t) => {

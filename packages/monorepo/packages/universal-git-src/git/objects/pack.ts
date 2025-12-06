@@ -1,10 +1,10 @@
 import { GitPackIndex } from "../../models/GitPackIndex.ts"
 import { GitMultiPackIndex } from "../../models/GitMultiPackIndex.ts"
 import { join } from '../../core-utils/GitPath.ts'
-import { detectObjectFormat, type ObjectFormat as HashObjectFormat } from "../../utils/detectObjectFormat.ts"
+import { detectObjectFormat, type ObjectFormat as HashObjectFormat } from "../backends/GitBackendFs/utils/detectObjectFormat.ts"
 import type { FileSystemProvider } from "../../models/FileSystem.ts"
 import type { ProgressCallback } from "../remote/GitRemoteHTTP.ts"
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 const PackfileCache = Symbol('PackfileCache')
 const MultiPackIndexCache = Symbol('MultiPackIndexCache')

@@ -1,10 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { resolveBlob } from '@awesome-os/universal-git-src/utils/resolveBlob.ts'
+import { resolveBlob } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/resolveBlob.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { writeBlob, writeTag } from '@awesome-os/universal-git-src/index.ts'
-import { ObjectTypeError } from '@awesome-os/universal-git-src/errors/ObjectTypeError.ts'
-import { NotFoundError } from '@awesome-os/universal-git-src/errors/NotFoundError.ts'
+import { ObjectTypeError } from '@awesome-os/universal-git-src/git/errors/ObjectTypeError.ts'
+import { NotFoundError } from '@awesome-os/universal-git-src/git/errors/NotFoundError.ts'
 
 test('resolveBlob', async (t) => {
   await t.test('ok:resolves-blob', async () => {
@@ -68,7 +68,7 @@ test('resolveBlob', async (t) => {
     const cache: Record<string, unknown> = {}
     
     // Write an empty tree object
-    const { writeTree } = await import('@awesome-os/universal-git-src/commands/writeTree.ts')
+    const { writeTree } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/writeTree.ts')
     const treeOid = await writeTree({
       repo,
       tree: [],

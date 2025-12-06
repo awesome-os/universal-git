@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { mode2type } from '@awesome-os/universal-git-src/utils/mode2type.ts'
-import { InternalError } from '@awesome-os/universal-git-src/errors/InternalError.ts'
+import { mode2type } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/mode2type.ts'
+import { InternalError } from '@awesome-os/universal-git-src/git/errors/InternalError.ts'
 
 test('mode2type', async (t) => {
   await t.test('ok:returns-tree-directory', () => {

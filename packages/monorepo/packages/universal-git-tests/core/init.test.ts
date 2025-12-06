@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { init, getConfig, setConfig } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
+import { join } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts'
 
 test('init', async (t) => {
   await t.test('init creates repository', async () => {

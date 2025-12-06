@@ -1,0 +1,76 @@
+{
+  "name": "@awesome-os/native-file-system-adapter-src",
+  "version": "3.0.1",
+  "description": "Native File System API",
+  "main": "mod.ts",
+  "directories": {
+    "example": "example"
+  },
+  "type": "module",
+  "exports": {
+    "*.js": "*.ts",
+    "*.ts": "*.ts"
+  },
+  "scripts": {
+    "test": "exit 0",
+    "test:browser": "npx http-serve -p 4444 & open http://localhost:4444/example/test.html",
+    "test:node": "node --experimental-strip-types test/test-node.ts",
+    "test:deno": "deno run --allow-read --allow-write --allow-net test/test-deno.ts",
+    "test:wpt-in-deno": "deno run --allow-read --allow-write --allow-net test/test-wpt-in-deno.ts",
+    "build": "rm -rf dist && rollup -c rollup.config.js",
+    "_prepublishOnly": "tsc -p tsconfig.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jimmywarting/native-file-system-adapter.git"
+  },
+  "engines": {   "node": ">=20.0.0"  },
+  "keywords": [
+    "filesystem",
+    "file",
+    "blob",
+    "stream",
+    "fs",
+    "read",
+    "write",
+    "delete",
+    "file system access",
+    "spec"
+  ],
+  "author": "Frank Lemnaschik",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/awesome-os/universal-git/issues"
+  },
+  "contributors": [
+    {
+      "name": "Alexandru Ciuca"
+    },
+    {
+      "name": "Jimmy Wärting"
+    }
+  ],
+  "homepage": "https://github.com/awesome-os/universal-git/tree/main/worktrees/NativFileSystemAdapter#readme",
+  "optionalDependencies": {
+    "fetch-blob": "^4.0.0"
+  },
+  "standard": {
+    "globals": [
+      "File",
+      "performance",
+      "Blob",
+      "Response",
+      "ClipboardEvent",
+      "DataTransferItem",
+      "FormData",
+      "alert",
+      "ReadableStream",
+      "DataTransfer"
+    ]
+  },
+  "devDependencies": {
+    "@types/filesystem": "^0.0.36",
+    "standard": "^17.1.2",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import isValidRef from '@awesome-os/universal-git-src/utils/isValidRef.ts'
+import isValidRef from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/isValidRef.ts'
 
 test('isValidRef', async (t) => {
   await t.test('ok:validates-ref-names-with-slashes', () => {

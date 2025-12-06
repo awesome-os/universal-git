@@ -1,10 +1,23 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { indexPack } from '@awesome-os/universal-git-src/commands/indexPack.ts'
+import { indexPack } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/indexPack.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { MissingParameterError } from '@awesome-os/universal-git-src/errors/MissingParameterError.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
-import { createBackend } from '@awesome-os/universal-git-src/backends/index.ts'
+import { MissingParameterError } from '@awesome-os/universal-git-src/git/errors/MissingParameterError.ts'
+import { join } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts'
+import { BackendRegistry } from '@awesome-os/universal-git-src/git/backends/BackendRegistry.ts'
+import { GitBackendFs } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts'
+import type { BackendFactory } from '@awesome-os/universal-git-src/git/backends/types.ts'
+
+// Register filesystem backend factory
+if (!BackendRegistry.isRegistered('filesystem')) {
+  const filesystemFactory: BackendFactory = (options) => {
+    if (options.type !== 'filesystem') {
+      throw new Error(`Expected filesystem backend, got ${options.type}`)
+    }
+    return new GitBackendFs(options.fs, options.gitdir)
+  }
+  BackendRegistry.register('filesystem', filesystemFactory)
+}
 
 test('indexPack', async (t) => {
   await t.test('param:fs-missing', async () => {
@@ -139,7 +152,7 @@ test('indexPack', async (t) => {
     }
     
     // Create backend for bare repo (no worktree)
-    const gitBackend = createBackend({
+    const gitBackend = BackendRegistry.createBackend({
       type: 'filesystem',
       fs,
       gitdir,
@@ -148,6 +161,7 @@ test('indexPack', async (t) => {
     const cache: Record<string, unknown> = {}
     const { oids } = await indexPack({
       gitBackend,
+      fs, // fs is required even when using gitBackend
       dir, // dir === gitdir for bare repos
       filepath: packfilePath,
       cache,
@@ -177,7 +191,7 @@ test('indexPack', async (t) => {
     }
     
     // Create backend for bare repo (no worktree)
-    const gitBackend = createBackend({
+    const gitBackend = BackendRegistry.createBackend({
       type: 'filesystem',
       fs,
       gitdir,
@@ -186,6 +200,7 @@ test('indexPack', async (t) => {
     const cache: Record<string, unknown> = {}
     const { oids } = await indexPack({
       gitBackend,
+      fs, // fs is required even when using gitBackend
       dir, // dir === gitdir for bare repos
       filepath: packfilePath,
       cache,
@@ -217,7 +232,7 @@ test('indexPack', async (t) => {
     }
     
     // Create backend for bare repo (no worktree)
-    const gitBackend = createBackend({
+    const gitBackend = BackendRegistry.createBackend({
       type: 'filesystem',
       fs,
       gitdir,
@@ -226,6 +241,7 @@ test('indexPack', async (t) => {
     const cache: Record<string, unknown> = {}
     await indexPack({
       gitBackend,
+      fs, // fs is required even when using gitBackend
       dir, // dir === gitdir for bare repos
       filepath: packfilePath,
       cache,
@@ -251,7 +267,7 @@ test('indexPack', async (t) => {
     }
     
     // Create backend for bare repo (no worktree)
-    const gitBackend = createBackend({
+    const gitBackend = BackendRegistry.createBackend({
       type: 'filesystem',
       fs,
       gitdir,
@@ -260,6 +276,7 @@ test('indexPack', async (t) => {
     const cache: Record<string, unknown> = {}
     const { oids: oids1 } = await indexPack({
       gitBackend,
+      fs, // fs is required even when using gitBackend
       dir, // dir === gitdir for bare repos
       filepath: packfilePath,
       cache,
@@ -272,6 +289,7 @@ test('indexPack', async (t) => {
     
     const { oids: oids2 } = await indexPack({
       gitBackend,
+      fs, // fs is required even when using gitBackend
       dir, // dir === gitdir for bare repos
       filepath: packfilePath,
       cache,
@@ -296,7 +314,7 @@ test('indexPack', async (t) => {
     }
     
     // Create backend for bare repo (no worktree)
-    const gitBackend = createBackend({
+    const gitBackend = BackendRegistry.createBackend({
       type: 'filesystem',
       fs,
       gitdir,
@@ -307,6 +325,7 @@ test('indexPack', async (t) => {
     
     const { oids } = await indexPack({
       gitBackend,
+      fs, // fs is required even when using gitBackend
       dir, // dir === gitdir for bare repos
       filepath: packfilePath,
       cache,
@@ -336,7 +355,7 @@ test('indexPack', async (t) => {
     }
     
     // Create backend for bare repo (no worktree)
-    const gitBackend = createBackend({
+    const gitBackend = BackendRegistry.createBackend({
       type: 'filesystem',
       fs,
       gitdir,
@@ -347,6 +366,7 @@ test('indexPack', async (t) => {
     // Test with explicit gitBackend
     const { oids: oids1 } = await indexPack({
       gitBackend,
+      fs, // fs is required even when using gitBackend
       dir, // dir === gitdir for bare repos
       filepath: packfilePath,
       cache,

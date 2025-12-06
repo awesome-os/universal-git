@@ -60,7 +60,7 @@ minimisted(async function ({ _: [command, ...args], ...opts }) {
   })
 
   await t.test('param:fs-missing', async () => {
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await writeBlob({
         gitdir: '/tmp/test.git',
@@ -75,7 +75,7 @@ minimisted(async function ({ _: [command, ...args], ...opts }) {
 
   await t.test('param:blob-missing', async () => {
     const { fs, gitdir } = await makeFixture('test-writeBlob')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await writeBlob({
         fs,
@@ -138,7 +138,7 @@ minimisted(async function ({ _: [command, ...args], ...opts }) {
 
   await t.test('error:caller-property', async () => {
     const { fs, gitdir } = await makeFixture('test-writeBlob')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await writeBlob({
         fs,

@@ -3,6 +3,7 @@ import assert from 'node:assert'
 import * as path from 'path'
 import { findRoot } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
+import { normalize } from '@awesome-os/universal-git-src/core-utils/GitPath.ts'
 
 // NOTE: Because ".git" is not allowed as a path name in git,
 // we can't actually store the ".git" folders in our fixture,
@@ -16,7 +17,8 @@ test('findRoot', async (t) => {
     
     const foundRoot = await findRoot({ fs, filepath: dir })
     // findRoot returns the directory containing .git, not the .git directory itself
-    assert.strictEqual(foundRoot, dir)
+    // Normalize foundRoot for comparison (makeFixture already normalizes dir)
+    assert.strictEqual(normalize(foundRoot), dir)
   })
 
   await t.test('finds git directory from subdirectory', async () => {
@@ -31,12 +33,14 @@ test('findRoot', async (t) => {
     
     const foundRoot = await findRoot({ fs, filepath: subdir })
     // findRoot should find the directory containing .git
-    assert.strictEqual(foundRoot, dir)
+    // Normalize foundRoot for comparison (makeFixture already normalizes dir)
+    assert.strictEqual(normalize(foundRoot), dir)
   })
 
   await t.test('filepath has its own .git folder', async () => {
     // Setup
     const { fs, dir } = await makeFixture('test-findRoot')
+    
     await fs.mkdir(path.join(dir, 'foobar', '.git'))
     await fs.mkdir(path.join(dir, 'foobar/bar', '.git'))
     // Test
@@ -44,12 +48,15 @@ test('findRoot', async (t) => {
       fs,
       filepath: path.join(dir, 'foobar'),
     })
-    assert.strictEqual(path.basename(root), 'foobar')
+    // Normalize root for comparison (makeFixture already normalizes dir)
+    const normalizedRoot = normalize(root)
+    assert.strictEqual(path.basename(normalizedRoot), 'foobar')
   })
 
   await t.test('filepath has ancestor with a .git folder', async () => {
     // Setup
     const { fs, dir } = await makeFixture('test-findRoot')
+    
     await fs.mkdir(path.join(dir, 'foobar', '.git'))
     await fs.mkdir(path.join(dir, 'foobar/bar', '.git'))
     // Test
@@ -57,7 +64,9 @@ test('findRoot', async (t) => {
       fs,
       filepath: path.join(dir, 'foobar/bar/baz/buzz'),
     })
-    assert.strictEqual(path.basename(root), 'bar')
+    // Normalize root for comparison (makeFixture already normalizes dir)
+    const normalizedRoot = normalize(root)
+    assert.strictEqual(path.basename(normalizedRoot), 'bar')
   })
 })
 

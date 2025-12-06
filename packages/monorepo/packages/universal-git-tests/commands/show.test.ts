@@ -1,10 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { show } from '@awesome-os/universal-git-src/commands/show.ts'
+import { show } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/show.ts'
 import { init, add, commit, annotatedTag } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { MissingParameterError } from '@awesome-os/universal-git-src/errors/MissingParameterError.ts'
-import { NotFoundError } from '@awesome-os/universal-git-src/errors/NotFoundError.ts'
+import { MissingParameterError } from '@awesome-os/universal-git-src/git/errors/MissingParameterError.ts'
+import { NotFoundError } from '@awesome-os/universal-git-src/git/errors/NotFoundError.ts'
 
 test('show', async (t) => {
   await t.test('param:fs-missing', async () => {
@@ -45,7 +45,7 @@ test('show', async (t) => {
     const repo = await Repository.open({ fs, dir, gitdir, cache })
     
     // Create a commit
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file.txt`, 'content')
     
@@ -75,7 +75,7 @@ test('show', async (t) => {
     const repo = await Repository.open({ fs, dir, gitdir, cache })
     
     // Create a commit
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file.txt`, 'content')
     
@@ -108,7 +108,7 @@ test('show', async (t) => {
     const repo = await Repository.open({ fs, dir, gitdir, cache })
     
     // Create a commit
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file.txt`, 'content')
     
@@ -139,7 +139,7 @@ test('show', async (t) => {
     const repo = await Repository.open({ fs, dir, gitdir, cache })
     
     // Create a commit
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file.txt`, 'content')
     
@@ -176,7 +176,7 @@ test('show', async (t) => {
     const repo = await Repository.open({ fs, dir, gitdir, cache })
     
     // Create a commit
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file.txt`, 'content')
     
@@ -189,11 +189,11 @@ test('show', async (t) => {
       cache: repo.cache,
     })
 
-    // Get the blob OID from the tree
+    // Get the blob OID from the tree - use dir to let readCommit resolve gitdir the same way commit does
     const { readCommit, readTree } = await import('@awesome-os/universal-git-src/index.ts')
-    const commitResult = await readCommit({ repo, oid: commitOid })
+    const commitResult = await readCommit({ fs, dir, oid: commitOid, cache: repo.cache })
     const treeOid = commitResult.commit.tree
-    const treeResult = await readTree({ repo, oid: treeOid })
+    const treeResult = await readTree({ fs, dir, oid: treeOid, cache: repo.cache })
     const blobOid = treeResult.tree.find((entry: any) => entry.path === 'file.txt')?.oid
 
     // Show the blob - use dir to let show resolve gitdir the same way commit does
@@ -216,7 +216,7 @@ test('show', async (t) => {
     const repo = await Repository.open({ fs, dir, gitdir, cache })
     
     // Create a commit
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file.txt`, 'content')
     
@@ -264,7 +264,7 @@ test('show', async (t) => {
     const repo = await Repository.open({ fs, dir, gitdir, cache })
     
     // Create a commit
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file.txt`, 'content')
     
@@ -298,7 +298,7 @@ test('show', async (t) => {
     const repo = await Repository.open({ fs, dir, gitdir, cache })
     
     // Create a commit
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file.txt`, 'content')
     
@@ -332,7 +332,7 @@ test('show', async (t) => {
     const repo = await Repository.open({ fs, dir, gitdir, cache })
     
     // Create a commit
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file.txt`, 'content')
     
@@ -368,7 +368,7 @@ test('show', async (t) => {
     await init({ fs, dir, defaultBranch: 'main' })
     
     // Create a commit
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file.txt`, 'content')
     
@@ -401,7 +401,7 @@ test('show', async (t) => {
     const repo = await Repository.open({ fs, dir, cache })
     
     // Create a commit
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file.txt`, 'content')
     
@@ -431,7 +431,7 @@ test('show', async (t) => {
     const repo = await Repository.open({ fs, dir, gitdir, cache })
     
     // Create a commit
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file.txt`, 'content')
     

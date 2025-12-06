@@ -1,10 +1,10 @@
-import { arrayRange } from "../utils/arrayRange.ts"
-import { GitWalkSymbol } from "../utils/symbols.ts"
-import { unionOfIterators } from "../utils/unionOfIterators.ts"
-import { createFileSystem } from '../utils/createFileSystem.ts'
-import { assertParameter } from "../utils/assertParameter.ts"
+import { arrayRange } from "../git/backends/GitBackendFs/utils/arrayRange.ts"
+import { GitWalkSymbol } from "../git/backends/GitBackendFs/utils/symbols.ts"
+import { unionOfIterators } from "../git/backends/GitBackendFs/utils/unionOfIterators.ts"
+import { createFileSystem } from '../git/backends/GitBackendFs/utils/createFileSystem.ts'
+import { assertParameter } from "../git/backends/GitBackendFs/utils/assertParameter.ts"
 import { normalizeCommandArgs } from '../utils/commandHelpers.ts'
-import { join } from "../utils/join.ts"
+import { join } from "../core-utils/GitPath.ts"
 import { Repository } from "../core-utils/Repository.ts"
 import type { FileSystemProvider } from "../models/FileSystem.ts"
 import type { Walker, WalkerMap, WalkerReduce, WalkerIterate, WalkerEntry, WalkerIterateCallback } from "../models/Walker.ts"
@@ -44,7 +44,7 @@ export async function _walk({
     try {
       for (const child of children) {
         childIndex++
-        const childPaths = child.map(c => c?._fullpath || c?.path || String(c) || 'null')
+        const childPaths = child.map((c: any) => (c && typeof c === 'object' ? (c._fullpath || c.path) : String(c)) || 'null')
         log(`  [${childIndex}] Processing child: ${JSON.stringify(childPaths)}`)
         try {
           log(`    [${childIndex}] Calling walk()...`)
@@ -74,7 +74,7 @@ export async function _walk({
     return results
   }),
 }: {
-  gitBackend: import('../backends/GitBackend.ts').GitBackend
+  gitBackend: import('../git/backends/GitBackend.ts').GitBackend
   worktreeBackend?: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend
   cache?: Record<string, unknown>
   trees: Walker[]
@@ -140,7 +140,10 @@ export async function _walk({
           return []
         }
         // Call readdir on the entry - it returns Promise<string[] | null>
-        log(`    Walker ${i}: calling readdir on ${entry._fullpath || entry.path || entry}...`)
+        const entryPath = (entry && typeof entry === 'object' && ('_fullpath' in entry || 'path' in entry)) 
+          ? ((entry as any)._fullpath || (entry as any).path) 
+          : String(entry)
+        log(`    Walker ${i}: calling readdir on ${entryPath}...`)
         try {
           const startTime = Date.now()
           const result = await (walkers[i] as any).readdir(entry)
@@ -343,12 +346,12 @@ export async function walk({
     })
     log('normalizeCommandArgs done', { 
       repoExists: !!normalized.repo,
-      treesCount: normalized.trees.length,
+      treesCount: (trees as Walker[]).length,
       gitdir: normalized.gitdir,
       dir: normalized.dir,
     })
 
-    assertParameter('trees', normalized.trees)
+    assertParameter('trees', trees)
     
     log('Calling _walk...')
     if (!normalized.repo?.gitBackend) {
@@ -358,10 +361,10 @@ export async function walk({
       gitBackend: normalized.repo.gitBackend,
       worktreeBackend: normalized.repo.worktreeBackend || undefined,
       cache: normalized.repo.cache,
-      trees: normalized.trees,
-      map: normalized.map,
-      reduce: normalized.reduce,
-      iterate: normalized.iterate,
+      trees: trees as Walker[],
+      map: map,
+      reduce: reduce,
+      iterate: iterate,
     })
     log('_walk completed')
     return result

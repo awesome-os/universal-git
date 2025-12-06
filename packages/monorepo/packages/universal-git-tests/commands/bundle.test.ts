@@ -1,12 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { bundle, verifyBundle, unbundle, add, commit, branch, tag, readObject, resolveRef } from '@awesome-os/universal-git-src/index.ts'
+import { bundle, verifyBundle, unbundle, add, commit, branch, tag, readObject, resolveRef, currentBranch } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
+import { join } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts'
 import * as os from 'os'
 import * as path from 'path'
 import { promises as nodeFs } from 'fs'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 test('bundle', async (t) => {
   await t.test('creates bundle with specific refs', async () => {
@@ -19,6 +19,29 @@ test('bundle', async (t) => {
       message: 'First commit',
       author: { name: 'Test', email: 'test@example.com' },
     })
+    
+    // Get the actual default branch name from HEAD
+    // After commit, HEAD should point to a branch ref
+    let defaultBranch = 'refs/heads/master'
+    try {
+      const headRef = await repo.gitBackend.readSymbolicRef('HEAD')
+      if (headRef) {
+        // Verify the branch ref exists
+        try {
+          await repo.resolveRef(headRef)
+          defaultBranch = headRef
+        } catch {
+          // Branch ref doesn't exist, use HEAD directly
+          defaultBranch = 'HEAD'
+        }
+      } else {
+        // HEAD is detached, use HEAD directly
+        defaultBranch = 'HEAD'
+      }
+    } catch {
+      // Fallback to HEAD if we can't read symbolic ref
+      defaultBranch = 'HEAD'
+    }
     
     await branch({ repo, ref: 'feature', checkout: true })
     await nodeFs.writeFile(join(dir, 'file2.txt'), 'content2')
@@ -43,13 +66,13 @@ test('bundle', async (t) => {
       const result = await bundle({
         repo,
         filepath: bundlePath,
-        refs: ['refs/heads/master', 'refs/tags/v1.0.0'],
+        refs: [defaultBranch, 'refs/tags/v1.0.0'],
       })
       
       assert.ok(result, 'Bundle result should be present')
       assert.strictEqual(result.filepath, bundlePath, 'Bundle path should match')
       assert.strictEqual(result.refs.size, 2, 'Should have 2 refs')
-      assert.ok(result.refs.has('refs/heads/master'), 'Should include master branch')
+      assert.ok(result.refs.has(defaultBranch), `Should include ${defaultBranch} branch`)
       assert.ok(result.refs.has('refs/tags/v1.0.0'), 'Should include v1.0.0 tag')
       assert.ok(result.objectCount > 0, 'Should have objects')
       
@@ -83,11 +106,31 @@ test('bundle', async (t) => {
       author: { name: 'Test', email: 'test@example.com' },
     })
     
+    // Get the actual default branch name from HEAD
+    let defaultBranch = 'refs/heads/master'
+    try {
+      const headRef = await repo.gitBackend.readSymbolicRef('HEAD')
+      if (headRef) {
+        // Verify the branch ref exists
+        try {
+          await repo.resolveRef(headRef)
+          defaultBranch = headRef
+        } catch {
+          // Branch ref doesn't exist, use HEAD directly
+          defaultBranch = 'HEAD'
+        }
+      } else {
+        defaultBranch = 'HEAD'
+      }
+    } catch {
+      defaultBranch = 'HEAD'
+    }
+    
     await branch({ repo, ref: 'feature', checkout: false })
     await tag({
       repo,
       ref: 'v1.0.0',
-      object: 'refs/heads/master',
+      object: defaultBranch,
     })
     
     // Create bundle with all refs
@@ -265,9 +308,7 @@ test('verifyBundle', async (t) => {
 
 test('unbundle', async (t) => {
   await t.test('unbundles bundle into repository', async () => {
-    const { repo: sourceRepo } = await makeFixture('test-bundle', { init: true })
-    const sourceDir = sourceRepo.dir!
-    const sourceGitdir = await sourceRepo.getGitdir()
+    const { repo: sourceRepo, dir: sourceDir, gitdir: sourceGitdir } = await makeFixture('test-bundle', { init: true })
     
     // Create commits and branches in source repo
     await nodeFs.writeFile(join(sourceDir, 'file1.txt'), 'content1')
@@ -277,6 +318,26 @@ test('unbundle', async (t) => {
       message: 'First commit',
       author: { name: 'Test', email: 'test@example.com' },
     })
+    
+    // Get the default branch name before checking out feature
+    let defaultBranch = 'refs/heads/master'
+    try {
+      const headRef = await sourceRepo.gitBackend.readSymbolicRef('HEAD')
+      if (headRef) {
+        // Verify the branch ref exists
+        try {
+          await sourceRepo.resolveRef(headRef)
+          defaultBranch = headRef
+        } catch {
+          // Branch ref doesn't exist, use HEAD directly
+          defaultBranch = 'HEAD'
+        }
+      } else {
+        defaultBranch = 'HEAD'
+      }
+    } catch {
+      defaultBranch = 'HEAD'
+    }
     
     await branch({ repo: sourceRepo, ref: 'feature', checkout: true })
     await nodeFs.writeFile(join(sourceDir, 'file2.txt'), 'content2')
@@ -294,24 +355,24 @@ test('unbundle', async (t) => {
       object: commit1,
       force: true,
     })
-    
-    // Create bundle
-    const bundlePath = join(os.tmpdir(), `bundle-unbundle-${Date.now()}.bundle`)
-    try {
-      await bundle({
-        repo: sourceRepo,
-        filepath: bundlePath,
-        refs: ['refs/heads/master', 'refs/heads/feature', 'refs/tags/v1.0.0'],
-      })
+      
+      // Create bundle
+      const bundlePath = join(os.tmpdir(), `bundle-unbundle-${Date.now()}.bundle`)
+      try {
+        await bundle({
+          repo: sourceRepo,
+          filepath: bundlePath,
+          refs: [defaultBranch, 'refs/heads/feature', 'refs/tags/v1.0.0'],
+        })
       
       // Create destination repository
       const destDir = join(os.tmpdir(), `unbundle-dest-${Date.now()}`)
       await nodeFs.mkdir(destDir, { recursive: true })
       try {
-        if (!sourceRepo.fs) throw new Error('Filesystem not available')
+        const sourceFs = sourceRepo.gitBackend.getFs()
         const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
         const destRepo = await Repository.open({
-          fs: sourceRepo.fs,
+          fs: sourceFs,
           dir: destDir,
           init: true,
           cache: {},
@@ -327,23 +388,23 @@ test('unbundle', async (t) => {
         assert.ok(result, 'Unbundle result should be present')
         assert.ok(result.imported.size > 0, 'Should have imported refs')
         assert.strictEqual(result.imported.size, 3, 'Should have imported 3 refs')
-        assert.ok(result.imported.has('refs/heads/master'), 'Should have imported master')
+        assert.ok(result.imported.has(defaultBranch), `Should have imported ${defaultBranch}`)
         assert.ok(result.imported.has('refs/heads/feature'), 'Should have imported feature')
         assert.ok(result.imported.has('refs/tags/v1.0.0'), 'Should have imported tag')
         
         // Verify refs were imported correctly
-        const masterOid = await destRepo.resolveRef('refs/heads/master')
+        const defaultBranchOid = await destRepo.resolveRef(defaultBranch)
         const featureOid = await destRepo.resolveRef('refs/heads/feature')
         const tagOid = await destRepo.resolveRef('refs/tags/v1.0.0')
         
-        assert.ok(masterOid, 'Master ref should exist')
+        assert.ok(defaultBranchOid, `${defaultBranch} ref should exist`)
         assert.ok(featureOid, 'Feature ref should exist')
         assert.ok(tagOid, 'Tag ref should exist')
         
         // Verify objects are accessible
-        const { readObject } = await import('@awesome-os/universal-git-src/commands/readObject.ts')
-        const masterCommit = await readObject({ repo: destRepo, oid: masterOid })
-        assert.ok(masterCommit, 'Master commit should be readable')
+        const { readObject } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/readObject.ts')
+        const defaultBranchCommit = await readObject({ repo: destRepo, oid: defaultBranchOid })
+        assert.ok(defaultBranchCommit, `${defaultBranch} commit should be readable`)
         
         const featureCommit = await readObject({ repo: destRepo, oid: featureOid })
         assert.ok(featureCommit, 'Feature commit should be readable')
@@ -366,9 +427,7 @@ test('unbundle', async (t) => {
   })
   
   await t.test('unbundles specific refs only', async () => {
-    const { repo: sourceRepo } = await makeFixture('test-bundle', { init: true })
-    const sourceDir = sourceRepo.dir!
-    const sourceGitdir = await sourceRepo.getGitdir()
+    const { repo: sourceRepo, dir: sourceDir, gitdir: sourceGitdir } = await makeFixture('test-bundle', { init: true })
     
     // Create commits
     await nodeFs.writeFile(join(sourceDir, 'file1.txt'), 'content1')
@@ -379,6 +438,26 @@ test('unbundle', async (t) => {
       author: { name: 'Test', email: 'test@example.com' },
     })
     
+    // Get the actual default branch name from HEAD
+    let defaultBranch = 'refs/heads/master'
+    try {
+      const headRef = await sourceRepo.gitBackend.readSymbolicRef('HEAD')
+      if (headRef) {
+        // Verify the branch ref exists
+        try {
+          await sourceRepo.resolveRef(headRef)
+          defaultBranch = headRef
+        } catch {
+          // Branch ref doesn't exist, use HEAD directly
+          defaultBranch = 'HEAD'
+        }
+      } else {
+        defaultBranch = 'HEAD'
+      }
+    } catch {
+      defaultBranch = 'HEAD'
+    }
+    
     await branch({ repo: sourceRepo, ref: 'feature', checkout: false })
     
     // Create bundle with multiple refs
@@ -387,33 +466,33 @@ test('unbundle', async (t) => {
       await bundle({
         repo: sourceRepo,
         filepath: bundlePath,
-        refs: ['refs/heads/master', 'refs/heads/feature'],
+        refs: [defaultBranch, 'refs/heads/feature'],
       })
       
       // Create destination repository
       const destDir = join(os.tmpdir(), `unbundle-specific-${Date.now()}`)
       await nodeFs.mkdir(destDir, { recursive: true })
       try {
-        if (!sourceRepo.fs) throw new Error('Filesystem not available')
+        const sourceFs = sourceRepo.gitBackend.getFs()
         const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
         const destRepo = await Repository.open({
-          fs: sourceRepo.fs,
+          fs: sourceFs,
           dir: destDir,
           init: true,
           cache: {},
           autoDetectConfig: true,
         })
         
-        // Unbundle only master
+        // Unbundle only default branch
         const result = await unbundle({
           repo: destRepo,
           filepath: bundlePath,
-          refs: ['refs/heads/master'],
+          refs: [defaultBranch],
         })
         
         assert.ok(result, 'Unbundle result should be present')
         assert.strictEqual(result.imported.size, 1, 'Should have imported 1 ref')
-        assert.ok(result.imported.has('refs/heads/master'), 'Should have imported master')
+        assert.ok(result.imported.has(defaultBranch), `Should have imported ${defaultBranch}`)
         assert.ok(!result.imported.has('refs/heads/feature'), 'Should not have imported feature')
       } finally {
         try {
@@ -432,9 +511,7 @@ test('unbundle', async (t) => {
   })
   
   await t.test('rejects refs that already exist with different OID', async () => {
-    const { repo: sourceRepo } = await makeFixture('test-bundle', { init: true })
-    const sourceDir = sourceRepo.dir!
-    const sourceGitdir = await sourceRepo.getGitdir()
+    const { repo: sourceRepo, dir: sourceDir, gitdir: sourceGitdir } = await makeFixture('test-bundle', { init: true })
     
     // Create commit in source
     await nodeFs.writeFile(join(sourceDir, 'file1.txt'), 'content1')
@@ -445,23 +522,43 @@ test('unbundle', async (t) => {
       author: { name: 'Test', email: 'test@example.com' },
     })
     
+    // Get the actual default branch name from HEAD
+    let defaultBranch = 'refs/heads/master'
+    try {
+      const headRef = await sourceRepo.gitBackend.readSymbolicRef('HEAD')
+      if (headRef) {
+        // Verify the branch ref exists
+        try {
+          await sourceRepo.resolveRef(headRef)
+          defaultBranch = headRef
+        } catch {
+          // Branch ref doesn't exist, use HEAD directly
+          defaultBranch = 'HEAD'
+        }
+      } else {
+        defaultBranch = 'HEAD'
+      }
+    } catch {
+      defaultBranch = 'HEAD'
+    }
+    
     // Create bundle
     const bundlePath = join(os.tmpdir(), `bundle-conflict-${Date.now()}.bundle`)
     try {
       await bundle({
         repo: sourceRepo,
         filepath: bundlePath,
-        refs: ['refs/heads/master'],
+        refs: [defaultBranch],
       })
       
       // Create destination repository with different commit
       const destDir = join(os.tmpdir(), `unbundle-conflict-${Date.now()}`)
       await nodeFs.mkdir(destDir, { recursive: true })
       try {
-        if (!sourceRepo.fs) throw new Error('Filesystem not available')
+        const sourceFs = sourceRepo.gitBackend.getFs()
         const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
         const destRepo = await Repository.open({
-          fs: sourceRepo.fs,
+          fs: sourceFs,
           dir: destDir,
           init: true,
           cache: {},

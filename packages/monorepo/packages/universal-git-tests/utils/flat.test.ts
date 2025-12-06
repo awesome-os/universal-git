@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { flat } from '@awesome-os/universal-git-src/utils/flat.ts'
+import { flat } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/flat.ts'
 
 test('flat', async (t) => {
   await t.test('ok:flattens-nested-arrays', () => {

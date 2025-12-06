@@ -29,7 +29,7 @@ export async function getRemote(
   const config = await this.getConfig()
   const url = await config.get(`remote.${name}.url`) as string | undefined
   if (!url) {
-    const { NotFoundError } = await import('../errors/NotFoundError.ts')
+    const { NotFoundError } = await import('../git/errors/NotFoundError.ts')
     throw new NotFoundError(`Remote '${name}' not found`)
   }
   
@@ -40,7 +40,7 @@ export async function getRemote(
     http: options?.http,
     ssh: options?.ssh,
     tcp: options?.tcp,
-    fs: options?.fs || this.fs,
+    fs: options?.fs || (this.gitBackend && 'getFs' in this.gitBackend && typeof this.gitBackend.getFs === 'function' ? this.gitBackend.getFs() : undefined),
     auth: options?.auth,
     useRestApi: options?.useRestApi,
     urlOnly: options?.urlOnly,
@@ -58,12 +58,21 @@ export async function listRemotes(this: Repository): Promise<Array<{ name: strin
   const config = await this.getConfig()
   const remoteNames = await config.getSubsections('remote')
   const remotes = await Promise.all(
-    remoteNames.map(async name => ({
-      name: name!,
-      backend: await this.getRemote(name!, { urlOnly: true }),
-    }))
+    remoteNames.map(async name => {
+      try {
+        return {
+          name: name!,
+          backend: await this.getRemote(name!, { urlOnly: true }),
+        }
+      } catch (err) {
+        // If getRemote fails (e.g., remote was deleted but config cache is stale),
+        // skip this remote. This can happen if config was modified externally.
+        return null
+      }
+    })
   )
-  return remotes
+  // Filter out null entries (remotes that couldn't be loaded)
+  return remotes.filter((r): r is { name: string; backend: import('../git/remote/GitRemoteBackend.ts').GitRemoteBackend } => r !== null)
 }
 
 /**
@@ -94,7 +103,7 @@ export async function fetch(
     tcp?: import('../daemon/TcpClient.ts').TcpClient
   } = {}
 ): Promise<void> {
-  const { fetch: _fetch } = await import('../commands/fetch.ts')
+  const { fetch: _fetch } = await import('../git/backends/GitBackendFs/commands/fetch.ts')
   const gitdir = await this.getGitdir()
   return _fetch({
     repo: this,
@@ -122,8 +131,8 @@ export async function push(
     includeSubmodules?: boolean
     submoduleRecurse?: boolean
   } = {}
-): Promise<import('../commands/push.ts').PushResult> {
-  const { push: _push } = await import('../commands/push.ts')
+): Promise<import('../git/backends/GitBackendFs/commands/push.ts').PushResult> {
+  const { push: _push } = await import('../git/backends/GitBackendFs/commands/push.ts')
   const gitdir = await this.getGitdir()
   return _push({
     repo: this,
@@ -151,7 +160,7 @@ export async function pull(
     ssh?: import('../ssh/SshClient.ts').SshClient
     tcp?: import('../daemon/TcpClient.ts').TcpClient
   } = {}
-): Promise<import('../commands/pull.ts').PullResult> {
+): Promise<import('../git/backends/GitBackendFs/commands/pull.ts').PullResult> {
   const repo = this as any
   if (!this.fs) {
     throw new Error('Cannot pull: filesystem is required. Checkout to a WorktreeBackend first.')
@@ -172,14 +181,14 @@ export async function pull(
     throw new Error('Cannot pull: worktreeBackend is required. Checkout to a WorktreeBackend first.')
   }
   
-  const { pull: _pull } = await import('../commands/pull.ts')
+  const { pull: _pull } = await import('../git/backends/GitBackendFs/commands/pull.ts')
   const gitdir = await this.getGitdir()
   
   // worktreeBackend is a black box - pass repo directly to pull command
   return _pull({
     repo: this,
     fs: this.fs,
-    dir: repo._dir || undefined, // legacy dir support
+    dir: (repo as any).__dir || undefined, // legacy dir support
     gitdir,
     cache: this.cache,
     remote,

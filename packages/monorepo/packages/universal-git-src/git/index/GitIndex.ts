@@ -1,12 +1,12 @@
-import { InternalError } from '../../errors/InternalError.ts'
-import { UnsafeFilepathError } from '../../errors/UnsafeFilepathError.ts'
-import { BufferCursor } from "../../utils/BufferCursor.ts"
-import { comparePath } from "../../utils/comparePath.ts"
-import { normalizeStats } from "../../utils/normalizeStats.ts"
-import { shasum } from "../../utils/shasum.ts"
-import { getOidLength, type ObjectFormat } from '../../utils/detectObjectFormat.ts'
+import { InternalError } from '../errors/InternalError.ts'
+import { UnsafeFilepathError } from '../errors/UnsafeFilepathError.ts'
+import { BufferCursor } from "../backends/GitBackendFs/utils/BufferCursor.ts"
+import { comparePath } from "../backends/GitBackendFs/utils/comparePath.ts"
+import { normalizeStats } from "../backends/GitBackendFs/utils/normalizeStats.ts"
+import { shasum } from "../backends/GitBackendFs/utils/shasum.ts"
+import { getOidLength, type ObjectFormat } from '../backends/GitBackendFs/utils/detectObjectFormat.ts'
 import type { Stat } from '../../models/FileSystem.ts'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 type CacheEntryFlags = {
   assumeValid: boolean

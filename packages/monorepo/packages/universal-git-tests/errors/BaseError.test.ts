@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { BaseError } from '@awesome-os/universal-git-src/errors/BaseError.ts'
+import { BaseError } from '@awesome-os/universal-git-src/git/errors/BaseError.ts'
 
 test('BaseError', async (t) => {
   await t.test('constructor - creates error with message', () => {

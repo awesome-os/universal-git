@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { updateRemoteRefs } from '@awesome-os/universal-git-src/git/refs/updateRemoteRefs.ts'
-import { InvalidOidError } from '@awesome-os/universal-git-src/errors/InvalidOidError.ts'
+import { InvalidOidError } from '@awesome-os/universal-git-src/git/errors/InvalidOidError.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { init, commit, add, branch, resolveRef, setConfig } from '@awesome-os/universal-git-src/index.ts'
 

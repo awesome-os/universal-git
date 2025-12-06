@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { NoRefspecError } from '@awesome-os/universal-git-src/errors/NoRefspecError.ts'
+import { NoRefspecError } from '@awesome-os/universal-git-src/git/errors/NoRefspecError.ts'
 
 test('NoRefspecError', async (t) => {
   await t.test('creates error with remote name', () => {

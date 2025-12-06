@@ -1,9 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
-import { GitBackendFs } from '@awesome-os/universal-git-src/backends/GitBackendFs/index.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
+import { GitBackendFs } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts'
 import { makeNodeFixture } from '../helpers/makeNodeFixture.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
 
 test('GitBackendFs', async (t) => {
   await t.test('getType - returns filesystem', async () => {

@@ -1,7 +1,7 @@
-import { assignDefined } from './assignDefined.ts'
-import type { Author, CommitObject } from "../models/GitCommit.ts"
-import type { Repository } from "../core-utils/Repository.ts"
-import type { GitBackend } from "../backends/GitBackend.ts"
+import { assignDefined } from '../git/backends/GitBackendFs/utils/assignDefined.ts'
+import type { Author, CommitObject } from "../../../../models/GitCommit.ts"
+import type { Repository } from "../../../../core-utils/Repository.ts"
+import type { GitBackend } from "../git/backends/GitBackend.ts"
 
 /**
  * Return committer object by using properties with this priority:

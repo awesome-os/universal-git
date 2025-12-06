@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { collect } from '@awesome-os/universal-git-src/utils/collect.ts'
+import { collect } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/collect.ts'
 
 test('collect', async (t) => {
   await t.test('ok:collects-array-buffers', async () => {

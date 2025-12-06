@@ -10,8 +10,8 @@ import {
   readBlob,
 } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
-import { ConfigAccess } from '@awesome-os/universal-git-src/utils/configAccess.ts'
+import { join } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts'
+import { ConfigAccess } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/configAccess.ts'
 
 test('sparse checkout cone mode', async (t) => {
   await t.test('initialize sparse checkout with cone mode', async () => {
@@ -459,8 +459,8 @@ test('sparse checkout cone mode', async (t) => {
     const exists = await fs.exists(sparseCheckoutFile).catch(() => false)
     assert.strictEqual(exists, false, 'Sparse checkout file should not exist')
     
-    // All files should be checked out
-    const files = await listFiles({ repo })
+    // All files should be checked out - list from HEAD to verify files are in the repository
+    const files = await listFiles({ repo, ref: 'HEAD' })
     assert.ok(files.includes('file.txt'))
   })
 

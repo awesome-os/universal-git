@@ -6,12 +6,13 @@
  * of the merge process, providing a clean audit trail and better encapsulation
  */
 
-import { MergeConflictError } from '../errors/MergeConflictError.ts'
-import { UnmergedPathsError } from '../errors/UnmergedPathsError.ts'
+import { MergeConflictError } from '../git/errors/MergeConflictError.ts'
+import { UnmergedPathsError } from '../git/errors/UnmergedPathsError.ts'
 import { getStateMutationStream } from './StateMutationStream.ts'
-import type { GitBackend } from '../backends/GitBackend.ts'
+import type { GitBackend } from '../git/backends/GitBackend.ts'
 import type { GitIndex } from '../git/index/GitIndex.ts'
 import type { FileSystemProvider } from '../models/FileSystem.ts'
+import type { Repository } from './Repository.ts'
 
 export type MergeStreamEvent =
   | { type: 'start'; data: { ourOid: string; baseOid: string; theirOid: string } }
@@ -22,7 +23,8 @@ export type MergeStreamEvent =
   | { type: 'error'; data: { error: Error } }
 
 export interface MergeStreamOptions {
-  gitBackend: GitBackend
+  repo?: Repository
+  gitBackend?: GitBackend
   index: GitIndex
   ourOid: string
   baseOid: string
@@ -145,7 +147,18 @@ export class MergeStream extends ReadableStream<MergeStreamEvent> {
   }
 
   private async startMerge(): Promise<void> {
-    const { gitBackend, index, ourOid, baseOid, theirOid } = this.options
+    const { repo: inputRepo, gitBackend: inputGitBackend, index, ourOid, baseOid, theirOid } = this.options
+
+    // Validate that we have either repo or gitBackend
+    if (!inputRepo && !inputGitBackend) {
+      throw new Error('Either repo or gitBackend must be provided to MergeStream')
+    }
+
+    // Extract gitBackend from repo if provided, otherwise use inputGitBackend
+    const gitBackend = inputRepo?.gitBackend || inputGitBackend
+    if (!gitBackend) {
+      throw new Error('gitBackend is required - either provide it directly or via repo')
+    }
 
     // Emit start event
     await this.emit({
@@ -178,20 +191,32 @@ export class MergeStream extends ReadableStream<MergeStreamEvent> {
     const { Repository } = await import('./Repository.ts')
     const { createGitWorktreeBackend } = await import('../git/worktree/index.ts')
     
-    // Create Repository with proper worktree backend if fs and dir are available
-    // Otherwise, use the worktreeBackend from the repo if it exists
-    let worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend | undefined
-    if (this.options.fs && this.options.dir) {
-      worktreeBackend = createGitWorktreeBackend({ fs: this.options.fs, dir: this.options.dir })
+    // Use inputRepo if provided, otherwise create a new Repository
+    let repo: Repository
+    if (inputRepo) {
+      // Use the provided repo, but update worktree backend if fs/dir are provided
+      repo = inputRepo
+      if (this.options.fs && this.options.dir) {
+        const worktreeBackend = createGitWorktreeBackend({ fs: this.options.fs, dir: this.options.dir })
+        // Update repo's worktree backend if needed
+        if (worktreeBackend) {
+          (repo as any)._worktreeBackend = worktreeBackend
+        }
+      }
+    } else {
+      // Create Repository with proper worktree backend if fs and dir are available
+      let worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend | undefined
+      if (this.options.fs && this.options.dir) {
+        worktreeBackend = createGitWorktreeBackend({ fs: this.options.fs, dir: this.options.dir })
+      }
+      
+      repo = new Repository({
+        gitBackend,
+        worktreeBackend,
+        cache: this.options.cache || {},
+        autoDetectConfig: true,
+      })
     }
-    // Note: If fs/dir are not available, mergeTree should use the repo's worktreeBackend
-    
-    const repo = new Repository({
-      gitBackend,
-      worktreeBackend,
-      cache: this.options.cache || {},
-      autoDetectConfig: true,
-    })
     
     await this.emit({ type: 'merge-start', data: {} })
 

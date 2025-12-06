@@ -10,7 +10,7 @@ import * as fs from 'fs'
 import path from 'path'
 import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 import { createDefaultTransport, createTransport } from '@awesome-os/universal-git-src/transport/index.ts'
-import { createFileSystem } from '@awesome-os/universal-git-src/utils/createFileSystem.ts'
+import { createFileSystem } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts'
 
 async function main() {
   console.log('🚀 Worker Thread Example\n')

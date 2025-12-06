@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { writeRefsAdResponse } from '@awesome-os/universal-git-src/wire/writeRefsAdResponse.ts'
-import { collect } from '@awesome-os/universal-git-src/utils/collect.ts'
+import { collect } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/collect.ts'
 
 test('writeRefsAdResponse', async (t) => {
   await t.test('write refs advertisement with multiple refs and capabilities (plain objects/arrays)', async () => {

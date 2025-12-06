@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { pkg } from '@awesome-os/universal-git-src/utils/pkg.ts'
+import { pkg } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/pkg.ts'
 
 test('pkg', async (t) => {
   await t.test('ok:pkg-exports-name', () => {

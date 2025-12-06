@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { encode, flush, delim, decodeStream } from '@awesome-os/universal-git-src/core-utils/network/PktLine.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 // Helper to create async iterable from buffers
 async function* createStream(buffers: UniversalBuffer[]): AsyncIterable<UniversalBuffer> {

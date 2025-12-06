@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { BufferCursor } from '@awesome-os/universal-git-src/utils/BufferCursor.ts'
+import { BufferCursor } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/BufferCursor.ts'
 
 test('BufferCursor', async (t) => {
   await t.test('ok:constructor-initializes', () => {

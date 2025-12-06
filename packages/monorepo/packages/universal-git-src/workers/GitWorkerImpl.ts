@@ -1,13 +1,13 @@
 import type { GitWorkerAPI, RepositoryOptions, GitBackendOptions, GitWorktreeBackendOptions, ProxiedRepository, ProxiedGitBackend, ProxiedGitWorktreeBackend } from './Proxies.ts'
-import type { GitBackend } from '../backends/GitBackend.ts'
+import type { GitBackend } from '../git/backends/GitBackend.ts'
 import type { GitWorktreeBackend } from '../git/worktree/GitWorktreeBackend.ts'
 import { Repository } from '../core-utils/Repository.ts'
-import { GitBackendFs } from '../backends/GitBackendFs/index.ts'
+import { GitBackendFs } from '../git/backends/GitBackendFs/GitBackendFs.ts'
 import { GitWorktreeFs } from '../git/worktree/fs/GitWorktreeFs.ts'
-import { createFileSystem } from '../utils/createFileSystem.ts'
+import { createFileSystem } from '../git/backends/GitBackendFs/utils/createFileSystem.ts'
 import type { FileSystemProvider, RawFileSystemProvider } from '../models/FileSystem.ts'
 import { readObject } from '../git/objects/readObject.ts'
-import { join } from '../utils/join.ts'
+import { join } from '../git/backends/GitBackendFs/utils/join.ts'
 import * as Comlink from 'comlink'
 import * as nodeFs from 'fs' // Import Node.js fs module at top level (same pattern as examples)
 

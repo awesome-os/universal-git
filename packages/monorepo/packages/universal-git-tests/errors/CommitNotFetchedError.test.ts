@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { CommitNotFetchedError } from '@awesome-os/universal-git-src/errors/CommitNotFetchedError.ts'
+import { CommitNotFetchedError } from '@awesome-os/universal-git-src/git/errors/CommitNotFetchedError.ts'
 
 test('CommitNotFetchedError', async (t) => {
   await t.test('constructor - basic', () => {

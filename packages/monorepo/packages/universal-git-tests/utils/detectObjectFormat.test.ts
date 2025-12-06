@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { detectObjectFormat, getOidLength, validateOid } from '@awesome-os/universal-git-src/utils/detectObjectFormat.ts'
+import { detectObjectFormat, getOidLength, validateOid } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/detectObjectFormat.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { setConfig } from '@awesome-os/universal-git-src/index.ts'
 
@@ -17,7 +17,7 @@ test('detectObjectFormat', async (t) => {
     await repo.gitBackend.setConfig('extensions.objectformat', 'sha256', 'local')
     
     // Debug: Print config content
-    const normalizedFs = (repo as any).fs || fs
+    const normalizedFs = fs
     try {
       const configContent = await normalizedFs.read(`${gitdir}/config`, 'utf8')
       console.log('Config content:', configContent)

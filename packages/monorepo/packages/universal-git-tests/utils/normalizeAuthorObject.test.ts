@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import { setConfig } from '@awesome-os/universal-git-src/index.ts'
-import { normalizeAuthorObject } from '@awesome-os/universal-git-src/utils/normalizeAuthorObject.ts'
+import { normalizeAuthorObject } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/normalizeAuthorObject.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { calculateBasicAuthHeader } from '@awesome-os/universal-git-src/utils/calculateBasicAuthHeader.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { calculateBasicAuthHeader } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/calculateBasicAuthHeader.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 test('calculateBasicAuthHeader', async (t) => {
   await t.test('ok:creates-header-username-password', () => {

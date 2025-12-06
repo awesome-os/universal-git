@@ -1,5 +1,5 @@
 import type { Repository } from './Repository.ts'
-import type { ObjectFormat } from '../utils/detectObjectFormat.ts'
+import type { ObjectFormat } from '../git/backends/GitBackendFs/utils/detectObjectFormat.ts'
 
 /**
  * Checks if repository is bare
@@ -12,7 +12,7 @@ export async function isBare(this: Repository): Promise<boolean> {
         const bare = await repo._gitBackend.getConfig('core.bare')
         repo._isBare = bare === 'true' || bare === true
       } catch {
-        repo._isBare = false
+        repo._isBare = Boolean(repo.worktreeBackend)
       }
     } else {
       repo._isBare = false
@@ -31,10 +31,10 @@ export async function getObjectFormat(this: Repository): Promise<ObjectFormat> {
       repo._objectFormat = await repo._gitBackend.getObjectFormat(repo.cache)
     } else {
       const gitdir = await this.getGitdir()
-      const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+      const { detectObjectFormat } = await import('../git/backends/GitBackendFs/utils/detectObjectFormat.ts')
       // Use gitBackend if available, otherwise fall back to fs
       repo._objectFormat = await detectObjectFormat(
-        repo._fs,
+        (repo as any).__fs,
         gitdir,
         repo.cache,
         repo._gitBackend

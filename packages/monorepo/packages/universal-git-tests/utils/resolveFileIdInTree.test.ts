@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { resolveFileIdInTree } from '@awesome-os/universal-git-src/utils/resolveFileIdInTree.ts'
+import { resolveFileIdInTree } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/resolveFileIdInTree.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { writeBlob, writeTree, writeCommit } from '@awesome-os/universal-git-src/index.ts'
 

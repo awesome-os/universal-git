@@ -12,8 +12,8 @@
 
 import { parsePointer, isPointer, generatePointer, getLFSObjectPath, extractHash } from './pointer.ts'
 import { getAttributes } from '../../core-utils/filesystem/GitAttributesParser.ts'
-import { join } from '../../utils/join.ts'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { join } from '../backends/GitBackendFs/utils/join.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 import type { FileSystemProvider } from '../../models/FileSystem.ts'
 import type { GitBackend } from '../../backends/GitBackend.ts'
 

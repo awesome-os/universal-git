@@ -1,16 +1,16 @@
-import { CheckoutConflictError } from "../errors/CheckoutConflictError.ts"
-import { CommitNotFetchedError } from "../errors/CommitNotFetchedError.ts"
-import { NotFoundError } from "../errors/NotFoundError.ts"
-import { MissingParameterError } from "../errors/MissingParameterError.ts"
+import { CheckoutConflictError } from "../git/errors/CheckoutConflictError.ts"
+import { CommitNotFetchedError } from "../git/errors/CommitNotFetchedError.ts"
+import { NotFoundError } from "../git/errors/NotFoundError.ts"
+import { MissingParameterError } from "../git/errors/MissingParameterError.ts"
 // RefManager import removed - using Repository.resolveRef/writeRef methods instead
 import { SparseCheckoutManager } from "../core-utils/filesystem/SparseCheckoutManager.ts"
 import { normalizeCommandArgs } from '../utils/commandHelpers.ts'
 import { readObject } from "../git/objects/readObject.ts"
 import { parse as parseCommit } from "../core-utils/parsers/Commit.ts"
 import { parse as parseConfig, serialize as serializeConfig } from "../core-utils/ConfigParser.ts"
-import { createFileSystem } from '../utils/createFileSystem.ts'
-import { assertParameter } from "../utils/assertParameter.ts"
-import { join } from "../utils/join.ts"
+import { createFileSystem } from '../git/backends/GitBackendFs/utils/createFileSystem.ts'
+import { assertParameter } from "../git/backends/GitBackendFs/utils/assertParameter.ts"
+import { join } from "../core-utils/GitPath.ts"
 import type { FileSystem } from "../models/FileSystem.ts"
 import type { ProgressCallback } from "../git/remote/types.ts"
 
@@ -209,7 +209,7 @@ export async function _checkout({
   nonBlocking = false,
   batchSize = 100,
 }: {
-  gitBackend?: import('../backends/GitBackend.ts').GitBackend
+  gitBackend?: import('../git/backends/GitBackend.ts').GitBackend
   worktreeBackend?: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend
   fs?: FileSystem
   cache: Record<string, unknown>
@@ -229,7 +229,7 @@ export async function _checkout({
   batchSize?: number
 }): Promise<void> {
   // Get backends - either provided directly or create from fs/dir/gitdir
-  let gitBackend: import('../backends/GitBackend.ts').GitBackend
+  let gitBackend: import('../git/backends/GitBackend.ts').GitBackend
   let worktreeBackend: import('../git/worktree/GitWorktreeBackend.ts').GitWorktreeBackend | null = null
   let worktreeGitdir: string
   let worktreeDir: string
@@ -252,7 +252,7 @@ export async function _checkout({
   }
 
   const resolveWorktreeGitdir = (
-    backend: import('../backends/GitBackend.ts').GitBackend | undefined,
+    backend: import('../git/backends/GitBackend.ts').GitBackend | undefined,
     fallback?: string
   ): string => {
     if (backend && typeof (backend as any).getGitdir === 'function') {
@@ -304,7 +304,7 @@ export async function _checkout({
       // Fallback if worktree.getGitdir is missing (e.g. if worktree is just the backend)
       worktreeGitdir = await repo.getGitdir()
     }
-    worktreeDir = worktree.dir || (worktreeBackend.getDirectory ? worktreeBackend.getDirectory() : undefined) || dir
+    worktreeDir = worktree.dir || (worktreeBackend?.getDirectory ? worktreeBackend.getDirectory() : undefined) || dir
   } else {
     throw new MissingParameterError('gitBackend and worktreeBackend, or fs, dir, and gitdir')
   }

@@ -8,12 +8,12 @@
  * @param depth - Maximum depth for symbolic ref resolution (default: 5)
  * @returns The resolved OID or null if ref doesn't exist
  */
-import { NotFoundError } from '../../errors/NotFoundError.ts'
+import { NotFoundError } from '../errors/NotFoundError.ts'
 import { parsePackedRefs, readPackedRefs } from './packedRefs.ts'
 import { join } from '../../core-utils/GitPath.ts'
-import { createFileSystem } from '../../utils/createFileSystem.ts'
-import { validateOid, getOidLength, type ObjectFormat } from '../../utils/detectObjectFormat.ts'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { createFileSystem } from '../backends/GitBackendFs/utils/createFileSystem.ts'
+import { validateOid, getOidLength, type ObjectFormat } from '../backends/GitBackendFs/utils/detectObjectFormat.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 import AsyncLock from 'async-lock'
 import type { FileSystemProvider } from '../../models/FileSystem.ts'
 
@@ -61,25 +61,28 @@ export async function readRef({
     return null
   }
   
+  // Handle depth=0 early return for ref pointer strings and OIDs
+  // But allow ref paths to continue so we can read the file
   if (depth <= 0) {
-    // Max depth reached - return the ref as-is (might be a symbolic ref)
-    // If it's a ref pointer, return just the target without 'ref: ' prefix
+    // If it's a ref pointer string (not a file path), return the target
     if (ref.startsWith('ref: ')) {
       return ref.slice('ref: '.length).trim()
     }
-    // If it's already a ref path (not an OID), return it
-    if (!validateOid(ref, objectFormat)) {
+    // If it's already a valid OID, return it
+    if (validateOid(ref, objectFormat)) {
       return ref
     }
-    return null
+    // If depth=0 and it's a ref path, we still need to read the file
+    // to get the OID (if it's a direct ref) or return the ref path (if it's symbolic)
+    // So we continue to read the file below
   }
 
   // Is it a ref pointer?
   if (ref.startsWith('ref: ')) {
     const targetRef = ref.slice('ref: '.length).trim()
-    // If depth is 1, return the target ref name instead of resolving further
+    // If depth is 1, resolve the target ref to its OID (one level of resolution)
     if (depth === 1) {
-      return targetRef
+      return readRef({ fs, gitdir, ref: targetRef, depth: 0, objectFormat, cache })
     }
     return readRef({ fs, gitdir, ref: targetRef, depth: depth - 1, objectFormat, cache })
   }
@@ -162,9 +165,11 @@ export async function readRef({
             // Check if the content is a ref pointer (starts with 'ref: ')
             if (contentStr.startsWith('ref: ')) {
               const targetRef = contentStr.slice('ref: '.length).trim()
-              // If depth is 1, return the target ref name instead of resolving further
+              // If depth is 1, we want to resolve one level: return the OID of the target ref
+              // If depth is undefined or > 1, resolve recursively
               if (depth === 1) {
-                return targetRef
+                // Resolve the target ref to its OID (with depth=0 to get OID, not ref path)
+                return readRef({ fs, gitdir, ref: targetRef, depth: 0, objectFormat, cache })
               }
               // Recursively resolve the symbolic ref
               const resolved = await readRef({ fs, gitdir, ref: targetRef, depth: depth - 1, objectFormat, cache })
@@ -178,6 +183,14 @@ export async function readRef({
               return resolved
             }
             // Otherwise return the SHA/content
+            // If depth=0 and this is a symbolic ref, return the ref path (don't follow)
+            if (depth === 0 && contentStr.startsWith('ref: ')) {
+              return contentStr.slice('ref: '.length).trim()
+            }
+            // If depth=0 and this is a ref path (not an OID), return the ref path (don't follow)
+            if (depth === 0 && !validateOid(contentStr, objectFormat) && contentStr.startsWith('refs/')) {
+              return contentStr
+            }
             // But if depth > 1 and this is a direct ref path (not an OID), return the ref path
             if (depth > 1 && !validateOid(contentStr, objectFormat) && contentStr.startsWith('refs/')) {
               return contentStr
@@ -217,11 +230,12 @@ export async function readRef({
       const packedMap = await readPackedRefs({ fs, gitdir })
       const packedSha = packedMap.get(refPath)
       if (packedSha) {
-        // If it's a symbolic ref and depth is 1, return the target ref name
+        // If it's a symbolic ref and depth is 1, resolve to OID
         if (packedSha.startsWith('ref: ')) {
           const targetRef = packedSha.slice('ref: '.length).trim()
           if (depth === 1) {
-            return targetRef
+            // Resolve the target ref to its OID (one level of resolution)
+            return readRef({ fs, gitdir, ref: targetRef, depth: 0, objectFormat, cache })
           }
           // Recursively resolve the symbolic ref
           return readRef({ fs, gitdir, ref: targetRef, depth: depth - 1, objectFormat, cache })

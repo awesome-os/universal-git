@@ -28,7 +28,7 @@ import 'dotenv/config.js'
 import path from 'path'
 import * as _fs from 'fs'
 import { FileSystem, type RawFileSystemProvider } from '@awesome-os/universal-git-src/models/FileSystem.ts'
-import { createFileSystem } from '@awesome-os/universal-git-src/utils/createFileSystem.ts'
+import { createFileSystem } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts'
 import * as git from '@awesome-os/universal-git-src/index.ts'
 import http from '@awesome-os/universal-git-src/http/node/index.ts'
 import { WorkerPool } from '@awesome-os/universal-git-src/workers/WorkerPool.ts'
@@ -163,7 +163,7 @@ async function main() {
       // Resolve worker script path using utility
       let workerScript: string | null = null
       try {
-        const { resolveWorkerScript } = await import('@awesome-os/universal-git-src/utils/resolveWorkerScript.ts')
+        const { resolveWorkerScript } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/resolveWorkerScript.ts')
         workerScript = resolveWorkerScript(import.meta.url)
         
         if (workerScript) {

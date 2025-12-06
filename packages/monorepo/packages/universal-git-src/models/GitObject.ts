@@ -1,5 +1,5 @@
-import { InternalError } from '../errors/InternalError.ts'
-import { UniversalBuffer } from '../utils/UniversalBuffer.ts'
+import { InternalError } from '../git/errors/InternalError.ts'
+import { UniversalBuffer } from '../git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 // ============================================================================
 // GIT OBJECT TYPES

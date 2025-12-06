@@ -1,5 +1,5 @@
 import { parse as parseConfig, type ConfigObject } from '../../core-utils/ConfigParser.ts'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 /**
  * Merges multiple config objects with proper precedence.

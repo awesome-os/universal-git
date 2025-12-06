@@ -1,4 +1,4 @@
-import { NotFoundError } from '../../errors/NotFoundError.ts'
+import { NotFoundError } from '../errors/NotFoundError.ts'
 import { readPackedRefs } from './packedRefs.ts'
 import { join } from '../../core-utils/GitPath.ts'
 import AsyncLock from 'async-lock'

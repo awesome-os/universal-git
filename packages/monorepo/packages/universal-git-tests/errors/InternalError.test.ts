@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { InternalError } from '@awesome-os/universal-git-src/errors/InternalError.ts'
+import { InternalError } from '@awesome-os/universal-git-src/git/errors/InternalError.ts'
 
 test('InternalError', async (t) => {
   await t.test('creates error with message', () => {

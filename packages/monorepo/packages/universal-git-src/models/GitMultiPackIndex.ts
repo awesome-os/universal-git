@@ -1,8 +1,8 @@
-import { InternalError } from '../errors/InternalError.ts'
-import { BufferCursor } from "../utils/BufferCursor.ts"
-import { shasum } from "../utils/shasum.ts"
-import { getOidLength } from "../utils/detectObjectFormat.ts"
-import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
+import { InternalError } from '../git/errors/InternalError.ts'
+import { BufferCursor } from "../git/backends/GitBackendFs/utils/BufferCursor.ts"
+import { shasum } from "../git/backends/GitBackendFs/utils/shasum.ts"
+import { getOidLength } from "../git/backends/GitBackendFs/utils/detectObjectFormat.ts"
+import { UniversalBuffer } from "../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
 
 // MIDX chunk IDs
 const CHUNK_ID_PACKNAMES = 0x504e414d // 'PNAM'

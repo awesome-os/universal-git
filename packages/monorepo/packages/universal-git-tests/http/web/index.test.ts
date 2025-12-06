@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { request } from '@awesome-os/universal-git-src/http/web/index.ts'
+import { request } from '@awesome-os/universal-git-src/git/http/web/index.ts'
 
 // Helper to create async iterable from buffers
 async function* createStream(buffers: Uint8Array[]): AsyncIterableIterator<Uint8Array> {

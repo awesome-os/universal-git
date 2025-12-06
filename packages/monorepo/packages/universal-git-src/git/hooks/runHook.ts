@@ -1,8 +1,8 @@
 import { getHooksPath, shouldRunHook } from './shouldRunHook.ts'
-import { join } from '../../utils/join.ts'
+import { join } from '../backends/GitBackendFs/utils/join.ts'
 import { getConfig } from '../config.ts'
 import type { FileSystemProvider } from '../../models/FileSystem.ts'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 /**
  * Hook execution context - information passed to hooks via environment variables
@@ -219,7 +219,7 @@ class NoOpHookExecutor implements HookExecutor {
 /**
  * Gets the default hook executor for the current environment
  */
-function getDefaultExecutor(): HookExecutor {
+export function getDefaultExecutor(): HookExecutor {
   // Check if we're in a Node.js environment with child_process support
   try {
     if (typeof process !== 'undefined' && process.versions?.node) {

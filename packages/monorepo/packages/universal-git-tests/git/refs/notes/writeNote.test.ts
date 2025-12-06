@@ -322,7 +322,7 @@ test('removeNote', async (t) => {
   await t.test('ok:handles-errors-gracefully-and-returns-null', async () => {
     const { repo } = await makeFixture('test-removeNote-error')
     
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/gitdir')
     const result = await removeNote({ 
       gitBackend: invalidBackend, 

@@ -1,0 +1,79 @@
+import type { GitBackendFs } from './GitBackendFs.ts'
+
+/**
+ * Config operations for GitBackendFs
+ */
+
+/**
+ * Get or create LocalConfigProvider (lazy initialization)
+ */
+async function getConfigProvider(this: GitBackendFs): Promise<import('../../config/LocalConfigProvider.ts').LocalConfigProvider> {
+  if (!this._configProvider) {
+    const { LocalConfigProvider } = await import('../../config/LocalConfigProvider.ts')
+    this._configProvider = new LocalConfigProvider(this)
+  }
+  return this._configProvider
+}
+
+export async function getConfig(this: GitBackendFs, path: string): Promise<unknown> {
+  const configProvider = await getConfigProvider.call(this)
+  return configProvider.get(path)
+}
+
+/**
+ * Set a config value (only local config is supported)
+ * Note: 'worktree' scope is handled by WorktreeBackend, not GitBackend
+ */
+export async function setConfig(
+  this: GitBackendFs,
+  path: string,
+  value: unknown,
+  scope?: 'local' | 'global' | 'system',
+  append?: boolean
+): Promise<void> {
+  const configProvider = await getConfigProvider.call(this)
+  return configProvider.set(path, value, scope, append)
+}
+
+/**
+ * Get all values for a config path (only from local config)
+ */
+export async function getAllConfig(this: GitBackendFs, path: string): Promise<Array<{ value: unknown; scope: 'local' }>> {
+  const configProvider = await getConfigProvider.call(this)
+  return configProvider.getAll(path)
+}
+
+/**
+ * Get all subsections for a section
+ */
+export async function getConfigSubsections(this: GitBackendFs, section: string): Promise<(string | null)[]> {
+  const configProvider = await getConfigProvider.call(this)
+  return configProvider.getSubsections(section)
+}
+
+/**
+ * Get all section names
+ */
+export async function getConfigSections(this: GitBackendFs): Promise<string[]> {
+  const configProvider = await getConfigProvider.call(this)
+  return configProvider.getSections()
+}
+
+/**
+ * Reload config (re-reads from filesystem/storage)
+ */
+export async function reloadConfig(this: GitBackendFs): Promise<void> {
+  const configProvider = await getConfigProvider.call(this)
+  return configProvider.reload()
+}
+
+/**
+ * Returns the configuration as a plain JavaScript object
+ * This provides a unified view of the configuration
+ */
+export async function getConfigFile(this: GitBackendFs): Promise<any> {
+  const configProvider = await getConfigProvider.call(this)
+  // Access internal config object if available, otherwise return empty
+  return (configProvider as any).config || {}
+}
+

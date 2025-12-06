@@ -1,4 +1,4 @@
-import { join } from '../../utils/join.ts'
+import { join } from '../backends/GitBackendFs/utils/join.ts'
 import { readRef, resolveRef } from './readRef.ts'
 import { writeRef, writeSymbolicRef } from './writeRef.ts'
 import type { FileSystemProvider } from '../../models/FileSystem.ts'

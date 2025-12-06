@@ -1,6 +1,6 @@
 import { GitObject } from "../../models/GitObject.ts"
 import { hashObject as hashObjectInternal, shasum, shasum256, type ObjectFormat } from "../../core-utils/ShaHasher.ts"
-import { UniversalBuffer } from "../../utils/UniversalBuffer.ts"
+import { UniversalBuffer } from "../backends/GitBackendFs/utils/UniversalBuffer.ts"
 
 /**
  * Compute the SHA-1 or SHA-256 hash of a git object

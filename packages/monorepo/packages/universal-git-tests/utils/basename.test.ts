@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { basename } from '@awesome-os/universal-git-src/utils/basename.ts'
+import { basename } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/basename.ts'
 
 test('basename', async (t) => {
   await t.test('ok:extracts-basename-from-path', () => {

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { compareTreeEntryPath } from '@awesome-os/universal-git-src/utils/compareTreeEntryPath.ts'
+import { compareTreeEntryPath } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/compareTreeEntryPath.ts'
 import type { TreeEntry } from '@awesome-os/universal-git-src/models/GitTree.ts'
 
 test('compareTreeEntryPath', async (t) => {

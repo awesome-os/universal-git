@@ -1,14 +1,14 @@
-import { InternalError } from "../../errors/InternalError.ts"
-import { CheckoutConflictError } from "../../errors/CheckoutConflictError.ts"
+import { InternalError } from "../errors/InternalError.ts"
+import { CheckoutConflictError } from "../errors/CheckoutConflictError.ts"
 import { readObject } from '../objects/readObject.ts'
 import { parse as parseTree } from '../../core-utils/parsers/Tree.ts'
 import { parse as parseCommit } from '../../core-utils/parsers/Commit.ts'
 import { SparseCheckoutManager } from '../../core-utils/filesystem/SparseCheckoutManager.ts'
 import { join } from '../../core-utils/GitPath.ts'
 // Using src/git/ functions directly for refs, index, and other operations
-import { normalizeStats } from "../../utils/normalizeStats.ts"
-import { createFileSystem } from '../../utils/createFileSystem.ts'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { normalizeStats } from "../backends/GitBackendFs/utils/normalizeStats.ts"
+import { createFileSystem } from '../backends/GitBackendFs/utils/createFileSystem.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 import type { FileSystemProvider } from "../../models/FileSystem.ts"
 import type { ProgressCallback } from "../remote/types.ts"
 
@@ -33,7 +33,7 @@ export const analyzeCheckout = async ({
   fs?: FileSystemProvider
   dir?: string
   gitdir?: string
-  gitBackend?: import('../../backends/GitBackend.ts').GitBackend
+  gitBackend?: import('../backends/GitBackend.ts').GitBackend
   worktreeBackend?: import('./GitWorktreeBackend.ts').GitWorktreeBackend
   treeOid: string
   filepaths?: string[]
@@ -50,7 +50,7 @@ export const analyzeCheckout = async ({
   // Use provided gitBackend or create GitBackendFs
   let effectiveGitBackend = gitBackend
   if (!effectiveGitBackend && fs && gitdir) {
-     const { GitBackendFs } = await import('../../backends/GitBackendFs/index.ts')
+     const { GitBackendFs } = await import('../backends/GitBackendFs/GitBackendFs.ts')
      effectiveGitBackend = new GitBackendFs(fs, gitdir)
   }
 
@@ -408,16 +408,18 @@ export const executeCheckout = async ({
   cache = {},
   onProgress,
   index: gitIndex, // NEW: Accept the index object passed from checkout
+  dryRun = false,
 }: {
   fs?: FileSystemProvider
   dir?: string
   gitdir?: string
-  gitBackend?: import('../../backends/GitBackend.ts').GitBackend
+  gitBackend?: import('../backends/GitBackend.ts').GitBackend
   worktreeBackend?: import('./GitWorktreeBackend.ts').GitWorktreeBackend
   operations: CheckoutOperation[]
   cache?: Record<string, unknown>
   onProgress?: ProgressCallback
   index: import('../../git/index/GitIndex.ts').GitIndex // NEW: Index object parameter
+  dryRun?: boolean
 }): Promise<void> => {
   // Check for conflicts
   const conflicts = operations.filter(op => op[0] === 'conflict').map(op => op[1] as string)
@@ -435,7 +437,7 @@ export const executeCheckout = async ({
   // Use provided gitBackend or create GitBackendFs
   let effectiveGitBackend = gitBackend
   if (!effectiveGitBackend && fs && gitdir) {
-     const { GitBackendFs } = await import('../../backends/GitBackendFs/index.ts')
+     const { GitBackendFs } = await import('../backends/GitBackendFs/GitBackendFs.ts')
      effectiveGitBackend = new GitBackendFs(fs, gitdir)
   }
 
@@ -469,14 +471,16 @@ export const executeCheckout = async ({
       if (modeNum === 0o160000) {
         // Submodules are stored in the index but don't have file content
         // They're represented as directories in the workdir
-        // Ensure the submodule directory exists
-        if (worktreeBackend) {
-            await worktreeBackend.mkdir(filepath)
-        } else {
-            await normalizedFs!.mkdir(join(dir!, filepath))
+        // Ensure the submodule directory exists (only if not dryRun)
+        if (!dryRun) {
+          if (worktreeBackend) {
+              await worktreeBackend.mkdir(filepath)
+          } else {
+              await normalizedFs!.mkdir(join(dir!, filepath))
+          }
         }
         
-        // Add the gitlink entry to the index with mode 160000
+        // Add the gitlink entry to the index with mode 160000 (always update index, even in dryRun)
         // Gitlinks don't have file stats, so we create minimal stats
         const stats = {
           ctimeSeconds: 0,
@@ -533,77 +537,98 @@ export const executeCheckout = async ({
           // This is expected behavior when LFS objects haven't been downloaded yet
         }
 
-        // Ensure directory exists
-        const dirPath = filepath.includes('/') ? filepath.substring(0, filepath.lastIndexOf('/')) : ''
-        if (dirPath) {
-          if (worktreeBackend) {
-              await worktreeBackend.mkdir(dirPath)
-          } else {
-              await normalizedFs!.mkdir(join(dir!, dirPath))
+        // Ensure directory exists (only if not dryRun)
+        if (!dryRun) {
+          const dirPath = filepath.includes('/') ? filepath.substring(0, filepath.lastIndexOf('/')) : ''
+          if (dirPath) {
+            if (worktreeBackend) {
+                await worktreeBackend.mkdir(dirPath)
+            } else {
+                await normalizedFs!.mkdir(join(dir!, dirPath))
+            }
           }
-        }
 
-        // Write the file
-        if (modeNum === 0o100644) {
-          if (worktreeBackend) {
-              await worktreeBackend.write(filepath, fileContent)
-          } else {
-              await normalizedFs!.write(join(dir!, filepath), fileContent)
-          }
-        } else if (modeNum === 0o100755) {
-          if (worktreeBackend) {
-              await worktreeBackend.write(filepath, fileContent, { mode: 0o777 })
-          } else {
-              await normalizedFs!.write(join(dir!, filepath), fileContent, { mode: 0o777 })
+          // Write the file (only if not dryRun)
+          if (modeNum === 0o100644) {
+            if (worktreeBackend) {
+                await worktreeBackend.write(filepath, fileContent)
+            } else {
+                await normalizedFs!.write(join(dir!, filepath), fileContent)
+            }
+          } else if (modeNum === 0o100755) {
+            if (worktreeBackend) {
+                await worktreeBackend.write(filepath, fileContent, { mode: 0o777 })
+            } else {
+                await normalizedFs!.write(join(dir!, filepath), fileContent, { mode: 0o777 })
+            }
           }
         } else if (modeNum === 0o120000) {
-          // Handle symlinks
-          // We assume worktreeBackend handles symlinks or we might skip special handling if it doesn't expose writelink
-          // For normalizedFs (direct fs), we handle it explicitly.
-          // If worktreeBackend is GitWorktreeFs, it uses fs.
-          
-          if (worktreeBackend) {
-              // worktreeBackend.write usually handles content. For symlinks, content is target path.
-              // If worktreeBackend supports symlinks properly (via mode), it should handle it.
-              // But GitWorktreeBackend interface just has write.
-              // If underlying fs supports symlinks, backend implementation should handle it based on mode?
-              // Or we need explicit symlink support in interface?
-              // Assuming write() with content as target is what we do for now if no dedicated method.
-              // But strictly speaking, symlinks need `symlink` syscall.
-              // If worktreeBackend is opaque, we trust it.
-              await worktreeBackend.write(filepath, fileContent)
-          } else {
-              // ... existing symlink logic using normalizedFs ...
-              // For brevity in this refactor, let's keep the existing logic for fs case
-              // and assume worktreeBackend is smart or we fall back to normalizedFs if worktreeBackend is actually wrapping fs?
-              // But we might not have normalizedFs if worktreeBackend is remote/db.
-              
-              // Simplification: just write content for now if worktreeBackend.
-              // TODO: Add symlink support to WorktreeBackend interface?
-              
-              const fullPath = join(dir!, filepath)
-              // ... copy existing complex logic ...
-              try {
-                const exists = await normalizedFs!.exists(fullPath)
-                if (exists) {
-                   try {
-                     await normalizedFs!.unlink(fullPath)
-                   } catch {}
+          // Handle symlinks (only if not dryRun)
+          if (!dryRun) {
+            // We assume worktreeBackend handles symlinks or we might skip special handling if it doesn't expose writelink
+            // For normalizedFs (direct fs), we handle it explicitly.
+            // If worktreeBackend is GitWorktreeFs, it uses fs.
+            
+            if (worktreeBackend) {
+                // worktreeBackend.write usually handles content. For symlinks, content is target path.
+                // If worktreeBackend supports symlinks properly (via mode), it should handle it.
+                // But GitWorktreeBackend interface just has write.
+                // If underlying fs supports symlinks, backend implementation should handle it based on mode?
+                // Or we need explicit symlink support in interface?
+                // Assuming write() with content as target is what we do for now if no dedicated method.
+                // But strictly speaking, symlinks need `symlink` syscall.
+                // If worktreeBackend is opaque, we trust it.
+                await worktreeBackend.write(filepath, fileContent)
+            } else {
+                // ... existing symlink logic using normalizedFs ...
+                // For brevity in this refactor, let's keep the existing logic for fs case
+                // and assume worktreeBackend is smart or we fall back to normalizedFs if worktreeBackend is actually wrapping fs?
+                // But we might not have normalizedFs if worktreeBackend is remote/db.
+                
+                // Simplification: just write content for now if worktreeBackend.
+                // TODO: Add symlink support to WorktreeBackend interface?
+                
+                const fullPath = join(dir!, filepath)
+                // ... copy existing complex logic ...
+                try {
+                  const exists = await normalizedFs!.exists(fullPath)
+                  if (exists) {
+                     try {
+                       await normalizedFs!.unlink(fullPath)
+                     } catch {}
+                  }
+                  await (normalizedFs as any).writelink?.(fullPath, fileContent)
+                } catch (e) {
+                   // fallback to write if writelink fails or not supported
+                   await normalizedFs!.write(fullPath, fileContent)
                 }
-                await (normalizedFs as any).writelink?.(fullPath, fileContent)
-              } catch (e) {
-                 // fallback to write if writelink fails or not supported
-                 await normalizedFs!.write(fullPath, fileContent)
-              }
+            }
           }
         }
 
-        // Add the entry to our new, clean index
+        // Add the entry to our new, clean index (always update index, even in dryRun)
+        // In dryRun, we still want to update the index to show what would happen
         let stats: any
-        if (worktreeBackend) {
-            stats = await worktreeBackend.lstat(filepath)
+        if (!dryRun) {
+          if (worktreeBackend) {
+              stats = await worktreeBackend.lstat(filepath)
+          } else {
+              stats = await normalizedFs!.lstat(join(dir!, filepath))
+          }
         } else {
-            stats = await normalizedFs!.lstat(join(dir!, filepath))
+          // In dryRun, create minimal stats for index entry
+          stats = {
+            ctimeSeconds: 0,
+            ctimeNanoseconds: 0,
+            mtimeSeconds: 0,
+            mtimeNanoseconds: 0,
+            dev: 0,
+            ino: 0,
+            mode: modeNum,
+            uid: 0,
+            gid: 0,
+            size: 0,
+          }
         }
         
         gitIndex.insert({
@@ -647,8 +672,8 @@ export const executeCheckout = async ({
       }
     } else if (op[0] === 'delete' || op[0] === 'delete-index') {
       // For deletions, we simply do nothing to the index, because we already cleared it.
-      // We only need to remove the file from the workdir if it's a 'delete' op.
-      if (op[0] === 'delete') {
+      // We only need to remove the file from the workdir if it's a 'delete' op (only if not dryRun).
+      if (op[0] === 'delete' && !dryRun) {
         try {
           if (worktreeBackend) {
               await worktreeBackend.remove(filepath)
@@ -663,10 +688,13 @@ export const executeCheckout = async ({
         }
       }
     } else if (op[0] === 'mkdir') {
-      if (worktreeBackend) {
-          await worktreeBackend.mkdir(filepath)
-      } else {
-          await normalizedFs!.mkdir(join(dir!, filepath))
+      // Only create directories if not dryRun
+      if (!dryRun) {
+        if (worktreeBackend) {
+            await worktreeBackend.mkdir(filepath)
+        } else {
+            await normalizedFs!.mkdir(join(dir!, filepath))
+        }
       }
     }
   }
@@ -733,7 +761,7 @@ export const getFileStatus = async ({
         headOid = rootEntry.oid
       } else {
         // File not in root, use resolveFilepath to search recursively
-        const { resolveFilepath } = await import('../../utils/resolveFilepath.ts')
+        const { resolveFilepath } = await import('../backends/GitBackendFs/utils/resolveFilepath.ts')
         // resolveFilepath needs gitBackend
         // resolveFilepath returns the OID directly, not an object
         // Pass minimal fs/gitdir if backend doesn't support direct path resolution (not used if gitBackend is passed)
@@ -835,11 +863,12 @@ export const checkout = async ({
   cache = {},
   onProgress,
   index,
+  dryRun = false,
 }: {
   fs?: FileSystemProvider
   dir?: string
   gitdir?: string
-  gitBackend?: import('../../backends/GitBackend.ts').GitBackend
+  gitBackend?: import('../backends/GitBackend.ts').GitBackend
   worktreeBackend?: import('./GitWorktreeBackend.ts').GitWorktreeBackend
   treeOid: string
   filepaths?: string[]
@@ -848,6 +877,7 @@ export const checkout = async ({
   cache?: Record<string, unknown>
   onProgress?: ProgressCallback
   index?: import('../../git/index/GitIndex.ts').GitIndex
+  dryRun?: boolean
 }): Promise<void> => {
   // CRITICAL: Use Repository to get a consistent context and access to the index.
   // Read the index ONCE and pass it to both analyzeCheckout and executeCheckout.
@@ -870,7 +900,7 @@ export const checkout = async ({
   let effectiveGitBackend = gitBackend
   if (!effectiveGitBackend) {
      if (fs && gitdir) {
-        const { GitBackendFs } = await import('../../backends/GitBackendFs/index.ts')
+        const { GitBackendFs } = await import('../backends/GitBackendFs/GitBackendFs.ts')
         effectiveGitBackend = new GitBackendFs(fs, gitdir)
      } else {
         throw new Error('checkout requires gitBackend OR (fs and gitdir)')
@@ -878,7 +908,7 @@ export const checkout = async ({
   }
   
   const { GitIndex } = await import('../../git/index/GitIndex.ts')
-  const { detectObjectFormat } = await import('../../utils/detectObjectFormat.ts')
+  const { detectObjectFormat } = await import('../backends/GitBackendFs/utils/detectObjectFormat.ts')
   
   let gitIndex: import('../../git/index/GitIndex.ts').GitIndex
 
@@ -928,12 +958,15 @@ export const checkout = async ({
     index: gitIndex, // Pass the live index object
     cache, 
     onProgress,
+    dryRun,
   })
   
-  // Write the modified index back to disk.
-  const indexObjectFormat = await effectiveGitBackend.getObjectFormat(cache)
-  const buffer = await gitIndex.toBuffer(indexObjectFormat)
-  await effectiveGitBackend.writeIndex(buffer)
+  // Write the modified index back to disk (only if not dryRun).
+  if (!dryRun) {
+    const indexObjectFormat = await effectiveGitBackend.getObjectFormat(cache)
+    const buffer = await gitIndex.toBuffer(indexObjectFormat)
+    await effectiveGitBackend.writeIndex(buffer)
+  }
 }
 
 /**

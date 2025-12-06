@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { InvalidOidError } from '@awesome-os/universal-git-src/errors/InvalidOidError.ts'
+import { InvalidOidError } from '@awesome-os/universal-git-src/git/errors/InvalidOidError.ts'
 
 test('InvalidOidError', async (t) => {
   await t.test('creates error with value', () => {

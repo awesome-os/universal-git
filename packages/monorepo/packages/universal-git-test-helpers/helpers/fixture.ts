@@ -1,10 +1,11 @@
 import { makeNodeFixture } from './makeNodeFixture.ts'
 // resetToCommit is not exported from main package, use relative path
-import { resetToCommit as gitResetToCommit } from '@awesome-os/universal-git-src/commands/reset.ts'
+import { resetToCommit as gitResetToCommit } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/reset.ts'
 // FileSystemProvider is not exported as subpath, use relative path
 import type { FileSystemProvider } from '@awesome-os/universal-git-src/models/FileSystem.ts'
 // Repository is not exported as subpath, use relative path
 import type { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
+import { normalize } from '@awesome-os/universal-git-src/core-utils/GitPath.ts'
 import type * as fs from 'fs'
 
 export interface TestFixture {
@@ -48,12 +49,12 @@ export async function makeFixture(fixtureName: string, options?: { init?: boolea
     }
   }
   
-  // Return repo and convenience accessors
+  // Return repo and convenience accessors with normalized paths (POSIX format for cross-platform compatibility)
   return {
     repo: fixture.repo,
     fs: fixture.fs,
-    dir: fixture.dir,
-    gitdir: fixture.gitdir,
+    dir: fixture.dir ? normalize(fixture.dir) : fixture.dir,
+    gitdir: fixture.gitdir ? normalize(fixture.gitdir) : fixture.gitdir,
   }
 }
 

@@ -31,7 +31,7 @@ describe('remove', () => {
   })
 
   it('param:fs-missing', async () => {
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await remove({
         gitdir: '/tmp/test.git',
@@ -46,7 +46,7 @@ describe('remove', () => {
 
   it('param:filepath-missing', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-remove', { init: true })
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await remove({
         repo,
@@ -83,7 +83,7 @@ describe('remove', () => {
 
   it('error:caller-property', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-remove', { init: true })
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await remove({
         repo,

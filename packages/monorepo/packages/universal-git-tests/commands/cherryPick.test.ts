@@ -2,8 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { cherryPick, init, commit, add, writeRef, resolveRef } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { MissingParameterError } from '@awesome-os/universal-git-src/errors/MissingParameterError.ts'
-import { NotFoundError } from '@awesome-os/universal-git-src/errors/NotFoundError.ts'
+import { MissingParameterError } from '@awesome-os/universal-git-src/git/errors/MissingParameterError.ts'
+import { NotFoundError } from '@awesome-os/universal-git-src/git/errors/NotFoundError.ts'
 import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 
 test('cherryPick', async (t) => {
@@ -22,7 +22,7 @@ test('cherryPick', async (t) => {
 
   await t.test('param:gitdir-or-dir-missing', async () => {
     const { fs } = await makeFixture('test-empty')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await cherryPick({
         fs,
@@ -59,7 +59,7 @@ test('cherryPick', async (t) => {
     const repo = await Repository.open({ fs, dir, cache })
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file1.txt`, 'content1')
     
@@ -119,7 +119,7 @@ test('cherryPick', async (t) => {
     const repo = await Repository.open({ fs, dir, gitdir, cache })
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file.txt`, 'content')
     
@@ -153,7 +153,7 @@ test('cherryPick', async (t) => {
     const repo = await Repository.open({ fs, dir, gitdir, cache })
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file.txt`, 'content')
     
@@ -189,7 +189,7 @@ test('cherryPick', async (t) => {
     const repo = await Repository.open({ fs, dir, gitdir, cache })
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file1.txt`, 'content1')
     
@@ -227,7 +227,7 @@ test('cherryPick', async (t) => {
     const repo = await Repository.open({ fs, dir, gitdir, cache })
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file1.txt`, 'content1')
     
@@ -270,7 +270,7 @@ test('cherryPick', async (t) => {
     const repo = await Repository.open({ fs, dir, gitdir, cache })
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file1.txt`, 'content1')
     
@@ -338,7 +338,7 @@ test('cherryPick', async (t) => {
     const repo = await Repository.open({ fs, dir, gitdir, cache })
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file.txt`, 'content1')
     
@@ -392,7 +392,7 @@ test('cherryPick', async (t) => {
     const repo = await Repository.open({ fs, dir, gitdir, cache })
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file.txt`, 'content1')
     
@@ -440,7 +440,7 @@ test('cherryPick', async (t) => {
     const repo = await Repository.open({ fs, dir, gitdir, cache })
     
     // Write files to filesystem
-    const { createFileSystem } = await import('@awesome-os/universal-git-src/utils/createFileSystem.ts')
+    const { createFileSystem } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts')
     const normalizedFs = createFileSystem(fs)
     await normalizedFs.write(`${dir}/file1.txt`, 'content1')
     

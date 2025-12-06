@@ -2,24 +2,24 @@ import { addRemote } from './addRemote.ts'
 import { _checkout } from './checkout.ts'
 import { _fetch } from './fetch.ts'
 import { _init } from './init.ts'
-import { MissingParameterError } from "../errors/MissingParameterError.ts"
+import { MissingParameterError } from "../../../../git/errors/MissingParameterError.ts"
 import { ConfigAccess } from "../utils/configAccess.ts"
 import { createFileSystem } from "../utils/createFileSystem.ts"
 import { assertParameter } from "../utils/assertParameter.ts"
 import { join } from "../utils/join.ts"
-import { Repository } from "../core-utils/Repository.ts"
+import { Repository } from "../../../../core-utils/Repository.ts"
 // RefManager import removed - using capability modules directly
-import type { FileSystemProvider } from "../models/FileSystem.ts"
-import type { BaseCommandOptions } from "../types/commandOptions.ts"
+import type { FileSystemProvider } from "../../../../models/FileSystem.ts"
+import type { BaseCommandOptions } from "../../../../types/commandOptions.ts"
 import type {
   HttpClient,
   ProgressCallback,
   AuthCallback,
   AuthFailureCallback,
   AuthSuccessCallback,
-} from "../git/remote/types.ts"
-import type { GitRemoteBackend } from "../git/remote/GitRemoteBackend.ts"
-import type { TcpClient, TcpProgressCallback } from "../daemon/TcpClient.ts"
+} from "../../../remote/types.ts"
+import type { GitRemoteBackend } from "../../../remote/GitRemoteBackend.ts"
+import type { TcpClient, TcpProgressCallback } from "../../../../daemon/TcpClient.ts"
 import type { SshClient, SshProgressCallback } from "../ssh/SshClient.ts"
 import type { MessageCallback } from './push.ts'
 import type { PostCheckoutCallback } from './checkout.ts'
@@ -102,7 +102,7 @@ export async function clone({
 
     if (_repo) {
       // If repo is provided, extract what we need
-      fs = _repo.fs
+      fs = _repo.gitBackend.getFs()
       effectiveDir = (_repo.worktreeBackend?.getDirectory ? _repo.worktreeBackend.getDirectory() : undefined) || dir
       effectiveGitdir = await _repo.getGitdir()
       cache = _repo.cache
@@ -242,7 +242,7 @@ export async function _clone({
   let gitdir: string
 
   if (_repo) {
-    fs = _repo.fs
+    fs = _repo.gitBackend.getFs()
     cache = _repo.cache
     dir = (_repo.worktreeBackend?.getDirectory ? _repo.worktreeBackend.getDirectory() : undefined) || _dir
     gitdir = await _repo.getGitdir()
@@ -302,7 +302,7 @@ export async function _clone({
       if (singleBranch && ref) {
         // Only copy the specific ref that was requested
         // Resolve the ref to get the full path (e.g., 'feature' -> 'refs/heads/feature')
-        const { resolveRef } = await import('../git/refs/readRef.ts')
+        const { resolveRef } = await import('../../../refs/readRef.ts')
         let sourceRefPath: string | null = null
         const possibleRefPaths = [
           ref,
@@ -333,7 +333,7 @@ export async function _clone({
             
             // Use centralized writeRef to ensure reflog entries are created
             // Import here to avoid circular dependencies
-            const { writeRef, writeSymbolicRef } = await import('../git/refs/writeRef.ts')
+            const { writeRef, writeSymbolicRef } = await import('../../../refs/writeRef.ts')
             if (trimmedContent.startsWith('ref: ')) {
               // Symbolic ref
               const targetRef = trimmedContent.substring(5) // Remove 'ref: ' prefix
@@ -375,7 +375,7 @@ export async function _clone({
       
       // Initialize empty index (don't copy from source)
       // Create an empty index file with version 2 header and proper checksum
-      const { GitIndex } = await import('../git/index/GitIndex.ts')
+      const { GitIndex } = await import('../../../index/GitIndex.ts')
       const emptyIndex = new GitIndex()
       const indexBuffer = await emptyIndex.toObject()
       await fs.write(join(gitdir, 'index'), indexBuffer)
@@ -388,8 +388,8 @@ export async function _clone({
       let fetchHead: string | null = null
       
       // CRITICAL: Use resolveRef, writeRef, and writeSymbolicRef directly to avoid circular import issues with RefManager
-      const { resolveRef } = await import('../git/refs/readRef.ts')
-      const { writeRef, writeSymbolicRef } = await import('../git/refs/writeRef.ts')
+      const { resolveRef } = await import('../../../refs/readRef.ts')
+      const { writeRef, writeSymbolicRef } = await import('../../../refs/writeRef.ts')
       
       // Try to resolve from source repository first
       // CRITICAL: Try multiple resolution strategies to find the ref
@@ -433,10 +433,10 @@ export async function _clone({
       if (_repo) {
         repo = _repo
       } else {
-        const { Repository } = await import('../core-utils/Repository.ts')
+        const { Repository } = await import('../../../../core-utils/Repository.ts')
         repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
       }
-      const normalizedFs = repo.fs
+      const normalizedFs = repo.gitBackend.getFs()
       const tagRefPath = join(gitdir, 'refs', 'tags', baseRef)
       const isTag = await normalizedFs.exists(tagRefPath)
       
@@ -540,7 +540,7 @@ export async function _clone({
     await _init({ fs, dir, gitdir, bare: false })
     
     // Initialize empty index file (required for checkout)
-    const { GitIndex } = await import('../git/index/GitIndex.ts')
+    const { GitIndex } = await import('../../../index/GitIndex.ts')
     const emptyIndex = new GitIndex()
     const indexBuffer = await emptyIndex.toObject()
     await fs.write(join(gitdir, 'index'), indexBuffer)
@@ -565,7 +565,7 @@ export async function _clone({
       if (_repo) {
         repo = _repo
       } else {
-        const { Repository } = await import('../core-utils/Repository.ts')
+        const { Repository } = await import('../../../../core-utils/Repository.ts')
         repo = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
       }
       const configService = await repo.getConfig()
@@ -579,7 +579,7 @@ export async function _clone({
     if (_repo) {
       repoForFetch = _repo
     } else {
-      const { Repository } = await import('../core-utils/Repository.ts')
+      const { Repository } = await import('../../../../core-utils/Repository.ts')
       repoForFetch = await Repository.open({ fs, dir, gitdir, cache, autoDetectConfig: true })
     }
     
@@ -628,11 +628,11 @@ export async function _clone({
     // CRITICAL: Use Repository to ensure consistent fs instance
     // Reuse the repo we already have
     const repo = repoForFetch
-    const normalizedFs = repo.fs
+    const normalizedFs = repo.gitBackend.getFs()
     
     // CRITICAL: Import ref functions directly to avoid circular import issues with RefManager
-    const { resolveRef: resolveRefRemote } = await import('../git/refs/readRef.ts')
-    const { writeRef: writeRefRemote, writeSymbolicRef: writeSymbolicRefRemote } = await import('../git/refs/writeRef.ts')
+    const { resolveRef: resolveRefRemote } = await import('../../../refs/readRef.ts')
+    const { writeRef: writeRefRemote, writeSymbolicRef: writeSymbolicRefRemote } = await import('../../../refs/writeRef.ts')
     
     // Determine what to checkout
     // When singleBranch is true, only use the explicitly provided ref, not defaultBranch
@@ -742,7 +742,7 @@ export async function _clone({
       // DEBUG: Check what branches exist before creating
       if (process.env.DEBUG_CLONE_REFS === 'true') {
         try {
-          const { listRefs } = await import('../git/refs/listRefs.ts')
+          const { listRefs } = await import('../../../refs/listRefs.ts')
           const existingBranches = await listRefs({ fs: normalizedFs, gitdir, filepath: 'refs/heads' })
           console.log(`[DEBUG clone] Existing branches BEFORE creating ${baseRef}:`, existingBranches)
         } catch (e) {
@@ -761,7 +761,7 @@ export async function _clone({
       // DEBUG: Check what branches exist after creating
       if (process.env.DEBUG_CLONE_REFS === 'true') {
         try {
-          const { listRefs } = await import('../git/refs/listRefs.ts')
+          const { listRefs } = await import('../../../refs/listRefs.ts')
           const existingBranches = await listRefs({ fs: normalizedFs, gitdir, filepath: 'refs/heads' })
           console.log(`[DEBUG clone] Existing branches AFTER creating ${baseRef}:`, existingBranches)
         } catch (e) {
@@ -883,12 +883,12 @@ export async function _clone({
           // DEBUG: After checkout, check what branches exist
           if (process.env.DEBUG_CLONE_REFS === 'true') {
             try {
-              const { listRefs } = await import('../git/refs/listRefs.ts')
+              const { listRefs } = await import('../../../refs/listRefs.ts')
               const existingBranches = await listRefs({ fs: normalizedFs, gitdir, filepath: 'refs/heads' })
               console.log(`[DEBUG clone] Branches AFTER checkout (singleBranch):`, existingBranches)
               
               // Also check reflog for branch creations
-              const { readLog } = await import('../git/logs/readLog.ts')
+              const { readLog } = await import('../../../logs/readLog.ts')
               for (const branch of existingBranches) {
                 try {
                   const reflog = await readLog({ fs: normalizedFs, gitdir, ref: branch, parsed: true })

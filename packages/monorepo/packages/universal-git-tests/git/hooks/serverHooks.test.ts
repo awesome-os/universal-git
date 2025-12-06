@@ -16,7 +16,7 @@ import {
   runServerHooks,
   type RefUpdate,
 } from '@awesome-os/universal-git-src/git/hooks/serverHooks.ts'
-import { init } from '@awesome-os/universal-git-src/commands/init.ts'
+import { init } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/init.ts'
 
 /**
  * Helper to create a temporary test repository

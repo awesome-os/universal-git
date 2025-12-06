@@ -6,7 +6,7 @@ import {
   comparePath,
   compareTreeEntryPath,
   compareAge,
-} from '@awesome-os/universal-git-src/utils/compare.ts'
+} from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/compare.ts'
 
 test('compare.ts - unified comparison utilities', async (t) => {
   await t.test('ok:compareStrings-a-lt-b', () => {

@@ -1,9 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { push, resolveRef, currentBranch } from '@awesome-os/universal-git-src/index.ts'
-import http from '@awesome-os/universal-git-src/http/node/index.ts'
+import http from '@awesome-os/universal-git-src/git/http/node/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { MissingParameterError } from '@awesome-os/universal-git-src/errors/MissingParameterError.ts'
+import { MissingParameterError } from '@awesome-os/universal-git-src/git/errors/MissingParameterError.ts'
 
 // Skip HTTP tests if running in CI without network access
 const SKIP_HTTP_TESTS = process.env.SKIP_HTTP_TESTS === 'true'
@@ -38,7 +38,7 @@ test('push', async (t) => {
 
   await t.test('param:gitdir-or-dir-missing', async () => {
     const { fs } = await makeFixture('test-push')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await push({
         fs,
@@ -104,9 +104,9 @@ test('push', async (t) => {
 
   await t.test('param:remote-and-url-missing', async () => {
     const { fs, gitdir } = await makeFixture('test-push')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     const { setConfig, writeRef } = await import('@awesome-os/universal-git-src/index.ts')
-    const { ConfigAccess } = await import('@awesome-os/universal-git-src/utils/configAccess.ts')
+    const { ConfigAccess } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/configAccess.ts')
     
     // Create the ref first so it exists
     await writeRef({ fs, gitdir, ref: 'refs/heads/main', value: '1234567890123456789012345678901234567890' })
@@ -142,7 +142,7 @@ test('push', async (t) => {
 
   await t.test('param:remoteRef-cannot-be-determined', async () => {
     const { fs, gitdir } = await makeFixture('test-push')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     const { setConfig } = await import('@awesome-os/universal-git-src/index.ts')
     
     // Set up remote URL but no branch.merge config
@@ -256,7 +256,7 @@ test('push', async (t) => {
   await t.test('behavior:onPrePush-returns-false', async () => {
     const { fs, gitdir } = await makeFixture('test-push')
     const { setConfig } = await import('@awesome-os/universal-git-src/index.ts')
-    const { UserCanceledError } = await import('@awesome-os/universal-git-src/errors/UserCanceledError.ts')
+    const { UserCanceledError } = await import('@awesome-os/universal-git-src/git/errors/UserCanceledError.ts')
     
     // Set up minimal config
     await setConfig({ fs, gitdir, path: 'remote.origin.url', value: 'https://example.com/repo.git' })

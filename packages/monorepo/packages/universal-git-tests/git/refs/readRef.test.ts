@@ -127,7 +127,7 @@ test('readRef', async (t) => {
 test('resolveRef', async (t) => {
   await t.test('error:throws-NotFoundError-when-ref-does-not-exist', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-empty')
-    const { NotFoundError } = await import('@awesome-os/universal-git-src/errors/NotFoundError.ts')
+    const { NotFoundError } = await import('@awesome-os/universal-git-src/git/errors/NotFoundError.ts')
     let error: unknown = null
     try {
       await repo.resolveRef('refs/heads/non-existent')
@@ -135,7 +135,14 @@ test('resolveRef', async (t) => {
       error = err
     }
     assert.notStrictEqual(error, null)
-    assert.ok(error instanceof NotFoundError)
+    // Check error by code/name since instanceof doesn't work across module boundaries
+    assert.ok(
+      error instanceof NotFoundError ||
+      (error as any)?.code === NotFoundError.code ||
+      (error as any)?.code === 'NotFoundError' ||
+      (error as any)?.name === 'NotFoundError',
+      `Expected NotFoundError, got: ${(error as any)?.code || (error as any)?.name || typeof error}`
+    )
   })
 })
 

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
-import { InMemoryBackend } from '@awesome-os/universal-git-src/backends/InMemoryBackend.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
+import { InMemoryBackend } from '@awesome-os/universal-git-src/git/backends/GitBackendInMemory/GitBackendInMemory.ts'
 
 test('InMemoryBackend', async (t) => {
   await t.test('getType - returns in-memory', () => {

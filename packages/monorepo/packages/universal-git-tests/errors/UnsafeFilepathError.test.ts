@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { UnsafeFilepathError } from '@awesome-os/universal-git-src/errors/UnsafeFilepathError.ts'
+import { UnsafeFilepathError } from '@awesome-os/universal-git-src/git/errors/UnsafeFilepathError.ts'
 
 test('UnsafeFilepathError', async (t) => {
   await t.test('creates error with filepath', () => {

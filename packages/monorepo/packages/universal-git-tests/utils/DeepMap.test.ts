@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { DeepMap } from '@awesome-os/universal-git-src/utils/DeepMap.ts'
+import { DeepMap } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/DeepMap.ts'
 
 test('DeepMap', async (t) => {
   await t.test('ok:set-get-single-key', () => {

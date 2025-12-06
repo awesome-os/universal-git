@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { CheckoutConflictError } from '@awesome-os/universal-git-src/errors/CheckoutConflictError.ts'
+import { CheckoutConflictError } from '@awesome-os/universal-git-src/git/errors/CheckoutConflictError.ts'
 
 test('CheckoutConflictError', async (t) => {
   await t.test('constructor - single filepath', () => {

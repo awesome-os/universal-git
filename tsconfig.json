@@ -1,6 +1,7 @@
 {
   "include": [
-    "packages/monorepo/packages/**/*.ts"
+    "packages/monorepo/packages/**/*.ts",
+    "worktrees/**/*.ts"
   ],
   "exclude": ["node_modules"],
   "compilerOptions": {

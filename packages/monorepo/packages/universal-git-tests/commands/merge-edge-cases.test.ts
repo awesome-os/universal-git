@@ -30,8 +30,7 @@ describe('merge edge cases - bisection tests', () => {
         
         // Merge theirs into ours
         const result = await merge({
-          fs: repo.fs,
-          gitdir: repo.gitdir,
+          repo: repo.repo,
           ours: 'ours',
           theirs: 'theirs',
           author: { name: 'Test', email: 'test@test.com', timestamp: 1262356920, timezoneOffset: 0 },
@@ -66,8 +65,7 @@ describe('merge edge cases - bisection tests', () => {
         
         // Merge theirs into ours
         const result = await merge({
-          fs: repo.fs,
-          gitdir: repo.gitdir,
+          repo: repo.repo,
           ours: 'ours',
           theirs: 'theirs',
           author: { name: 'Test', email: 'test@test.com', timestamp: 1262356920, timezoneOffset: 0 },
@@ -102,8 +100,7 @@ describe('merge edge cases - bisection tests', () => {
         
         // Merge theirs into ours
         const result = await merge({
-          fs: repo.fs,
-          gitdir: repo.gitdir,
+          repo: repo.repo,
           ours: 'ours',
           theirs: 'theirs',
           author: { name: 'Test', email: 'test@test.com', timestamp: 1262356920, timezoneOffset: 0 },
@@ -138,8 +135,7 @@ describe('merge edge cases - bisection tests', () => {
         
         // Merge theirs into ours
         const result = await merge({
-          fs: repo.fs,
-          gitdir: repo.gitdir,
+          repo: repo.repo,
           ours: 'ours',
           theirs: 'theirs',
           author: { name: 'Test', email: 'test@test.com', timestamp: 1262356920, timezoneOffset: 0 },
@@ -174,8 +170,7 @@ describe('merge edge cases - bisection tests', () => {
         
         // Merge theirs into ours
         const result = await merge({
-          fs: repo.fs,
-          gitdir: repo.gitdir,
+          repo: repo.repo,
           ours: 'ours',
           theirs: 'theirs',
           author: { name: 'Test', email: 'test@test.com', timestamp: 1262356920, timezoneOffset: 0 },
@@ -212,8 +207,7 @@ describe('merge edge cases - bisection tests', () => {
         
         // Merge theirs into ours
         const result = await merge({
-          fs: repo.fs,
-          gitdir: repo.gitdir,
+          repo: repo.repo,
           ours: 'ours',
           theirs: 'theirs',
           author: { name: 'Test', email: 'test@test.com', timestamp: 1262356920, timezoneOffset: 0 },
@@ -246,8 +240,7 @@ describe('merge edge cases - bisection tests', () => {
         
         // Merge theirs into ours
         const result = await merge({
-          fs: repo.fs,
-          gitdir: repo.gitdir,
+          repo: repo.repo,
           ours: 'ours',
           theirs: 'theirs',
           author: { name: 'Test', email: 'test@test.com', timestamp: 1262356920, timezoneOffset: 0 },
@@ -282,8 +275,7 @@ describe('merge edge cases - bisection tests', () => {
         let error: unknown = null
         try {
           await merge({
-            fs: repo.fs,
-            gitdir: repo.gitdir,
+            repo: repo.repo,
             ours: 'ours',
             theirs: 'theirs',
             abortOnConflict: true,
@@ -329,8 +321,7 @@ describe('merge edge cases - bisection tests', () => {
         let error: unknown = null
         try {
           await merge({
-            fs: repo.fs,
-            gitdir: repo.gitdir,
+            repo: repo.repo,
             ours: 'ours',
             theirs: 'theirs',
             abortOnConflict: true,
@@ -374,8 +365,7 @@ describe('merge edge cases - bisection tests', () => {
         let error: unknown = null
         try {
           await merge({
-            fs: repo.fs,
-            gitdir: repo.gitdir,
+            repo: repo.repo,
             ours: 'ours',
             theirs: 'theirs',
             abortOnConflict: true,
@@ -427,8 +417,7 @@ describe('merge edge cases - bisection tests', () => {
         
         // Merge theirs into ours
         const result = await merge({
-          fs: repo.fs,
-          gitdir: repo.gitdir,
+          repo: repo.repo,
           ours: 'ours',
           theirs: 'theirs',
           author: { name: 'Test', email: 'test@test.com', timestamp: 1262356920, timezoneOffset: 0 },
@@ -464,8 +453,7 @@ describe('merge edge cases - bisection tests', () => {
         
         // Merge theirs into ours
         const result = await merge({
-          fs: repo.fs,
-          gitdir: repo.gitdir,
+          repo: repo.repo,
           ours: 'ours',
           theirs: 'theirs',
           author: { name: 'Test', email: 'test@test.com', timestamp: 1262356920, timezoneOffset: 0 },
@@ -499,8 +487,7 @@ describe('merge edge cases - bisection tests', () => {
         
         // Merge theirs into ours
         const result = await merge({
-          fs: repo.fs,
-          gitdir: repo.gitdir,
+          repo: repo.repo,
           ours: 'ours',
           theirs: 'theirs',
           author: { name: 'Test', email: 'test@test.com', timestamp: 1262356920, timezoneOffset: 0 },
@@ -535,8 +522,7 @@ describe('merge edge cases - bisection tests', () => {
         
         // Merge theirs into ours
         const result = await merge({
-          fs: repo.fs,
-          gitdir: repo.gitdir,
+          repo: repo.repo,
           ours: 'ours',
           theirs: 'theirs',
           author: { name: 'Test', email: 'test@test.com', timestamp: 1262356920, timezoneOffset: 0 },
@@ -573,8 +559,7 @@ describe('merge edge cases - bisection tests', () => {
         let error: unknown = null
         try {
           await merge({
-            fs: repo.fs,
-            gitdir: repo.gitdir,
+            repo: repo.repo,
             ours: 'ours',
             theirs: 'theirs',
             abortOnConflict: true,
@@ -618,8 +603,7 @@ describe('merge edge cases - bisection tests', () => {
         
         // Merge theirs into ours - should be fast-forward
         const result = await merge({
-          fs: repo.fs,
-          gitdir: repo.gitdir,
+          repo: repo.repo,
           ours: 'ours',
           theirs: 'theirs',
           author: { name: 'Test', email: 'test@test.com', timestamp: 1262356920, timezoneOffset: 0 },
@@ -650,8 +634,7 @@ describe('merge edge cases - bisection tests', () => {
         
         // Merge theirs into ours - should be already merged
         const result = await merge({
-          fs: repo.fs,
-          gitdir: repo.gitdir,
+          repo: repo.repo,
           ours: 'ours',
           theirs: 'theirs',
           author: { name: 'Test', email: 'test@test.com', timestamp: 1262356920, timezoneOffset: 0 },

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { RemoteCapabilityError } from '@awesome-os/universal-git-src/errors/RemoteCapabilityError.ts'
+import { RemoteCapabilityError } from '@awesome-os/universal-git-src/git/errors/RemoteCapabilityError.ts'
 
 test('RemoteCapabilityError', async (t) => {
   await t.test('constructor - shallow capability with depth parameter', () => {

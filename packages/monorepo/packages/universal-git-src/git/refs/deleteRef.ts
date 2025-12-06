@@ -7,7 +7,7 @@
  * @param refs - Array of reference names to delete
  */
 import { join } from '../../core-utils/GitPath.ts'
-import { createFileSystem } from '../../utils/createFileSystem.ts'
+import { createFileSystem } from '../backends/GitBackendFs/utils/createFileSystem.ts'
 import { parsePackedRefs, serializePackedRefs } from './packedRefs.ts'
 import AsyncLock from 'async-lock'
 import type { FileSystemProvider } from '../../models/FileSystem.ts'

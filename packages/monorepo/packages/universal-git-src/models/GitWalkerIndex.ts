@@ -1,7 +1,7 @@
-import { compareStrings } from "../utils/compareStrings.ts"
-import { flatFileListToDirectoryStructure } from "../utils/flatFileListToDirectoryStructure.ts"
-import { mode2type } from "../utils/mode2type.ts"
-import { normalizeStats } from "../utils/normalizeStats.ts"
+import { compareStrings } from "../git/backends/GitBackendFs/utils/compareStrings.ts"
+import { flatFileListToDirectoryStructure } from "../git/backends/GitBackendFs/utils/flatFileListToDirectoryStructure.ts"
+import { mode2type } from "../git/backends/GitBackendFs/utils/mode2type.ts"
+import { normalizeStats } from "../git/backends/GitBackendFs/utils/normalizeStats.ts"
 import type { Stat } from './FileSystem.ts'
 import type { GitBackend } from '../backends/GitBackend.ts'
 
@@ -86,8 +86,8 @@ export class GitWalkerIndex {
   private async getTree(): Promise<Map<string, Inode>> {
     try {
       const { GitIndex } = await import('../git/index/GitIndex.ts')
-      const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
-      const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+      const { detectObjectFormat } = await import('../git/backends/GitBackendFs/utils/detectObjectFormat.ts')
+      const { UniversalBuffer } = await import('../git/backends/GitBackendFs/utils/UniversalBuffer.ts')
       
       let indexBuffer: UniversalBuffer
       try {

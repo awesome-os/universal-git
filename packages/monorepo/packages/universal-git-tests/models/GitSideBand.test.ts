@@ -1,8 +1,8 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
-import { collect } from '@awesome-os/universal-git-src/utils/collect.ts'
+import { collect } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/collect.ts'
 import { GitSideBand } from '@awesome-os/universal-git-src/models/GitSideBand.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 describe('GitSideBand', () => {
   it('ok:demux-packetlines-packfile-progress', async () => {

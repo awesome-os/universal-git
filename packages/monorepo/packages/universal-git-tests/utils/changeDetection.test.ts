@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { detectChange, detectThreeWayChange, modified } from '@awesome-os/universal-git-src/utils/changeDetection.ts'
+import { detectChange, detectThreeWayChange, modified } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/changeDetection.ts'
 import type { WalkerEntry } from '@awesome-os/universal-git-src/models/Walker.ts'
 import { createWalkerEntry } from '@awesome-os/universal-git-src/models/Walker.ts'
 

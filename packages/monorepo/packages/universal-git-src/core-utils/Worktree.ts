@@ -24,11 +24,15 @@ export class Worktree {
   // StagingArea removed - Worktree is now stateless, delegates to Repository
 
   private ensureFileSystem(): FileSystemProvider {
-    const fs = this.repo.fs
-    if (!fs) {
-      throw new Error('Filesystem unavailable. Attach a WorktreeBackend before performing this operation.')
+    // Get filesystem from gitBackend if available
+    if (this.repo.gitBackend && 'getFs' in this.repo.gitBackend && typeof this.repo.gitBackend.getFs === 'function') {
+      return this.repo.gitBackend.getFs()
     }
-    return fs
+    // Fallback to worktree backend if available
+    if (this.backend && 'getFs' in this.backend && typeof this.backend.getFs === 'function') {
+      return this.backend.getFs()
+    }
+    throw new Error('Filesystem unavailable. Attach a WorktreeBackend before performing this operation.')
   }
 
   private requireBackend(): GitWorktreeBackend {
@@ -233,7 +237,7 @@ export class Worktree {
    * @param filepath - File path relative to working directory root
    * @returns File status
    */
-  async status(filepath: string): Promise<import('../commands/status.ts').FileStatus> {
+  async status(filepath: string): Promise<import('../git/backends/GitBackendFs/commands/status.ts').FileStatus> {
     const gitdir = await this.getGitdir()
     const backend = this.requireBackend()
     return await backend.status(gitdir, filepath)
@@ -246,7 +250,7 @@ export class Worktree {
    */
   async statusMatrix(
     options?: { filepaths?: string[] }
-  ): Promise<import('../commands/statusMatrix.ts').StatusRow[]> {
+  ): Promise<import('../git/backends/GitBackendFs/commands/statusMatrix.ts').StatusRow[]> {
     const gitdir = await this.getGitdir()
     const backend = this.requireBackend()
     return await backend.statusMatrix(gitdir, options)
@@ -279,7 +283,7 @@ export class Worktree {
       filepaths?: string[]
       cached?: boolean
     }
-  ): Promise<import('../commands/diff.ts').DiffResult> {
+  ): Promise<import('../git/backends/GitBackendFs/commands/diff.ts').DiffResult> {
     const gitdir = await this.getGitdir()
     const backend = this.requireBackend()
     return await backend.diff(gitdir, options)

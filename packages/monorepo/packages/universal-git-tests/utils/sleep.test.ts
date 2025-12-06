@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { sleep } from '@awesome-os/universal-git-src/utils/sleep.ts'
+import { sleep } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/sleep.ts'
 
 test('sleep', async (t) => {
   await t.test('ok:resolves-after-milliseconds', async () => {

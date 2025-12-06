@@ -1,18 +1,18 @@
 import { WalkerFactory } from '../../models/Walker.ts'
-import { _walk } from '../../commands/walk.ts'
-import { writeBlob } from '../../commands/writeBlob.ts'
-import { writeTree } from '../../commands/writeTree.ts'
-import { MergeConflictError } from '../../errors/MergeConflictError.ts'
-import { MergeNotSupportedError } from '../../errors/MergeNotSupportedError.ts'
-import { NotFoundError } from '../../errors/NotFoundError.ts'
+import { _walk } from '../backends/GitBackendFs/commands/walk.ts'
+import { writeBlob } from '../backends/GitBackendFs/commands/writeBlob.ts'
+import { writeTree } from '../backends/GitBackendFs/commands/writeTree.ts'
+import { MergeConflictError } from '../errors/MergeConflictError.ts'
+import { MergeNotSupportedError } from '../errors/MergeNotSupportedError.ts'
+import { NotFoundError } from '../errors/NotFoundError.ts'
 import { GitTree } from "../../models/GitTree.ts"
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
-import { basename } from '../../utils/basename.ts'
-import { join } from '../../utils/join.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
+import { basename } from '../backends/GitBackendFs/utils/basename.ts'
+import { join } from '../backends/GitBackendFs/utils/join.ts'
 import { mergeFile } from './mergeFile.ts'
 import { mergeBlobs as mergeBlobsCapability } from './mergeBlobs.ts'
-import { modified, detectThreeWayChange } from '../../utils/changeDetection.ts'
-import { createFileSystem } from '../../utils/createFileSystem.ts'
+import { modified, detectThreeWayChange } from '../backends/GitBackendFs/utils/changeDetection.ts'
+import { createFileSystem } from '../backends/GitBackendFs/utils/createFileSystem.ts'
 import type { GitBackend } from '../../backends/GitBackend.ts'
 import type { FileSystemProvider } from "../../models/FileSystem.ts"
 import type { MergeDriverCallback, MergeDriverParams } from "./types.ts"
@@ -462,7 +462,7 @@ export async function mergeTree({
         }
         // Empty root - return empty tree OID
         // The empty tree OID is hardcoded: '4b825dc642cb6eb9a060e54bf8d69288fbee4904' for SHA-1
-        const { getOidLength } = await import('../../utils/detectObjectFormat.ts')
+        const { getOidLength } = await import('../backends/GitBackendFs/utils/detectObjectFormat.ts')
         const objectFormat = await repo.getObjectFormat()
         const emptyTreeOid = objectFormat === 'sha256'
           ? '0'.repeat(getOidLength('sha256'))
@@ -568,7 +568,7 @@ export async function mergeTree({
       if (repo.worktreeBackend) {
         // Use Promise.allSettled to write all files concurrently and handle partial failures
         // This eliminates race conditions and ensures all conflicts are written even if some fail
-        const { dirname } = await import('../../utils/dirname.ts')
+        const { dirname } = await import('../backends/GitBackendFs/utils/dirname.ts')
         const writePromises = Array.from(conflictedFiles.entries()).map(async ([filepath, { content, mode }]) => {
           const parentDir = dirname(filepath)
           try {
@@ -773,7 +773,7 @@ export async function mergeBlobs({
   let oid: string
   if (dryRun) {
     // For dryRun, compute OID without writing
-    const { computeObjectId } = await import('../../utils/computeObjectId.ts')
+    const { computeObjectId } = await import('../backends/GitBackendFs/utils/computeObjectId.ts')
     oid = computeObjectId({
       type: 'blob',
       object: UniversalBuffer.from(mergedText, 'utf8'),

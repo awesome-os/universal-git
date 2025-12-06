@@ -1,4 +1,4 @@
-import { InvalidOidError } from '../../errors/InvalidOidError.ts'
+import { InvalidOidError } from '../errors/InvalidOidError.ts'
 import type { GitBackend } from '../../backends/GitBackend.ts'
 import type { FileSystemProvider } from '../../models/FileSystem.ts'
 
@@ -59,7 +59,7 @@ export async function updateRemoteRefs({
     backend = gitBackend
   } else if (_fs && _gitdir) {
     // Legacy: create a temporary backend
-    const { GitBackendFs } = await import('../../backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('../backends/GitBackendFs/GitBackendFs.ts')
     backend = new GitBackendFs(_fs, _gitdir)
   } else {
     throw new Error('Either gitBackend or (fs and gitdir) must be provided')

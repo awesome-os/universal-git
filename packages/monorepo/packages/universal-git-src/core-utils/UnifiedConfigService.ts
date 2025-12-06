@@ -1,7 +1,7 @@
 import { parse as parseConfig, serialize as serializeConfig, type ConfigObject } from './ConfigParser.ts'
 import { join } from './GitPath.ts'
 import type { FileSystemProvider } from "../models/FileSystem.ts"
-import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
+import { UniversalBuffer } from "../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
 
 type ConfigValueWithScope = {
   value: unknown

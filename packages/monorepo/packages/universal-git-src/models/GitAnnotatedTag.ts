@@ -1,11 +1,11 @@
-import { InternalError } from '../errors/InternalError.ts'
-import { formatAuthor } from "../utils/formatAuthor.ts"
-import { normalizeNewlines } from "../utils/normalizeNewlines.ts"
-import { parseAuthor } from "../utils/parseAuthor.ts"
+import { InternalError } from '../git/errors/InternalError.ts'
+import { formatAuthor } from "../git/backends/GitBackendFs/utils/formatAuthor.ts"
+import { normalizeNewlines } from "../git/backends/GitBackendFs/utils/normalizeNewlines.ts"
+import { parseAuthor } from "../git/backends/GitBackendFs/utils/parseAuthor.ts"
 import type { Author } from './GitCommit.ts'
 import type { ObjectType } from './GitObject.ts'
 import type { SignCallback } from "../core-utils/Signing.ts"
-import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
+import { UniversalBuffer } from "../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
 
 // ============================================================================
 // GIT TAG TYPES

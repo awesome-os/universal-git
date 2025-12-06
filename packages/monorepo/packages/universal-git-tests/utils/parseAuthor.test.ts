@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { parseAuthor } from '@awesome-os/universal-git-src/utils/parseAuthor.ts'
+import { parseAuthor } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/parseAuthor.ts'
 
 test('parseAuthor', async (t) => {
   await t.test('ok:positive-timezone-offset', () => {
@@ -96,7 +96,7 @@ test('parseAuthor', async (t) => {
       timestamp: 1234567890,
       timezoneOffset: 120,
     }
-    const { formatAuthor } = await import('@awesome-os/universal-git-src/utils/formatAuthor.ts')
+    const { formatAuthor } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/formatAuthor.ts')
     const formatted = formatAuthor(original)
     const parsed = parseAuthor(formatted)
     // Note: timezoneOffset is negated in both formatAuthor and parseAuthor

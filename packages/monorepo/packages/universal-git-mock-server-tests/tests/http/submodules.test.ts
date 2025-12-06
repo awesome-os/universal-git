@@ -117,7 +117,7 @@ test('submodule support', async (t) => {
     const headOid = await resolveRef({ fs, gitdir, ref: 'HEAD' })
     const { readObject } = await import('@awesome-os/universal-git-src/git/objects/readObject.ts')
     const { parse: parseCommit } = await import('@awesome-os/universal-git-src/core-utils/parsers/Commit.ts')
-    const { resolveFilepath } = await import('@awesome-os/universal-git-src/utils/resolveFilepath.ts')
+    const { resolveFilepath } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/resolveFilepath.ts')
     const { object: commitObject } = await readObject({ fs, cache: {}, gitdir, oid: headOid })
     const commit = parseCommit(commitObject as Buffer)
     const expectedCommitOid = await resolveFilepath({ fs, cache: {}, gitdir, oid: commit.tree, filepath: 'test.empty' })
@@ -137,7 +137,7 @@ test('submodule support', async (t) => {
     assert.strictEqual(result.commitOid, expectedCommitOid, 'Should return the correct commit OID')
     
     // Verify submodule directory exists
-    const { join } = await import('@awesome-os/universal-git-src/utils/join.ts')
+    const { join } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts')
     const submoduleDir = join(dir, 'test.empty')
     const submoduleExists = await fs.exists(submoduleDir)
     assert.ok(submoduleExists, 'Submodule directory should exist')

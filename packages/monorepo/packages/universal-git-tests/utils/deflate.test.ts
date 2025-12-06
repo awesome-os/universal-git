@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { deflate } from '@awesome-os/universal-git-src/utils/deflate.ts'
+import { deflate } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/deflate.ts'
 
 test('deflate', async (t) => {
   await t.test('ok:compresses-buffer', async () => {

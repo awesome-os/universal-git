@@ -1,13 +1,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { InvalidFilepathError } from '@awesome-os/universal-git-src/errors/InvalidFilepathError.ts'
-import { NotFoundError } from '@awesome-os/universal-git-src/errors/NotFoundError.ts'
-import { ObjectTypeError } from '@awesome-os/universal-git-src/errors/ObjectTypeError.ts'
+import { InvalidFilepathError } from '@awesome-os/universal-git-src/git/errors/InvalidFilepathError.ts'
+import { NotFoundError } from '@awesome-os/universal-git-src/git/errors/NotFoundError.ts'
+import { ObjectTypeError } from '@awesome-os/universal-git-src/git/errors/ObjectTypeError.ts'
 import { GitTree } from '@awesome-os/universal-git-src/models/GitTree.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
-import { resolveFilepath } from '@awesome-os/universal-git-src/utils/resolveFilepath.ts'
-import type { GitBackend } from '@awesome-os/universal-git-src/backends/GitBackend.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
+import { resolveFilepath } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/resolveFilepath.ts'
+import type { GitBackend } from '@awesome-os/universal-git-src/git/backends/GitBackend.ts'
 
 // Helper function to write a blob using backend methods
 async function writeBlobWithBackend(gitBackend: GitBackend, content: string | Buffer): Promise<string> {

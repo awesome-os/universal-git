@@ -1,7 +1,7 @@
 import type { GitWorktreeBackend } from '../GitWorktreeBackend.ts'
 import type { Repository } from '../../../core-utils/Repository.ts'
-import type { ExtendedStat } from '../../../utils/statHelpers.ts'
-import type { UniversalBuffer } from '../../../utils/UniversalBuffer.ts'
+import type { ExtendedStat } from '../../backends/GitBackendFs/utils/statHelpers.ts'
+import type { UniversalBuffer } from '../../backends/GitBackendFs/utils/UniversalBuffer.ts'
 import { SubmoduleCache, addSubmoduleToBackend, getSubmoduleFromBackend } from '../SubmoduleManager.ts'
 import { normalize } from '../../../core-utils/GitPath.ts'
 
@@ -539,14 +539,14 @@ export class GitWorktreeMemory implements GitWorktreeBackend {
   async status(
     gitdir: string,
     filepath: string
-  ): Promise<import('../../../commands/status.ts').FileStatus> {
+  ): Promise<import('../../backends/GitBackendFs/commands/status.ts').FileStatus> {
     throw new Error('status not implemented for memory backend')
   }
 
   async statusMatrix(
     gitdir: string,
     options?: { filepaths?: string[] }
-  ): Promise<import('../../../commands/statusMatrix.ts').StatusRow[]> {
+  ): Promise<import('../../backends/GitBackendFs/commands/statusMatrix.ts').StatusRow[]> {
     throw new Error('statusMatrix not implemented for memory backend')
   }
 
@@ -565,7 +565,7 @@ export class GitWorktreeMemory implements GitWorktreeBackend {
       filepaths?: string[]
       cached?: boolean
     }
-  ): Promise<import('../../../commands/diff.ts').DiffResult> {
+  ): Promise<import('../../backends/GitBackendFs/commands/diff.ts').DiffResult> {
     throw new Error('diff not implemented for memory backend')
   }
 

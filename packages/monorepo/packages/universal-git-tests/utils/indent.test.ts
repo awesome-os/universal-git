@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { indent } from '@awesome-os/universal-git-src/utils/indent.ts'
+import { indent } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/indent.ts'
 
 test('indent', async (t) => {
   await t.test('ok:indents-single-line', () => {

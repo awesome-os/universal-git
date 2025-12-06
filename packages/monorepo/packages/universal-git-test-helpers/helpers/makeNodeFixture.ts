@@ -5,6 +5,7 @@ import { join, resolve } from 'path'
 import findUp from 'find-up'
 // FileSystem is not exported as subpath, use relative path
 import { FileSystem } from '@awesome-os/universal-git-src/models/FileSystem.ts'
+import { normalize } from '@awesome-os/universal-git-src/core-utils/GitPath.ts'
 import { onExit } from 'signal-exit'
 
 const TEMP_PATH = join(os.tmpdir(), 'ugit-test-fixture-')
@@ -63,8 +64,9 @@ export async function makeNodeFixture(fixture: string, options?: { init?: boolea
 
   const fs = new FileSystem(_fs)
 
-  const dir = await useTempDir(fixture)
-  let gitdir = await useTempDir(`${fixture}.git`)
+  // Normalize paths to POSIX format for cross-platform compatibility
+  const dir = normalize(await useTempDir(fixture))
+  let gitdir = normalize(await useTempDir(`${fixture}.git`))
 
   // If the .git fixture specific directory is empty, it means it wasn't found.
   // In that case, check if the main fixture directory has a .git folder and use that.
@@ -75,7 +77,7 @@ export async function makeNodeFixture(fixture: string, options?: { init?: boolea
       try {
         const stats = await _fs.promises.stat(dotGitPath)
         if (stats.isDirectory()) {
-          gitdir = dotGitPath
+          gitdir = normalize(dotGitPath)
         }
       } catch {
         // .git directory not found in worktree, stick with the empty gitdir (bare/fresh repo)
@@ -86,7 +88,7 @@ export async function makeNodeFixture(fixture: string, options?: { init?: boolea
   }
 
   // Create backends explicitly
-  const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+  const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
   const { createGitWorktreeBackend } = await import('@awesome-os/universal-git-src/git/worktree/index.ts')
   
   // Create GitBackend (GitBackendFs)

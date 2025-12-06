@@ -6,13 +6,13 @@
  */
 
 import { GitPktLine } from '../models/GitPktLine.ts'
-import { collect } from '../utils/collect.ts'
+import { collect } from '../git/backends/GitBackendFs/utils/collect.ts'
 import { readRef, resolveRef } from '../git/refs/readRef.ts'
-import { NotFoundError } from '../errors/NotFoundError.ts'
+import { NotFoundError } from '../git/errors/NotFoundError.ts'
 import { runServerHooks, type RefUpdate } from '../git/hooks/serverHooks.ts'
-import type { GitBackend } from '../backends/GitBackend.ts'
+import type { GitBackend } from '../git/backends/GitBackend.ts'
 import type { HookContext } from '../git/hooks/runHook.ts'
-import { UniversalBuffer } from '../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 /**
  * Result of processing a receive-pack request

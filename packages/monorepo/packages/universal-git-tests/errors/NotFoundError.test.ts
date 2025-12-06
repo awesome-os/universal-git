@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { NotFoundError } from '@awesome-os/universal-git-src/errors/NotFoundError.ts'
+import { NotFoundError } from '@awesome-os/universal-git-src/git/errors/NotFoundError.ts'
 
 test('NotFoundError', async (t) => {
   await t.test('creates error with ref name', () => {

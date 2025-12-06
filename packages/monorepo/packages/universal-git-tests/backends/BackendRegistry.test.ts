@@ -1,9 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { BackendRegistry } from '@awesome-os/universal-git-src/backends/BackendRegistry.ts'
-import { InMemoryBackend } from '@awesome-os/universal-git-src/backends/InMemoryBackend.ts'
-import type { GitBackend } from '@awesome-os/universal-git-src/backends/GitBackend.ts'
-import type { BackendFactory, BackendOptions } from '@awesome-os/universal-git-src/backends/types.ts'
+import { BackendRegistry } from '@awesome-os/universal-git-src/git/backends/BackendRegistry.ts'
+import { InMemoryBackend } from '@awesome-os/universal-git-src/git/backends/GitBackendInMemory/GitBackendInMemory.ts'
+import type { GitBackend } from '@awesome-os/universal-git-src/git/backends/GitBackend.ts'
+import type { BackendFactory, BackendOptions } from '@awesome-os/universal-git-src/git/backends/types.ts'
 
 test('BackendRegistry', async (t) => {
   await t.test('register - registers a backend factory', () => {

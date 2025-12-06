@@ -1,4 +1,4 @@
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../../git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 /**
  * Converts line endings in a buffer based on Git attributes

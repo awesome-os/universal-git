@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { normalizeIdentity } from '@awesome-os/universal-git-src/utils/normalizeIdentity.ts'
+import { normalizeIdentity } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/normalizeIdentity.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { setConfig } from '@awesome-os/universal-git-src/index.ts'
 import type { CommitObject } from '@awesome-os/universal-git-src/models/GitCommit.ts'

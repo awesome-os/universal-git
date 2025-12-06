@@ -1,4 +1,4 @@
-import type { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import type { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 import type {
   PullRequest,
   CreatePROptions,

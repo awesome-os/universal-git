@@ -2,7 +2,7 @@ import { resolveRef } from "../git/refs/readRef.ts"
 import { readLog, type ReflogEntry as GitReflogEntry } from "../git/logs/readLog.ts"
 import { readObject } from "../git/objects/readObject.ts"
 import { parse as parseCommit } from "../core-utils/parsers/Commit.ts"
-import { NotFoundError } from '../errors/NotFoundError.ts'
+import { NotFoundError } from '../git/errors/NotFoundError.ts'
 import type { FileSystemProvider } from "../models/FileSystem.ts"
 
 type ReflogEntry = {

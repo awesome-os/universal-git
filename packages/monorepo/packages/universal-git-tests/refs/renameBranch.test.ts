@@ -134,7 +134,7 @@ test('renameBranch', async (t) => {
   })
 
   await t.test('param:fs-missing', async () => {
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await renameBranch({
         gitdir: '/tmp/test.git',
@@ -172,7 +172,7 @@ test('renameBranch', async (t) => {
 
   await t.test('error:caller-property', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-renameBranch')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await renameBranch({
         gitdir: gitdir,
@@ -188,7 +188,7 @@ test('renameBranch', async (t) => {
 
   await t.test('error:old-branch-not-exist', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-renameBranch')
-    const { NotFoundError } = await import('@awesome-os/universal-git-src/errors/NotFoundError.ts')
+    const { NotFoundError } = await import('@awesome-os/universal-git-src/git/errors/NotFoundError.ts')
     try {
       await renameBranch({
         repo,

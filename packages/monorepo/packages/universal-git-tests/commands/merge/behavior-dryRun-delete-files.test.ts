@@ -24,7 +24,7 @@ import { execSync } from 'child_process'
 import { join } from 'path'
 import { mkdirSync, rmSync, existsSync } from 'fs'
 import { tmpdir } from 'os'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 /**
  * Helper function to read and compare git config before merge

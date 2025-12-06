@@ -3,50 +3,50 @@ import { _isDescendent } from './isDescendent.ts'
 import { listCommitsAndTags } from './listCommitsAndTags.ts'
 import { listObjects } from './listObjects.ts'
 import { _pack } from './pack.ts'
-import { GitPushError } from "../errors/GitPushError.ts"
-import { MissingParameterError } from "../errors/MissingParameterError.ts"
-import { NotFoundError } from "../errors/NotFoundError.ts"
-import { ParseError } from "../errors/ParseError.ts"
-import { PushRejectedError } from "../errors/PushRejectedError.ts"
-import { UserCanceledError } from "../errors/UserCanceledError.ts"
+import { GitPushError } from "../../../../git/errors/GitPushError.ts"
+import { MissingParameterError } from "../../../../git/errors/MissingParameterError.ts"
+import { NotFoundError } from "../../../../git/errors/NotFoundError.ts"
+import { ParseError } from "../../../../git/errors/ParseError.ts"
+import { PushRejectedError } from "../../../../git/errors/PushRejectedError.ts"
+import { UserCanceledError } from "../../../../git/errors/UserCanceledError.ts"
 import { ConfigAccess } from "../utils/configAccess.ts"
-import { expandRef, expandRefAgainstMap, resolveRefAgainstMap } from "../git/refs/expandRef.ts"
-import { resolveRef } from "../git/refs/readRef.ts"
-import { writeRef } from "../git/refs/writeRef.ts"
-import { deleteRef } from "../git/refs/deleteRef.ts"
-import { Repository } from "../core-utils/Repository.ts"
-import { findMergeBase } from "../core-utils/algorithms/CommitGraphWalker.ts"
-import { getRemoteHelperFor } from "../git/remote/getRemoteHelper.ts"
-import { RemoteBackendRegistry } from "../git/remote/RemoteBackendRegistry.ts"
-import { GitSideBand } from "../models/GitSideBand.ts"
+import { expandRef, expandRefAgainstMap, resolveRefAgainstMap } from "../../../refs/expandRef.ts"
+import { resolveRef } from "../../../refs/readRef.ts"
+import { writeRef } from "../../../refs/writeRef.ts"
+import { deleteRef } from "../../../refs/deleteRef.ts"
+import { Repository } from "../../../../core-utils/Repository.ts"
+import { findMergeBase } from "../../../../core-utils/algorithms/CommitGraphWalker.ts"
+import { getRemoteHelperFor } from "../../../remote/getRemoteHelper.ts"
+import { RemoteBackendRegistry } from "../../../remote/RemoteBackendRegistry.ts"
+import { GitSideBand } from "../../../../models/GitSideBand.ts"
 import { filterCapabilities } from "../utils/filterCapabilities.ts"
 import { collect } from "../utils/collect.ts"
 import { forAwait } from "../utils/forAwait.ts"
 import { fromValue } from "../utils/fromValue.ts"
 import { pkg } from "../utils/pkg.ts"
 import { splitLines } from "../utils/splitLines.ts"
-import { parseReceivePackResponse } from "../wire/parseReceivePackResponse.ts"
-import { writeReceivePackRequest } from "../wire/writeReceivePackRequest.ts"
+import { parseReceivePackResponse } from "../../../../wire/parseReceivePackResponse.ts"
+import { writeReceivePackRequest } from "../../../../wire/writeReceivePackRequest.ts"
 import { normalizeCommandArgs } from '../utils/commandHelpers.ts'
 import { assertParameter } from "../utils/assertParameter.ts"
 import { join } from "../utils/join.ts"
 import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
-import type { FileSystemProvider } from "../models/FileSystem.ts"
+import type { FileSystemProvider } from "../../../../models/FileSystem.ts"
 import type {
   HttpClient,
   ProgressCallback,
   AuthCallback,
   AuthFailureCallback,
   AuthSuccessCallback,
-} from "../git/remote/types.ts"
-import type { GitRemoteBackend } from "../git/remote/GitRemoteBackend.ts"
-import type { TcpClient, TcpProgressCallback } from "../daemon/TcpClient.ts"
+} from "../../../remote/types.ts"
+import type { GitRemoteBackend } from "../../../remote/GitRemoteBackend.ts"
+import type { TcpClient, TcpProgressCallback } from "../../../../daemon/TcpClient.ts"
 import type { SshClient, SshProgressCallback } from "../ssh/SshClient.ts"
-import { GitRemoteDaemon } from "../git/remote/GitRemoteDaemon.ts"
-import { GitRemoteHTTP } from "../git/remote/GitRemoteHTTP.ts"
-import { GitRemoteSSH } from "../git/remote/GitRemoteSSH.ts"
-import type { ClientRef } from "../git/refs/types.ts"
-import type { RefUpdateStatus } from "../git/refs/types.ts"
+import { GitRemoteDaemon } from "../../../remote/GitRemoteDaemon.ts"
+import { GitRemoteHTTP } from "../../../remote/GitRemoteHTTP.ts"
+import { GitRemoteSSH } from "../../../remote/GitRemoteSSH.ts"
+import type { ClientRef } from "../../../refs/types.ts"
+import type { RefUpdateStatus } from "../../../refs/types.ts"
 
 // ============================================================================
 // PUSH TYPES
@@ -300,7 +300,7 @@ async function _push({
     // For git:// protocol, try to get default TCP client if not provided
     if (url.startsWith('git://') && !tcp) {
       try {
-        const { tcpClient } = await import('../daemon/node/index.ts')
+        const { tcpClient } = await import('../../../../daemon/node/index.ts')
         tcp = tcpClient
       } catch {
         // If we can't import TCP client, let RemoteBackendRegistry handle the error
@@ -390,7 +390,7 @@ async function _push({
 
   // Run pre-push hook (before push operation)
   try {
-    const { runHook } = await import('../git/hooks/runHook.ts')
+    const { runHook } = await import('../../../hooks/runHook.ts')
     const worktree = repo.getWorktree()
     
     // Pre-push hook receives stdin with lines: <local ref> <local oid> <remote ref> <remote oid>
@@ -689,8 +689,8 @@ async function _push({
       
       // Add descriptive reflog entry for remote ref deletion
       if (oldRemoteRefOid) {
-        const { logRefUpdate } = await import('../git/logs/logRefUpdate.ts')
-        const { REFLOG_MESSAGES } = await import('../git/logs/messages.ts')
+        const { logRefUpdate } = await import('../../../logs/logRefUpdate.ts')
+        const { REFLOG_MESSAGES } = await import('../../../logs/messages.ts')
         await logRefUpdate({
           fs,
           gitdir,
@@ -707,8 +707,8 @@ async function _push({
       
       // Add descriptive reflog entry for remote ref update
       if (oldRemoteRefOid !== oid) {
-        const { logRefUpdate } = await import('../git/logs/logRefUpdate.ts')
-        const { REFLOG_MESSAGES } = await import('../git/logs/messages.ts')
+        const { logRefUpdate } = await import('../../../logs/logRefUpdate.ts')
+        const { REFLOG_MESSAGES } = await import('../../../logs/messages.ts')
         await logRefUpdate({
           fs,
           gitdir,
@@ -726,8 +726,8 @@ async function _push({
   if (result.ok && Object.values(result.refs).every(result => result.ok)) {
     // Run post-push hook (after successful push)
     try {
-      const { runHook } = await import('../git/hooks/runHook.ts')
-      const { Repository } = await import('../core-utils/Repository.ts')
+      const { runHook } = await import('../../../hooks/runHook.ts')
+      const { Repository } = await import('../../../../core-utils/Repository.ts')
       const repo = await Repository.open({ fs, dir: undefined, gitdir, cache, autoDetectConfig: true })
       const worktree = repo.getWorktree()
       

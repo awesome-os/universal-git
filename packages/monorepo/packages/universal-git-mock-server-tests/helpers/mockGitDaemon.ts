@@ -15,12 +15,12 @@ import { parseUploadPackRequest } from '@awesome-os/universal-git-src/wire/parse
 import { GitPktLine } from '@awesome-os/universal-git-src/models/GitPktLine.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import type { FileSystemProvider } from '@awesome-os/universal-git-src/models/FileSystem.ts'
-import { createFileSystem } from '@awesome-os/universal-git-src/utils/createFileSystem.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
-import { _pack } from '@awesome-os/universal-git-src/commands/pack.ts'
-import { listObjects } from '@awesome-os/universal-git-src/commands/listObjects.ts'
+import { createFileSystem } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
+import { _pack } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/pack.ts'
+import { listObjects } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/listObjects.ts'
 import { hasObject } from '@awesome-os/universal-git-src/git/objects/hasObject.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
+import { join } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts'
 
 /**
  * Timeout for mock server operations (30 seconds)

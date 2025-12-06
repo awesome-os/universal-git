@@ -3,7 +3,7 @@ import { GitRemoteSSH } from './GitRemoteSSH.ts'
 import { GitRemoteDaemon } from './GitRemoteDaemon.ts'
 import type { GitRemoteBackend } from './GitRemoteBackend.ts'
 import type { RemoteBackendOptions } from './types.ts'
-import { MissingParameterError } from '../../errors/MissingParameterError.ts'
+import { MissingParameterError } from '../errors/MissingParameterError.ts'
 
 /**
  * Registry for Git remote backends, indexed by URL for easy translation between

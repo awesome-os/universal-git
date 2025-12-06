@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { translateSSHtoHTTP } from '@awesome-os/universal-git-src/utils/translateSSHtoHTTP.ts'
+import { translateSSHtoHTTP } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/translateSSHtoHTTP.ts'
 
 test('translateSSHtoHTTP', async (t) => {
   await t.test('ok:translates-scp-syntax', () => {

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { getIterator } from '@awesome-os/universal-git-src/utils/getIterator.ts'
+import { getIterator } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/getIterator.ts'
 
 test('getIterator', async (t) => {
   await t.test('ok:returns-iterator-from-async-iterable', async () => {

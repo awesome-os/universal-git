@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { dirname } from '@awesome-os/universal-git-src/utils/dirname.ts'
+import { dirname } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/dirname.ts'
 
 test('dirname', async (t) => {
   await t.test('ok:extracts-directory-from-path', () => {

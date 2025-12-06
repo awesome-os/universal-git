@@ -1,9 +1,9 @@
-import { formatAuthor } from "../../utils/formatAuthor.ts"
-import { normalizeNewlines } from "../../utils/normalizeNewlines.ts"
-import { parseAuthor } from "../../utils/parseAuthor.ts"
+import { formatAuthor } from "../../git/backends/GitBackendFs/utils/formatAuthor.ts"
+import { normalizeNewlines } from "../../git/backends/GitBackendFs/utils/normalizeNewlines.ts"
+import { parseAuthor } from "../../git/backends/GitBackendFs/utils/parseAuthor.ts"
 import type { TagObject } from "../../models/GitAnnotatedTag.ts"
 import type { Author } from "../../models/GitCommit.ts"
-import { UniversalBuffer } from "../../utils/UniversalBuffer.ts"
+import { UniversalBuffer } from "../../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
 
 /**
  * Parses a tag buffer into a TagObject

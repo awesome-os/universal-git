@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { isPromiseLike, isObject, isFunction } from '@awesome-os/universal-git-src/utils/types.ts'
+import { isPromiseLike, isObject, isFunction } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/types.ts'
 
 test('types', async (t) => {
   await t.test('ok:isPromiseLike-Promise', () => {

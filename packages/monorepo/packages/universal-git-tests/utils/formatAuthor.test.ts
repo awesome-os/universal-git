@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { formatAuthor } from '@awesome-os/universal-git-src/utils/formatAuthor.ts'
+import { formatAuthor } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/formatAuthor.ts'
 import type { Author } from '@awesome-os/universal-git-src/models/GitCommit.ts'
 
 test('formatAuthor', async (t) => {

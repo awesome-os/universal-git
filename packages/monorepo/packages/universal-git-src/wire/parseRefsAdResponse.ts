@@ -1,8 +1,8 @@
-import { EmptyServerResponseError } from "../errors/EmptyServerResponseError.ts"
-import { ParseError } from "../errors/ParseError.ts"
+import { EmptyServerResponseError } from "../git/errors/EmptyServerResponseError.ts"
+import { ParseError } from "../git/errors/ParseError.ts"
 import { GitPktLine } from "../models/GitPktLine.ts"
 import { parseCapabilitiesV2 } from './parseCapabilitiesV2.ts'
-import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
+import { UniversalBuffer } from "../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
 
 type ReadFunction = () => Promise<UniversalBuffer | null | true>
 

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { compareAge } from '@awesome-os/universal-git-src/utils/compareAge.ts'
+import { compareAge } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/compareAge.ts'
 import type { CommitObject } from '@awesome-os/universal-git-src/models/GitCommit.ts'
 
 test('compareAge', async (t) => {

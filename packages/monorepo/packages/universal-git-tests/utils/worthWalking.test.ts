@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { worthWalking } from '@awesome-os/universal-git-src/utils/worthWalking.ts'
+import { worthWalking } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/worthWalking.ts'
 
 test('worthWalking', async (t) => {
   await t.test('ok:current-directory', () => {

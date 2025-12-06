@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { flatFileListToDirectoryStructure } from '@awesome-os/universal-git-src/utils/flatFileListToDirectoryStructure.ts'
+import { flatFileListToDirectoryStructure } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/flatFileListToDirectoryStructure.ts'
 
 test('flatFileListToDirectoryStructure', async (t) => {
   await t.test('ok:simple-structure', async () => {

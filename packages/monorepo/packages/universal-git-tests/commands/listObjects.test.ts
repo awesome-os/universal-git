@@ -1,9 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { init, commit, add } from '@awesome-os/universal-git-src/index.ts'
-import { listObjects } from '@awesome-os/universal-git-src/commands/listObjects.ts'
+import { listObjects } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/listObjects.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
+import { join } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts'
 
 test('listObjects', async (t) => {
   await t.test('returns Set for empty oids array', async () => {
@@ -147,7 +147,7 @@ test('listObjects', async (t) => {
     
     // Get the tree OID from a known commit
     const commitOid = 'c60bbbe99e96578105c57c4b3f2b6ebdf863edbc'
-    const { readCommit } = await import('@awesome-os/universal-git-src/commands/readCommit.ts')
+    const { readCommit } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/readCommit.ts')
     const commitObj = await readCommit({ fs, gitdir, oid: commitOid, cache })
     const treeOid = commitObj.commit.tree
 

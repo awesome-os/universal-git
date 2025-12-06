@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { FIFO } from '@awesome-os/universal-git-src/utils/FIFO.ts'
+import { FIFO } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/FIFO.ts'
 
 test('FIFO', async (t) => {
   await t.test('ok:writes-reads-buffers-order', async () => {

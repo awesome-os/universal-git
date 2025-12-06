@@ -1,7 +1,7 @@
 import AsyncLock from 'async-lock'
 
-import { join } from "../utils/join.ts"
-import { createFileSystem } from '../utils/createFileSystem.ts'
+import { join } from "./backends/GitBackendFs/utils/join.ts"
+import { createFileSystem } from './backends/GitBackendFs/utils/createFileSystem.ts'
 import type { FileSystemProvider } from "../models/FileSystem.ts"
 
 let lock: AsyncLock | null = null

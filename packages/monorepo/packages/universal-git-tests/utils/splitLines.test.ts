@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { splitLines } from '@awesome-os/universal-git-src/utils/splitLines.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { splitLines } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/splitLines.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 test('splitLines', async (t) => {
   await t.test('ok:splits-lines-newline', async () => {

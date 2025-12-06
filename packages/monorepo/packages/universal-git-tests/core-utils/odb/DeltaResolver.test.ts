@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { applyDelta } from '@awesome-os/universal-git-src/utils/applyDelta.ts'
+import { applyDelta } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/applyDelta.ts'
 
 // Helper to encode varint (little-endian)
 function encodeVarInt(n: number): number[] {

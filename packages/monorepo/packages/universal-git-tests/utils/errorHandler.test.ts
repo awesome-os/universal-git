@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { withErrorCaller, setErrorCaller } from '@awesome-os/universal-git-src/utils/errorHandler.ts'
+import { withErrorCaller, setErrorCaller } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/errorHandler.ts'
 
 test('errorHandler', async (t) => {
   await t.test('ok:withErrorCaller-sets-caller', async () => {

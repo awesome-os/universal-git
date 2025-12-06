@@ -15,7 +15,7 @@ const writeGitIgnore = async (repo: Repository) => {
   if (!repo.worktreeBackend) {
     throw new Error('WorktreeBackend not available')
   }
-  const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
+  const { UniversalBuffer } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts')
   const content = ['*-pattern.js', 'i.txt', 'js_modules', '.DS_Store'].join('\n')
   await repo.worktreeBackend.write(
     '.gitignore',
@@ -28,7 +28,7 @@ const writeSymlink = async (repo: Repository) => {
   if (!repo.worktreeBackend) {
     throw new Error('WorktreeBackend not available')
   }
-  const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
+  const { UniversalBuffer } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts')
   try {
     await repo.worktreeBackend.writelink('e-link.txt', 'c/e.txt')
   } catch {
@@ -71,7 +71,7 @@ describe('add', () => {
     await repo.init()
     
     // Test - Note: parallel option is not exposed on repo.add(), but we test the functionality
-    const { add } = await import('@awesome-os/universal-git-src/commands/add.ts')
+    const { add } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/add.ts')
     await add({
       repo,
       filepath: ['a.txt', 'a-copy.txt', 'b.txt'],
@@ -137,7 +137,7 @@ describe('add', () => {
     await writeGitIgnore(repo)
 
     // Test
-    const { add } = await import('@awesome-os/universal-git-src/commands/add.ts')
+    const { add } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/add.ts')
     await add({
       repo,
       filepath: ['a.txt', 'i.txt'],
@@ -198,7 +198,7 @@ describe('add', () => {
     await writeGitIgnore(repo)
     
     // Test
-    const { add } = await import('@awesome-os/universal-git-src/commands/add.ts')
+    const { add } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/add.ts')
     await add({ repo, filepath: 'i.txt', force: true })
     assert.strictEqual((await listFiles({ repo })).length, 1)
   })
@@ -252,7 +252,7 @@ describe('add', () => {
     
     // Test
     assert.strictEqual((await listFiles({ repo })).length, 0)
-    const { add } = await import('@awesome-os/universal-git-src/commands/add.ts')
+    const { add } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/add.ts')
     await add({ repo, filepath: 'c', force: true })
     assert.strictEqual((await listFiles({ repo })).length, 4)
   })
@@ -277,7 +277,7 @@ describe('add', () => {
     
     // Test
     assert.strictEqual((await listFiles({ repo })).length, 0)
-    const { add } = await import('@awesome-os/universal-git-src/commands/add.ts')
+    const { add } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/add.ts')
     await add({ repo, filepath: '.', parallel: false })
     assert.strictEqual((await listFiles({ repo })).length, 7)
   })
@@ -289,7 +289,7 @@ describe('add', () => {
     if (!repo.worktreeBackend) {
       throw new Error('WorktreeBackend not available')
     }
-    const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
+    const { UniversalBuffer } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts')
     
     // Ensure autocrlf is set to true
     const config = await repo.getConfig()
@@ -346,7 +346,7 @@ describe('add', () => {
     if (!repo.worktreeBackend) {
       throw new Error('WorktreeBackend not available')
     }
-    const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
+    const { UniversalBuffer } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts')
     
     // Create a directory with multiple files
     await repo.worktreeBackend.mkdir('subdir')
@@ -355,7 +355,7 @@ describe('add', () => {
     await repo.worktreeBackend.write('subdir/file3.txt', UniversalBuffer.from('content3', 'utf8'))
     
     // Add directory with parallel=false
-    const { add } = await import('@awesome-os/universal-git-src/commands/add.ts')
+    const { add } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/add.ts')
     await add({ repo, filepath: 'subdir', parallel: false })
     
     const files = await listFiles({ repo })
@@ -390,7 +390,7 @@ describe('add', () => {
     if (!repo.worktreeBackend) {
       throw new Error('WorktreeBackend not available')
     }
-    const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
+    const { UniversalBuffer } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts')
     
     // Create a file
     await repo.worktreeBackend.write('file.txt', UniversalBuffer.from('content', 'utf8'))
@@ -410,7 +410,7 @@ describe('add', () => {
     if (!repo.worktreeBackend) {
       throw new Error('WorktreeBackend not available')
     }
-    const { UniversalBuffer } = await import('@awesome-os/universal-git-src/utils/UniversalBuffer.ts')
+    const { UniversalBuffer } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts')
     
     // Set autocrlf to true
     const config = await repo.getConfig()

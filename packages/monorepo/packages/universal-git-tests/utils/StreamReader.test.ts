@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { StreamReader } from '@awesome-os/universal-git-src/utils/StreamReader.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { StreamReader } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/StreamReader.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 test('StreamReader', async (t) => {
   await t.test('ok:constructor-initializes', () => {

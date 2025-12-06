@@ -1,12 +1,12 @@
 import { join } from "../utils/join.ts"
 import { ConfigAccess } from "../utils/configAccess.ts"
-import { writeSymbolicRef } from "../git/refs/writeRef.ts"
+import { writeSymbolicRef } from "../../../refs/writeRef.ts"
 import { GitBackendFs } from '../backends/GitBackendFs/index.ts'
 import { assertParameter } from "../utils/assertParameter.ts"
 import type { ObjectFormat } from "../utils/detectObjectFormat.ts"
-import type { FileSystemProvider } from "../models/FileSystem.ts"
+import type { FileSystemProvider } from "../../../../models/FileSystem.ts"
 import type { GitBackend } from '../backends/GitBackend.ts'
-import type { Repository } from '../core-utils/Repository.ts'
+import type { Repository } from '../../../../core-utils/Repository.ts'
 
 /**
  * Initialize a new repository

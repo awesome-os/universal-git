@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { fromValue } from '@awesome-os/universal-git-src/utils/fromValue.ts'
+import { fromValue } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/fromValue.ts'
 
 test('fromValue', async (t) => {
   await t.test('ok:converts-value-to-iterator', async () => {

@@ -46,7 +46,7 @@ export async function checkout(
       // Index file doesn't exist, create an empty one
       const { GitIndex } = await import('../git/index/GitIndex.ts')
       const emptyIndex = new GitIndex()
-      const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+      const { UniversalBuffer } = await import('../git/backends/GitBackendFs/utils/UniversalBuffer.ts')
       const buffer = await emptyIndex.toBuffer(await repo._gitBackend.getObjectFormat(repo.cache))
       await repo._gitBackend.writeIndex(buffer)
     }
@@ -115,7 +115,7 @@ export async function checkout(
       // Empty repository: create clean staging area
       const { GitIndex } = await import('../git/index/GitIndex.ts')
       const emptyIndex = new GitIndex()
-      const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+      const { UniversalBuffer } = await import('../git/backends/GitBackendFs/utils/UniversalBuffer.ts')
       const buffer = await emptyIndex.toBuffer(await repo._gitBackend.getObjectFormat(repo.cache))
       await repo._gitBackend.writeIndex(buffer)
       
@@ -127,12 +127,12 @@ export async function checkout(
       }
     } else {
       // Repository has commits: perform normal checkout
-      const { _checkout } = await import('../commands/checkout.ts')
+      const { _checkout } = await import('../git/backends/GitBackendFs/commands/checkout.ts')
       
       await _checkout({
         gitBackend: repo._gitBackend,
         worktreeBackend: worktreeBackend,
-        fs: repo.fs,
+        fs: repo.__fs,
         cache: repo.cache,
         gitdir,
         ref: targetRef,
@@ -172,11 +172,12 @@ export async function branch(
     force?: boolean
   } = {}
 ): Promise<void> {
-  const { branch: _branch } = await import('../commands/branch.ts')
+  const { branch: _branch } = await import('../git/backends/GitBackendFs/commands/branch.ts')
   const gitdir = await this.getGitdir()
+  const repo = this as any
   return _branch({
     repo: this,
-    fs: this.fs,
+    fs: repo.__fs,
     gitdir,
     cache: this.cache,
     ref: branch,
@@ -190,11 +191,12 @@ export async function branch(
  * Get the current branch name
  */
 export async function currentBranch(this: Repository): Promise<string | null> {
-  const { currentBranch: _currentBranch } = await import('../commands/currentBranch.ts')
+  const { currentBranch: _currentBranch } = await import('../git/backends/GitBackendFs/commands/currentBranch.ts')
   const gitdir = await this.getGitdir()
+  const repo = this as any
   return _currentBranch({
     repo: this,
-    fs: this.fs,
+    fs: repo.__fs,
     gitdir,
     cache: this.cache,
   })
@@ -209,11 +211,12 @@ export async function listBranches(
     remote?: boolean
   } = {}
 ): Promise<string[]> {
-  const { listBranches: _listBranches } = await import('../commands/listBranches.ts')
+  const { listBranches: _listBranches } = await import('../git/backends/GitBackendFs/commands/listBranches.ts')
   const gitdir = await this.getGitdir()
+  const repo = this as any
   return _listBranches({
     repo: this,
-    fs: this.fs,
+    fs: repo.__fs,
     gitdir,
     cache: this.cache,
     remote: options.remote,
@@ -224,9 +227,9 @@ export async function listBranches(
  * Resolve a reference to an OID
  */
 export async function resolveRef(this: Repository, ref: string): Promise<string> {
-  const oid = await (this as any)._gitBackend.readRef(ref)
+  const oid = await (this as any)._gitBackend.readRef(ref, 5, this.cache)
   if (!oid) {
-    const { NotFoundError } = await import('../errors/NotFoundError.ts')
+    const { NotFoundError } = await import('../git/errors/NotFoundError.ts')
     throw new NotFoundError(ref)
   }
   return oid

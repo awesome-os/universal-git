@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 import { mergeBlobs } from '@awesome-os/universal-git-src/git/merge/mergeBlobs.ts'
 
 test('mergeBlobs', async (t) => {

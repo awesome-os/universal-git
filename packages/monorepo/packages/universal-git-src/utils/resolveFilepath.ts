@@ -1,11 +1,11 @@
 // @ts-check
-import { InvalidFilepathError } from '../errors/InvalidFilepathError.ts'
-import { NotFoundError } from '../errors/NotFoundError.ts'
-import { ObjectTypeError } from '../errors/ObjectTypeError.ts'
-import { GitTree } from "../models/GitTree.ts"
-import { readObject } from "../git/objects/readObject.ts"
+import { InvalidFilepathError } from '../../../../errors/InvalidFilepathError.ts'
+import { NotFoundError } from '../../../../errors/NotFoundError.ts'
+import { ObjectTypeError } from '../../../../errors/ObjectTypeError.ts'
+import { GitTree } from "../../../../models/GitTree.ts"
+import { readObject } from "../../../objects/readObject.ts"
 import { resolveTree } from './resolveTree.ts'
-import type { FileSystemProvider } from "../models/FileSystem.ts"
+import type { FileSystemProvider } from "../../../../models/FileSystem.ts"
 
 import type { GitBackend } from '../backends/GitBackend.ts'
 

@@ -3,7 +3,7 @@ import { write as writeLoose } from './loose.ts'
 import { deflate } from '../../core-utils/Zlib.ts'
 import { hashObject, shasum, shasum256, type ObjectFormat as HashObjectFormat } from '../../core-utils/ShaHasher.ts'
 import type { FileSystemProvider } from "../../models/FileSystem.ts"
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 export type ObjectFormat = 'deflated' | 'wrapped' | 'content'
 

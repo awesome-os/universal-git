@@ -1,0 +1,16 @@
+{"name": "@awesome-os/uv-git",
+  "version": "0.0.0-development",
+  "description": "A Reimplementation of git the stupid content tracker",
+  "type": "module",
+  "typings": "./index.d.cts",
+  "main": "./index.cjs",
+  "module": "./index.js",
+  "unpkg": "./index.umd.min.js",
+  "bin": {
+    "ugit": "./cli.cjs"
+  },
+  "sideEffects": false,
+  "engines": {
+    "node": ">=14.17"
+  }
+}

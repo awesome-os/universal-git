@@ -1,9 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { pull, resolveRef, currentBranch } from '@awesome-os/universal-git-src/index.ts'
-import http from '@awesome-os/universal-git-src/http/node/index.ts'
+import http from '@awesome-os/universal-git-src/git/http/node/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { MissingParameterError } from '@awesome-os/universal-git-src/errors/MissingParameterError.ts'
+import { MissingParameterError } from '@awesome-os/universal-git-src/git/errors/MissingParameterError.ts'
 
 // Skip HTTP tests if running in CI without network access
 const SKIP_HTTP_TESTS = process.env.SKIP_HTTP_TESTS === 'true'
@@ -42,7 +42,7 @@ test('pull', async (t) => {
 
   await t.test('param:gitdir-or-dir-missing', async () => {
     const { fs } = await makeFixture('test-pull')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await pull({
         fs,
@@ -157,7 +157,7 @@ test('pull', async (t) => {
 
   await t.test('error:MissingNameError-author', async () => {
     const { fs, gitdir } = await makeFixture('test-pull')
-    const { MissingNameError } = await import('@awesome-os/universal-git-src/errors/MissingNameError.ts')
+    const { MissingNameError } = await import('@awesome-os/universal-git-src/git/errors/MissingNameError.ts')
     const { setConfig, deleteConfig } = await import('@awesome-os/universal-git-src/index.ts')
     
     // Try to remove user.name and user.email config to force author error
@@ -181,8 +181,8 @@ test('pull', async (t) => {
       // The error might be MissingNameError for author, or it might fail earlier
       // If it's MissingNameError, verify it's for author
       if (error instanceof MissingNameError) {
-        const param = (error as any).data?.parameter
-        assert.ok(param === 'author' || param === 'committer', `Expected 'author' or 'committer', got '${param}'`)
+        const role = (error as any).data?.role
+        assert.ok(role === 'author' || role === 'committer', `Expected 'author' or 'committer', got '${role}'`)
       } else {
         // Might fail at HTTP level or other validation, which is acceptable
         assert.ok(error instanceof Error, 'Expected error')
@@ -192,7 +192,7 @@ test('pull', async (t) => {
 
   await t.test('param:ref-missing', async () => {
     const { fs, gitdir } = await makeFixture('test-pull')
-    const { MissingNameError } = await import('@awesome-os/universal-git-src/errors/MissingNameError.ts')
+    const { MissingNameError } = await import('@awesome-os/universal-git-src/git/errors/MissingNameError.ts')
     const { setConfig } = await import('@awesome-os/universal-git-src/index.ts')
     
     // Set up author/committer config

@@ -2,8 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { GitPackIndex, GitObject, shasum } from '@awesome-os/universal-git-src/internal-apis.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { join } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 // Add error listeners to catch unhandled errors and rejections
 if (typeof process !== 'undefined') {

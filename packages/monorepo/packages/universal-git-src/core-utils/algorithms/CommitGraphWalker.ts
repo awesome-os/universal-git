@@ -2,7 +2,7 @@ import { GitCommit } from "../../models/GitCommit.ts"
 import { readObject } from '../../git/objects/readObject.ts'
 import type { FileSystemProvider } from "../../models/FileSystem.ts"
 import type { CommitObject } from "../../models/GitCommit.ts"
-import { UniversalBuffer } from "../../utils/UniversalBuffer.ts"
+import { UniversalBuffer } from "../../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
 
 type ReadCommitFn = (oid: string) => Promise<CommitObject>
 

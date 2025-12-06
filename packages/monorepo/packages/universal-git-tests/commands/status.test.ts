@@ -3,7 +3,7 @@ import assert from 'node:assert'
 import * as path from 'path'
 import { Errors, status, add, remove } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 describe('status', () => {
   it('ok:basic', async () => {

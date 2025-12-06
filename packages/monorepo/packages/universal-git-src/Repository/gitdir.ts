@@ -1,9 +1,9 @@
 import type { Repository } from './Repository.ts'
-import type { GitBackend } from '../backends/GitBackend.ts'
+import type { GitBackend } from '../git/backends/GitBackend.ts'
 import type { GitWorktreeBackend } from '../git/worktree/GitWorktreeBackend.ts'
 import type { FileSystemProvider } from '../models/FileSystem.ts'
 import { join } from '../core-utils/GitPath.ts'
-import { findRoot } from '../commands/findRoot.ts'
+import { findRoot } from '../git/backends/GitBackendFs/commands/findRoot.ts'
 
 /**
  * Gets the git directory
@@ -17,8 +17,9 @@ export async function getGitdir(this: Repository): Promise<string> {
   // Since we are extracting methods, we assume 'this' is bound to Repository instance
   const repo = this as any
   
-  if (repo._gitdir) {
-    return repo._gitdir
+  // Access private fields directly (bypassing getters that throw)
+  if (repo.__gitdir) {
+    return repo.__gitdir
   }
   
   // Use gitBackend if available
@@ -26,18 +27,18 @@ export async function getGitdir(this: Repository): Promise<string> {
     // Check if backend is GitBackendFs which exposes getGitdir
     // We can't import GitBackendFs here easily due to circular deps, so check property
     if ('getGitdir' in repo._gitBackend && typeof repo._gitBackend.getGitdir === 'function') {
-      repo._gitdir = repo._gitBackend.getGitdir()
-      return repo._gitdir
+      repo.__gitdir = repo._gitBackend.getGitdir()
+      return repo.__gitdir
     }
   }
   
   // Fallback: derive from dir if available (legacy support)
-  if (repo._dir && repo._fs) {
+  if (repo.__dir && repo.__fs) {
     // Find .git directory
     try {
-      const root = await findRoot({ fs: repo._fs, filepath: repo._dir })
-      repo._gitdir = join(root, '.git')
-      return repo._gitdir
+      const root = await findRoot({ fs: repo.__fs, filepath: repo.__dir })
+      repo.__gitdir = join(root, '.git')
+      return repo.__gitdir
     } catch (e) {
       // Ignore error and fall through
     }

@@ -1,4 +1,4 @@
-import { MissingParameterError } from '../errors/MissingParameterError.ts'
+import { MissingParameterError } from '../../../../git/errors/MissingParameterError.ts'
 import { assertParameter } from '../utils/assertParameter.ts'
 import { join } from '../utils/join.ts'
 import { createFileSystem } from '../utils/createFileSystem.ts'
@@ -7,13 +7,13 @@ import { _init } from './init.ts'
 import { _clone } from './clone.ts'
 import { checkout } from './checkout.ts'
 import { sparseCheckout } from './sparseCheckout.ts'
-import type { FileSystemProvider } from '../models/FileSystem.ts'
+import type { FileSystemProvider } from '../../../../models/FileSystem.ts'
 import type {
   HttpClient,
   ProgressCallback,
   AuthCallback,
-} from '../git/remote/GitRemoteHTTP.ts'
-import type { TcpClient } from '../daemon/TcpClient.ts'
+} from '../../../remote/GitRemoteHTTP.ts'
+import type { TcpClient } from '../../../../daemon/TcpClient.ts'
 import type { SshClient } from '../ssh/SshClient.ts'
 
 /**
@@ -222,9 +222,9 @@ export async function ungit({
       // Multi-worker checkout works for both sparse and full checkouts
       if (useWorkers && workerScript) {
         try {
-          const { MultiWorkerSparseCheckout } = await import('../workers/MultiWorkerSparseCheckout.ts')
-          const { WorkerPool } = await import('../workers/WorkerPool.ts')
-          const { createDefaultTransport, createTransport } = await import('../transport/index.ts')
+          const { MultiWorkerSparseCheckout } = await import('../../../../workers/MultiWorkerSparseCheckout.ts')
+          const { WorkerPool } = await import('../../../../workers/WorkerPool.ts')
+          const { createDefaultTransport, createTransport } = await import('../../../../transport/index.ts')
           
           // Create transport
           let defaultTransport: any

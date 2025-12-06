@@ -1,5 +1,5 @@
 import type { GitWorktreeBackend } from './GitWorktreeBackend.ts'
-import type { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import type { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 /**
  * Supported Git worktree backend types

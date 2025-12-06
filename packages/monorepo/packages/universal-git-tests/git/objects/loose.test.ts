@@ -3,7 +3,7 @@ import assert from 'node:assert'
 import { read, write } from '@awesome-os/universal-git-src/git/objects/loose.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { GitObject } from '@awesome-os/universal-git-src/models/GitObject.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 test('loose.read', async (t) => {
   await t.test('ok:returns-null-when-object-does-not-exist', async () => {
@@ -78,7 +78,7 @@ test('loose.write', async (t) => {
       error = err
     }
     assert.notStrictEqual(error, null)
-    const { InternalError } = await import('@awesome-os/universal-git-src/errors/InternalError.ts')
+    const { InternalError } = await import('@awesome-os/universal-git-src/git/errors/InternalError.ts')
     assert.ok(error instanceof InternalError)
     assert.ok((error as Error).message.includes('OID is required'))
   })

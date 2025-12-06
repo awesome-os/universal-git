@@ -1,9 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { listpack } from '@awesome-os/universal-git-src/utils/git-list-pack.ts'
-import { InternalError } from '@awesome-os/universal-git-src/errors/InternalError.ts'
-import { deflate } from '@awesome-os/universal-git-src/utils/deflate.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { listpack } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/git-list-pack.ts'
+import { InternalError } from '@awesome-os/universal-git-src/git/errors/InternalError.ts'
+import { deflate } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/deflate.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 // Helper to create a simple packfile header
 function createPackHeader(version: number, numObjects: number): UniversalBuffer {

@@ -1,12 +1,12 @@
-import { HttpError } from '../../errors/HttpError.ts'
-import { SmartHttpError } from '../../errors/SmartHttpError.ts'
-import { UserCanceledError } from '../../errors/UserCanceledError.ts'
-import { calculateBasicAuthHeader } from '../../utils/calculateBasicAuthHeader.ts'
-import { collect } from '../../utils/collect.ts'
-import { extractAuthFromUrl } from '../../utils/extractAuthFromUrl.ts'
+import { HttpError } from '../errors/HttpError.ts'
+import { SmartHttpError } from '../errors/SmartHttpError.ts'
+import { UserCanceledError } from '../errors/UserCanceledError.ts'
+import { calculateBasicAuthHeader } from '../backends/GitBackendFs/utils/calculateBasicAuthHeader.ts'
+import { collect } from '../backends/GitBackendFs/utils/collect.ts'
+import { extractAuthFromUrl } from '../backends/GitBackendFs/utils/extractAuthFromUrl.ts'
 import { parseRefsAdResponse } from '../../wire/parseRefsAdResponse.ts'
-import { fromValue } from '../../utils/fromValue.ts'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { fromValue } from '../backends/GitBackendFs/utils/fromValue.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 import type {
   AuthCallback,
   AuthFailureCallback,

@@ -1,13 +1,13 @@
-import { ParseError } from '../../errors/ParseError.ts'
-import { EmptyServerResponseError } from '../../errors/EmptyServerResponseError.ts'
+import { ParseError } from '../errors/ParseError.ts'
+import { EmptyServerResponseError } from '../errors/EmptyServerResponseError.ts'
 import { parseRefsAdResponse } from '../../wire/parseRefsAdResponse.ts'
 import type { SshClient, SshConnection, SshProgressCallback } from '../../ssh/SshClient.ts'
 import { GitPktLine } from '../../models/GitPktLine.ts'
-import { collect } from '../../utils/collect.ts'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { collect } from '../backends/GitBackendFs/utils/collect.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 import type { GitRemoteBackend } from './GitRemoteBackend.ts'
 import type { RemoteDiscoverOptions, RemoteDiscoverResult, RemoteConnectOptions, RemoteConnection } from './types.ts'
-import { MissingParameterError } from '../../errors/MissingParameterError.ts'
+import { MissingParameterError } from '../errors/MissingParameterError.ts'
 
 // ============================================================================
 // SSH PROTOCOL TYPES

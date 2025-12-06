@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { AlreadyExistsError } from '@awesome-os/universal-git-src/errors/AlreadyExistsError.ts'
+import { AlreadyExistsError } from '@awesome-os/universal-git-src/git/errors/AlreadyExistsError.ts'
 
 test('AlreadyExistsError', async (t) => {
   await t.test('creates error for branch', () => {

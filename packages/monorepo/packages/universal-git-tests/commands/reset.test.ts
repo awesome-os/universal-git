@@ -62,9 +62,7 @@ test('resetToCommit', async (t) => {
     await fs.write(`${dir}/commit1.txt`, 'commit 1')
     await add({ repo, filepath: 'commit1.txt', cache })
     const commit1Oid = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'Commit 1',
       author: {
         name: 'Test',
@@ -79,9 +77,7 @@ test('resetToCommit', async (t) => {
     await fs.write(`${dir}/commit2.txt`, 'commit 2')
     await add({ repo, filepath: 'commit2.txt', cache })
     const commit2Oid = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'Commit 2',
       author: {
         name: 'Test',
@@ -132,9 +128,7 @@ test('resetToCommit', async (t) => {
     await fs.write(`${dir}/feature.txt`, 'feature content')
     await add({ repo, filepath: 'feature.txt', cache })
     const featureCommitOid = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'Feature commit',
       author: {
         name: 'Test',
@@ -209,9 +203,7 @@ test('resetToCommit', async (t) => {
     await fs.write(`${dir}/test.txt`, 'test content')
     await add({ repo, filepath: 'test.txt', cache })
     const testCommitOid = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'Test commit',
       author: {
         name: 'Test',
@@ -219,6 +211,7 @@ test('resetToCommit', async (t) => {
         timestamp: 1262356920,
         timezoneOffset: -0,
       },
+      cache,
       cache,
     })
     
@@ -248,9 +241,7 @@ test('resetToCommit', async (t) => {
     await fs.write(`${dir}/new.txt`, 'new content')
     await add({ repo, filepath: 'new.txt', cache })
     const newCommitOid = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'New commit',
       author: {
         name: 'Test',
@@ -258,6 +249,7 @@ test('resetToCommit', async (t) => {
         timestamp: 1262356920,
         timezoneOffset: -0,
       },
+      cache,
       cache,
     })
     
@@ -359,9 +351,7 @@ test('resetToCommit', async (t) => {
     await fs.write(`${dir}/file.txt`, 'content')
     await add({ repo, filepath: 'file.txt', cache })
     const newCommitOid = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'New commit',
       author: {
         name: 'Test',
@@ -369,6 +359,7 @@ test('resetToCommit', async (t) => {
         timestamp: 1262356920,
         timezoneOffset: -0,
       },
+      cache,
       cache,
     })
     
@@ -414,9 +405,7 @@ test('resetToCommit', async (t) => {
     await fs.write(`${dir}/file.txt`, 'content')
     await add({ repo, filepath: 'file.txt', cache })
     const initialOid = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'Initial commit',
       author: {
         name: 'Test',
@@ -424,6 +413,7 @@ test('resetToCommit', async (t) => {
         timestamp: 1262356920,
         timezoneOffset: -0,
       },
+      cache,
       cache,
     })
     
@@ -473,9 +463,7 @@ test('resetToCommit', async (t) => {
     await fs.write(`${dir}/new-file.txt`, 'new content')
     await add({ repo, filepath: 'new-file.txt', cache })
     const newCommitOid = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'New commit',
       author: {
         name: 'Test',
@@ -483,6 +471,7 @@ test('resetToCommit', async (t) => {
         timestamp: 1262356920,
         timezoneOffset: -0,
       },
+      cache,
       cache,
     })
     
@@ -619,9 +608,7 @@ test('resetToCommit', async (t) => {
     await fs.write(`${dir}/file.txt`, 'content')
     await add({ repo, filepath: 'file.txt', cache })
     const newCommitOid = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'New commit',
       author: {
         name: 'Test',
@@ -629,6 +616,7 @@ test('resetToCommit', async (t) => {
         timestamp: 1262356920,
         timezoneOffset: -0,
       },
+      cache,
       cache,
     })
     
@@ -667,9 +655,7 @@ test('resetToCommit', async (t) => {
     await fs.write(`${dir}/file1.txt`, 'content1')
     await add({ repo, filepath: 'file1.txt', cache })
     const commit1Oid = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'Commit 1',
       author: {
         name: 'Test',
@@ -677,6 +663,7 @@ test('resetToCommit', async (t) => {
         timestamp: 1262356920,
         timezoneOffset: -0,
       },
+      cache,
       cache,
     })
     
@@ -733,9 +720,7 @@ test('resetToCommit', async (t) => {
     await fs.write(`${dir}/file1.txt`, 'content1')
     await add({ repo, filepath: 'file1.txt', cache })
     const initialOid = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'Initial commit',
       author: {
         name: 'Test',
@@ -743,6 +728,7 @@ test('resetToCommit', async (t) => {
         timestamp: 1262356920,
         timezoneOffset: -0,
       },
+      cache,
       cache,
     })
     
@@ -786,9 +772,7 @@ test('resetToCommit', async (t) => {
     await fs.write(`${dir}/file1.txt`, 'content1')
     await add({ repo, filepath: 'file1.txt', cache })
     const initialHeadOid = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'Initial commit',
       author: {
         name: 'Test',
@@ -796,6 +780,7 @@ test('resetToCommit', async (t) => {
         timestamp: 1262356920,
         timezoneOffset: -0,
       },
+      cache,
       cache,
     })
     
@@ -861,9 +846,7 @@ test('resetToCommit', async (t) => {
     await fs.write(`${dir}/file.txt`, 'content')
     await add({ repo, filepath: 'file.txt', cache })
     const newCommitOid = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'New commit',
       author: {
         name: 'Test',
@@ -871,6 +854,7 @@ test('resetToCommit', async (t) => {
         timestamp: 1262356920,
         timezoneOffset: -0,
       },
+      cache,
       cache,
     })
     
@@ -909,9 +893,7 @@ test('resetToCommit', async (t) => {
     await fs.write(`${dir}/file1.txt`, 'content1')
     await add({ repo, filepath: 'file1.txt', cache })
     const commit1Oid = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'Commit 1',
       author: {
         name: 'Test',
@@ -919,6 +901,7 @@ test('resetToCommit', async (t) => {
         timestamp: 1262356920,
         timezoneOffset: -0,
       },
+      cache,
       cache,
     })
     
@@ -984,9 +967,7 @@ test('resetToCommit', async (t) => {
     await fs.write(`${dir}/file1.txt`, 'content1')
     await add({ repo, filepath: 'file1.txt', cache })
     const commit1Oid = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'Commit 1',
       author: {
         name: 'Test',
@@ -994,6 +975,7 @@ test('resetToCommit', async (t) => {
         timestamp: 1262356920,
         timezoneOffset: -0,
       },
+      cache,
       cache,
     })
     
@@ -1084,9 +1066,7 @@ test('resetToCommit', async (t) => {
     await fs.write(`${dir}/file.txt`, 'content')
     await add({ repo, filepath: 'file.txt', cache })
     const newCommitOid = await commit({
-      fs,
-      dir,
-      gitdir,
+      repo,
       message: 'New commit',
       author: {
         name: 'Test',
@@ -1094,6 +1074,7 @@ test('resetToCommit', async (t) => {
         timestamp: 1262356920,
         timezoneOffset: -0,
       },
+      cache,
       cache,
     })
     

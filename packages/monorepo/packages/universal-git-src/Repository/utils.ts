@@ -30,7 +30,7 @@ export async function analyzeCheckout(
   
   // Ensure index is synchronized before analysis
   const { GitIndex } = await import('../git/index/GitIndex.ts')
-  const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+  const { UniversalBuffer } = await import('../git/backends/GitBackendFs/utils/UniversalBuffer.ts')
   
   let index: GitIndex
   if (repo._gitBackend) {
@@ -50,13 +50,13 @@ export async function analyzeCheckout(
   } else {
     // Fallback to fs if no backend (shouldn't happen, but handle gracefully)
     const { readIndex } = await import('../git/index/readIndex.ts')
-    index = await readIndex({ fs: repo._fs!, gitdir })
+    index = await readIndex({ fs: (repo as any).__fs!, gitdir })
   }
   
   // Ensure dir is defined for analyzeCheckout
   // analyzeCheckout currently requires dir string. 
   // If worktreeBackend is present, we try to get dir from it or use repo._dir.
-  let dir = repo._dir
+  let dir = (repo as any).__dir
   if (!dir && repo._worktreeBackend && repo._worktreeBackend.getDirectory) {
     dir = repo._worktreeBackend.getDirectory()
   }

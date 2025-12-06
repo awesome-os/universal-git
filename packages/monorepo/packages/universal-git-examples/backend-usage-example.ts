@@ -23,7 +23,7 @@
  */
 
 import type { FileSystemProvider, RawFileSystemProvider } from '@awesome-os/universal-git-src/models/FileSystem.ts'
-import { createFileSystem } from '@awesome-os/universal-git-src/utils/createFileSystem.ts'
+import { createFileSystem } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts'
 import { createBackend } from '@awesome-os/universal-git-src/backends/index.ts'
 import type { GitBackend } from '@awesome-os/universal-git-src/backends/GitBackend.ts'
 import { readRef } from '@awesome-os/universal-git-src/git/refs/readRef.ts'

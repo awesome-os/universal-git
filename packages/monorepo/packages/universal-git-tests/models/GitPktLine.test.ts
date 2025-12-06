@@ -1,8 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { GitPktLine } from '@awesome-os/universal-git-src/models/GitPktLine.ts'
-import { fromValue } from '@awesome-os/universal-git-src/utils/fromValue.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { fromValue } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/fromValue.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 test('GitPktLine', async (t) => {
   await t.test('encode string to pkt-line', async () => {

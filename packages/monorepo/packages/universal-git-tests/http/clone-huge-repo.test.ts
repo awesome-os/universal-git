@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { clone } from '@awesome-os/universal-git-src/index.ts'
-import http from '@awesome-os/universal-git-src/http/node/index.ts'
+import http from '@awesome-os/universal-git-src/git/http/node/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 
 test('huge repo clone and checkout', async (t) => {

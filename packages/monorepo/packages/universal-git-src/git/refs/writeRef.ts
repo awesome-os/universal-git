@@ -9,10 +9,10 @@
  * @param symbolic - Whether this is a symbolic ref (default: false)
  */
 import { join, normalize } from '../../core-utils/GitPath.ts'
-import { dirname } from '../../utils/dirname.ts'
-import { validateOid, getOidLength, type ObjectFormat } from '../../utils/detectObjectFormat.ts'
+import { dirname } from '../backends/GitBackendFs/utils/dirname.ts'
+import { validateOid, getOidLength, type ObjectFormat } from '../backends/GitBackendFs/utils/detectObjectFormat.ts'
 import AsyncLock from 'async-lock'
-import type { GitBackend } from '../../backends/GitBackend.ts'
+import type { GitBackend } from '../backends/GitBackend.ts'
 
 // Git's zero OID (null commit) - used for new refs and deletions
 // SHA-1: 40 zeros, SHA-256: 64 zeros
@@ -51,13 +51,18 @@ export async function writeRef({
   gitdir?: string
 }): Promise<void> {
   // Support both new signature (gitBackend) and legacy signature (fs/gitdir)
-  let backend: GitBackend
+  let backend: GitBackend | undefined
   let gitdir: string
   let fs: any
   
   if (gitBackend) {
     backend = gitBackend
-    gitdir = backend.getGitdir()
+    // Check if backend has getGitdir method (GitBackendFs)
+    if ('getGitdir' in backend && typeof backend.getGitdir === 'function') {
+      gitdir = backend.getGitdir()
+    } else {
+      throw new Error('GitBackend must provide getGitdir() method for writeRef')
+    }
     // Get fs from backend if available (for GitBackendFs)
     if ('getFs' in backend && typeof backend.getFs === 'function') {
       fs = backend.getFs()
@@ -70,19 +75,19 @@ export async function writeRef({
     fs = _fs
     gitdir = _gitdir
     // Try to get objectFormat from gitBackend if available
-    const { detectObjectFormat } = await import('../../utils/detectObjectFormat.ts')
-    objectFormat = objectFormat || await detectObjectFormat(fs, gitdir, {}, undefined)
+    const { detectObjectFormat } = await import('../backends/GitBackendFs/utils/detectObjectFormat.ts')
+    objectFormat = objectFormat || await detectObjectFormat(fs, gitdir)
   } else {
     throw new Error('Either gitBackend or (fs and gitdir) must be provided')
   }
   
   // Get objectFormat from backend if not provided
-  if (!objectFormat && backend) {
+  if (!objectFormat && backend && 'getObjectFormat' in backend && typeof backend.getObjectFormat === 'function') {
     objectFormat = await backend.getObjectFormat({})
   }
   objectFormat = objectFormat || 'sha1'
   
-  const { createFileSystem } = await import('../../utils/createFileSystem.ts')
+  const { createFileSystem } = await import('../backends/GitBackendFs/utils/createFileSystem.ts')
   const normalizedFs = createFileSystem(fs)
   const path = join(gitdir, ref)
   const zeroOid = getZeroOid(objectFormat)
@@ -104,10 +109,9 @@ export async function writeRef({
     // Read old OID before writing (for reflog)
     let oldOid = zeroOid // Default for new refs
     try {
-      const { readRef } = await import('./readRef.ts')
       const oldValue = backend 
-        ? await readRef({ gitBackend: backend, ref, objectFormat })
-        : await readRef({ fs, gitdir, ref, objectFormat })
+        ? await backend.readRef(ref, 5, {})
+        : await (await import('./readRef.ts')).readRef({ fs, gitdir, ref, objectFormat })
       if (oldValue && typeof oldValue === 'string' && validateOid(oldValue, objectFormat)) {
         oldOid = oldValue
       }
@@ -125,7 +129,7 @@ export async function writeRef({
     
     // Strict validation: must match expected OID format
     if (!validateOid(trimmedValue, objectFormat)) {
-      const { InvalidOidError } = await import('../../errors/InvalidOidError.ts')
+      const { InvalidOidError } = await import('../errors/InvalidOidError.ts')
       const expectedLength = getOidLength(objectFormat)
       throw new InvalidOidError(
         `Invalid value for ref "${ref}": Not a ${expectedLength}-char OID. Got "${trimmedValue}" (length: ${trimmedValue.length})`
@@ -194,6 +198,7 @@ export async function writeSymbolicRef({
   ref,
   value,
   oldOid: providedOldOid,
+  newOid: providedNewOid,
   objectFormat,
   // Legacy parameters for backward compatibility
   fs: _fs,
@@ -203,19 +208,25 @@ export async function writeSymbolicRef({
   ref: string
   value: string
   oldOid?: string
+  newOid?: string
   objectFormat?: ObjectFormat
   // Legacy parameters for backward compatibility
   fs?: any
   gitdir?: string
 }): Promise<void> {
   // Support both new signature (gitBackend) and legacy signature (fs/gitdir)
-  let backend: GitBackend
+  let backend: GitBackend | undefined
   let gitdir: string
   let fs: any
   
   if (gitBackend) {
     backend = gitBackend
-    gitdir = backend.getGitdir()
+    // Check if backend has getGitdir method (GitBackendFs)
+    if ('getGitdir' in backend && typeof backend.getGitdir === 'function') {
+      gitdir = backend.getGitdir()
+    } else {
+      throw new Error('GitBackend must provide getGitdir() method for writeSymbolicRef')
+    }
     // Get fs from backend if available (for GitBackendFs)
     if ('getFs' in backend && typeof backend.getFs === 'function') {
       fs = backend.getFs()
@@ -228,19 +239,19 @@ export async function writeSymbolicRef({
     fs = _fs
     gitdir = _gitdir
     // Try to get objectFormat from gitBackend if available
-    const { detectObjectFormat } = await import('../../utils/detectObjectFormat.ts')
-    objectFormat = objectFormat || await detectObjectFormat(fs, gitdir, {}, undefined)
+    const { detectObjectFormat } = await import('../backends/GitBackendFs/utils/detectObjectFormat.ts')
+    objectFormat = objectFormat || await detectObjectFormat(fs, gitdir)
   } else {
     throw new Error('Either gitBackend or (fs and gitdir) must be provided')
   }
   
   // Get objectFormat from backend if not provided
-  if (!objectFormat && backend) {
+  if (!objectFormat && backend && 'getObjectFormat' in backend && typeof backend.getObjectFormat === 'function') {
     objectFormat = await backend.getObjectFormat({})
   }
   objectFormat = objectFormat || 'sha1'
   
-  const { createFileSystem } = await import('../../utils/createFileSystem.ts')
+  const { createFileSystem } = await import('../backends/GitBackendFs/utils/createFileSystem.ts')
   const normalizedFs = createFileSystem(fs)
   const path = join(gitdir, ref)
   const zeroOid = getZeroOid(objectFormat)
@@ -288,19 +299,27 @@ export async function writeSymbolicRef({
     // (will default to zero OID in logRefUpdate)
     
     // Resolve new HEAD OID (the target branch)
-    // Strip 'ref: ' prefix if present (it's only used in HEAD file format, not in ref resolution)
-    const targetRef = value.startsWith('ref: ') ? value.substring(5).trim() : value.trim()
-    try {
-      // Use backend.readRef instead of resolveRef
-      const newHeadOid = backend
-        ? await backend.readRef(targetRef, 5, {})
-        : await (await import('./readRef.ts')).resolveRef({ fs, gitdir, ref: targetRef, objectFormat })
-      if (newHeadOid && validateOid(newHeadOid, objectFormat)) {
-        newOid = newHeadOid
+    // Use providedNewOid if available (from checkout command which already resolved it)
+    // Otherwise, try to resolve it from the target ref
+    if (providedNewOid && typeof providedNewOid === 'string' && validateOid(providedNewOid, objectFormat)) {
+      // providedNewOid is a valid OID, use it
+      newOid = providedNewOid
+    } else {
+      // Strip 'ref: ' prefix if present (it's only used in HEAD file format, not in ref resolution)
+      const targetRef = value.startsWith('ref: ') ? value.substring(5).trim() : value.trim()
+      try {
+        // Use backend.readRef instead of resolveRef
+        const newHeadOid = backend
+          ? await backend.readRef(targetRef, 5, {})
+          : await (await import('./readRef.ts')).resolveRef({ fs, gitdir, ref: targetRef, objectFormat })
+        if (newHeadOid && validateOid(newHeadOid, objectFormat)) {
+          newOid = newHeadOid
+        }
+      } catch (err) {
+        // Target ref doesn't exist yet - will try to resolve again inside lock if needed
+        // For reflog entry creation, we need newOid, so we'll resolve it inside the lock
+        // This shouldn't happen in normal operation, but we handle it gracefully
       }
-    } catch {
-      // Target ref doesn't exist yet - will be resolved later
-      // This shouldn't happen in normal operation, but we handle it gracefully
     }
   }
   
@@ -333,6 +352,24 @@ export async function writeSymbolicRef({
     if (ref === 'HEAD') {
       // Use oldOid if available, otherwise use zero OID (for new refs)
       const finalOldOid = oldOid || zeroOid
+      
+      // If newOid wasn't resolved earlier, try to resolve it now (inside the lock)
+      // This ensures we have newOid for the reflog entry
+      if (newOid === zeroOid && trimmedValue) {
+        try {
+          const targetRef = trimmedValue.startsWith('ref: ') ? trimmedValue.substring(5).trim() : trimmedValue.trim()
+          const resolvedNewOid = backend
+            ? await backend.readRef(targetRef, 5, {})
+            : await (await import('./readRef.ts')).resolveRef({ fs, gitdir, ref: targetRef, objectFormat })
+          if (resolvedNewOid && validateOid(resolvedNewOid, objectFormat)) {
+            newOid = resolvedNewOid
+          }
+        } catch {
+          // If we still can't resolve it, newOid remains zeroOid
+          // This might happen if the ref doesn't exist yet, but we'll still create the reflog entry
+        }
+      }
+      
       // Only log if oldOid and newOid are different (actual change occurred)
       if (finalOldOid !== newOid) {
         // Use gitBackend.appendReflog if available, otherwise use logRefUpdate

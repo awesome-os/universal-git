@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { comparePath } from '@awesome-os/universal-git-src/utils/comparePath.ts'
+import { comparePath } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/comparePath.ts'
 
 test('comparePath', async (t) => {
   await t.test('ok:compares-paths-correctly', () => {

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { formatInfoRefs } from '@awesome-os/universal-git-src/utils/formatInfoRefs.ts'
+import { formatInfoRefs } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/formatInfoRefs.ts'
 
 test('formatInfoRefs', async (t) => {
   await t.test('ok:formats-refs-no-prefix', () => {

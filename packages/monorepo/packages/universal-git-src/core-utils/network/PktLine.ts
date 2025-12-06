@@ -1,6 +1,6 @@
-import { StreamReader } from "../../utils/StreamReader.ts"
-import { padHex } from "../../utils/padHex.ts"
-import { UniversalBuffer } from "../../utils/UniversalBuffer.ts"
+import { StreamReader } from "../../git/backends/GitBackendFs/utils/StreamReader.ts"
+import { padHex } from "../../git/backends/GitBackendFs/utils/padHex.ts"
+import { UniversalBuffer } from "../../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
 
 /**
  * pkt-line Format

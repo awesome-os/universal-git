@@ -4,7 +4,7 @@ import { setConfig, pull, log, add, commit, Errors } from '@awesome-os/universal
 import { createMockHttpClient } from '../../helpers/mockHttpServer.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 // join is not exported as subpath, use package import
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
+import { join } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts'
 
 test('pull', async (t) => {
   await t.test('pull', async () => {

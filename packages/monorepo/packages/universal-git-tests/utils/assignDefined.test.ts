@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { assignDefined } from '@awesome-os/universal-git-src/utils/assignDefined.ts'
+import { assignDefined } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/assignDefined.ts'
 
 test('assignDefined', async (t) => {
   await t.test('ok:assigns-defined-properties', () => {

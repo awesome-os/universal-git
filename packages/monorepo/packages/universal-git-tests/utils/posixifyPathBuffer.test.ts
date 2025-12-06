@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { posixifyPathBuffer } from '@awesome-os/universal-git-src/utils/posixifyPathBuffer.ts'
+import { posixifyPathBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/posixifyPathBuffer.ts'
 
 test('posixifyPathBuffer', async (t) => {
   await t.test('ok:converts-backslashes-Buffer', () => {

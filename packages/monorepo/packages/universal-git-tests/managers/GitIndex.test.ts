@@ -3,8 +3,8 @@ import assert from 'node:assert'
 import { GitIndex } from '@awesome-os/universal-git-src/internal-apis.ts'
 import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { join } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 test('GitIndex', async (t) => {
   await t.test('GitIndex.from(buffer) - Simple', async () => {

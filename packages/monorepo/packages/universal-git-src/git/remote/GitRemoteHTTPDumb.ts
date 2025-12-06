@@ -1,9 +1,9 @@
-import { HttpError } from '../../errors/HttpError.ts'
-import { collect } from '../../utils/collect.ts'
-import { extractAuthFromUrl } from '../../utils/extractAuthFromUrl.ts'
-import { calculateBasicAuthHeader } from '../../utils/calculateBasicAuthHeader.ts'
+import { HttpError } from '../errors/HttpError.ts'
+import { collect } from '../backends/GitBackendFs/utils/collect.ts'
+import { extractAuthFromUrl } from '../backends/GitBackendFs/utils/extractAuthFromUrl.ts'
+import { calculateBasicAuthHeader } from '../backends/GitBackendFs/utils/calculateBasicAuthHeader.ts'
 import type { HttpClient, ProgressCallback, GitAuth } from './GitRemoteHTTP.ts'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 // ============================================================================
 // HTTP DUMB PROTOCOL IMPLEMENTATION

@@ -2,8 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { resolveRef, init, commit, add } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { MissingParameterError } from '@awesome-os/universal-git-src/errors/MissingParameterError.ts'
-import { NotFoundError } from '@awesome-os/universal-git-src/errors/NotFoundError.ts'
+import { MissingParameterError } from '@awesome-os/universal-git-src/git/errors/MissingParameterError.ts'
+import { NotFoundError } from '@awesome-os/universal-git-src/git/errors/NotFoundError.ts'
 
 test('resolveRef', async (t) => {
   await t.test('param:fs-missing', async () => {
@@ -21,7 +21,7 @@ test('resolveRef', async (t) => {
 
   await t.test('param:gitdir-or-dir-missing', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true })
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await resolveRef({
         fs: fs,

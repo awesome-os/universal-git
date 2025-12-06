@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { ConfigAccess, getConfigValue, setConfigValue } from '@awesome-os/universal-git-src/utils/configAccess.ts'
+import { ConfigAccess, getConfigValue, setConfigValue } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/configAccess.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 
 test('configAccess', async (t) => {

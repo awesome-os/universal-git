@@ -4,7 +4,7 @@ import { processReceivePack, formatReceivePackResponse, type ReceivePackResult }
 import { GitPktLine } from '@awesome-os/universal-git-src/models/GitPktLine.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 const createStream = UniversalBuffer.createStream
 
 test('processReceivePack', async (t) => {
@@ -284,7 +284,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     // Use invalid gitdir to cause error - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -531,7 +531,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     // Use invalid gitdir path to cause filesystem error - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/path/to/gitdir')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -556,7 +556,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     // Use invalid gitdir - will cause filesystem error - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -739,7 +739,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     // Use invalid gitdir path that will cause ENOENT when reading ref - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/gitdir/path')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -767,7 +767,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     // Use gitdir path that will cause error with /nonexistent/ in message - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -848,7 +848,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     // Use invalid gitdir to potentially trigger error path - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -873,7 +873,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     // Use invalid gitdir to cause system error (not validation error) - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/system/error')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -903,7 +903,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     // Use invalid gitdir to potentially trigger error without message - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -951,7 +951,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     // Use invalid gitdir to cause error with code - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -1007,7 +1007,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     // Use gitdir path that will trigger "no such file" error with gitdir in path - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/gitdir/path')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -1033,7 +1033,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     // Use invalid gitdir to cause system errors for all refs - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -1062,7 +1062,7 @@ test('processReceivePack', async (t) => {
     const stream = createStream(request)
     
     // Use invalid gitdir to cause error with errno - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -1077,7 +1077,7 @@ test('processReceivePack', async (t) => {
   await t.test('handles update hook rejection with non-ENOENT error', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create an update hook that rejects (non-ENOENT error)
-    const { join } = await import('@awesome-os/universal-git-src/utils/join.ts')
+    const { join } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts')
     const hooksDir = join(gitdir, 'hooks')
     await repo.gitBackend.getFs().mkdir(hooksDir, { recursive: true })
     
@@ -1119,7 +1119,7 @@ process.exit(1);
   await t.test('handles post-receive hook error', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create a post-receive hook that errors
-    const { join } = await import('@awesome-os/universal-git-src/utils/join.ts')
+    const { join } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts')
     const hooksDir = join(gitdir, 'hooks')
     await repo.gitBackend.getFs().mkdir(hooksDir, { recursive: true })
     
@@ -1155,7 +1155,7 @@ process.exit(1);
   await t.test('handles validation error filtering (hook rejected message)', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create an update hook that rejects with "hook rejected" message
-    const { join } = await import('@awesome-os/universal-git-src/utils/join.ts')
+    const { join } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts')
     const hooksDir = join(gitdir, 'hooks')
     await repo.gitBackend.getFs().mkdir(hooksDir, { recursive: true })
     
@@ -1208,7 +1208,7 @@ process.exit(1);
     const stream = createStream(request)
     
     // Use invalid gitdir to cause system error - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/gitdir/path')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -1262,7 +1262,7 @@ process.exit(1);
     // Use an invalid gitdir that might pass the early check but fail during ref operations
     // On some systems, the gitdir check might not catch this, so the error will occur
     // when resolveRef tries to read the ref, which should trigger the outer catch block - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/gitdir/path/that/might/pass/early/check')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -1287,7 +1287,7 @@ process.exit(1);
   await t.test('handles error with "update hook" in message', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-empty', { init: true, defaultBranch: 'main' })
     // Create an update hook that rejects with "update hook" in message
-    const { join } = await import('@awesome-os/universal-git-src/utils/join.ts')
+    const { join } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts')
     const hooksDir = join(gitdir, 'hooks')
     await repo.gitBackend.getFs().mkdir(hooksDir, { recursive: true })
     
@@ -1372,7 +1372,7 @@ process.exit(1);
     const stream = createStream(request)
     
     // Use invalid gitdir to cause error early (sets unpackError) - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -1401,7 +1401,7 @@ process.exit(1);
     const stream = createStream(request)
     
     // Use invalid gitdir to cause ENOENT when reading ref - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/gitdir/path')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -1432,7 +1432,7 @@ process.exit(1);
     const stream = createStream(request)
     
     // Use gitdir path that will trigger "no such file" error with gitdir in path - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/gitdir/path')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -1457,7 +1457,7 @@ process.exit(1);
     const stream = createStream(request)
     
     // Use invalid gitdir to trigger error with enoent in message - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -1523,7 +1523,7 @@ process.exit(1);
     // Use invalid gitdir to cause system error for second ref - create backend with invalid gitdir
     // Note: This test mixes validation errors (conflict) with system errors (invalid gitdir)
     // The system error should cause unpackOk = false even if there's also a validation error
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -1548,7 +1548,7 @@ process.exit(1);
     const stream = createStream(request)
     
     // Use invalid gitdir to cause error with code - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
       gitBackend: invalidBackend,
@@ -1578,7 +1578,7 @@ process.exit(1);
     const stream = createStream(request)
     
     // Use invalid gitdir to cause error - create backend with invalid gitdir
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/invalid/gitdir')
     const result = await processReceivePack({
       gitBackend: invalidBackend,

@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { writeReceivePackRequest } from '@awesome-os/universal-git-src/wire/writeReceivePackRequest.ts'
 import { GitPktLine } from '@awesome-os/universal-git-src/models/GitPktLine.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 // Helper to decode pkt-line buffer to string
 function decodePktLine(buffer: UniversalBuffer): string {

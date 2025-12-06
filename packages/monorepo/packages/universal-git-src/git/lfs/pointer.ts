@@ -1,4 +1,4 @@
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 /**
  * Git LFS Pointer File Format

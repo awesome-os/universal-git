@@ -1,10 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { resolveTree } from '@awesome-os/universal-git-src/utils/resolveTree.ts'
+import { resolveTree } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/resolveTree.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { writeTree, writeCommit, writeTag, writeBlob } from '@awesome-os/universal-git-src/index.ts'
-import { ObjectTypeError } from '@awesome-os/universal-git-src/errors/ObjectTypeError.ts'
-import { NotFoundError } from '@awesome-os/universal-git-src/errors/NotFoundError.ts'
+import { ObjectTypeError } from '@awesome-os/universal-git-src/git/errors/ObjectTypeError.ts'
+import { NotFoundError } from '@awesome-os/universal-git-src/git/errors/NotFoundError.ts'
 
 test('resolveTree', async (t) => {
   await t.test('ok:resolves-tree', async () => {

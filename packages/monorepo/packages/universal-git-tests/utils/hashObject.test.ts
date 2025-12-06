@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { hashObject } from '@awesome-os/universal-git-src/utils/hashObject.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { hashObject } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/hashObject.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 test('hashObject', async (t) => {
   await t.test('ok:hashes-blob', async () => {

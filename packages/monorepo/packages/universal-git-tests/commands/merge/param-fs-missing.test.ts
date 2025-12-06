@@ -24,7 +24,7 @@ import { execSync } from 'child_process'
 import { join } from 'path'
 import { mkdirSync, rmSync, existsSync } from 'fs'
 import { tmpdir } from 'os'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 /**
  * Helper function to read and compare git config before merge
@@ -119,7 +119,7 @@ describe('merge', () => {
 
   it('param:fs-missing', async () => {
         const { repo, fs, dir, gitdir } = await makeFixture('test-merge')
-        const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+        const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
 
         let error: unknown = null
         try {

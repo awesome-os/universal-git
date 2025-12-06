@@ -5,16 +5,16 @@
  * and ensure consistent type handling across commands.
  */
 
-import { MissingParameterError } from '../errors/MissingParameterError.ts'
+import { MissingParameterError } from '../../../../errors/MissingParameterError.ts'
 import { createFileSystem } from './createFileSystem.ts'
-import { join, normalize } from '../core-utils/GitPath.ts'
-import { Repository } from '../core-utils/Repository.ts'
-import type { FileSystemProvider } from '../models/FileSystem.ts'
-import type { BaseCommandOptions } from '../types/commandOptions.ts'
+import { join, normalize } from '../../../../core-utils/GitPath.ts'
+import { Repository } from '../../../../core-utils/Repository.ts'
+import type { FileSystemProvider } from '../../../../models/FileSystem.ts'
+import type { BaseCommandOptions } from '../../../../types/commandOptions.ts'
 import type { GitBackend } from '../backends/GitBackend.ts'
-import type { GitWorktreeBackend } from '../git/worktree/GitWorktreeBackend.ts'
+import type { GitWorktreeBackend } from '../../../worktree/GitWorktreeBackend.ts'
 import { GitBackendFs } from '../backends/GitBackendFs/index.ts'
-import { createGitWorktreeBackend } from '../git/worktree/index.ts'
+import { createGitWorktreeBackend } from '../../../worktree/index.ts'
 
 /**
  * Normalizes command arguments to handle repo, backend, and legacy fs/gitdir/dir patterns.
@@ -169,7 +169,7 @@ export async function normalizeCommandArgs<T extends Record<string, unknown>>(
     // Create repository with backends (if provided) or legacy inputs
     if (gitBackend) {
       // Use Repository constructor directly when backends are provided
-      const { Repository } = await import('../core-utils/Repository.ts')
+      const { Repository } = await import('../../../../core-utils/Repository.ts')
       repo = new Repository({
         gitBackend,
         worktreeBackend: worktree,
@@ -181,7 +181,7 @@ export async function normalizeCommandArgs<T extends Record<string, unknown>>(
       // Normalize paths before passing to createRepository() for consistency
       const normalizedDirForOpen = dir ? normalize(dir) : undefined
       const normalizedGitdirForOpen = args.gitdir ? normalize(args.gitdir) : undefined
-      const { createRepository } = await import('../core-utils/createRepository.ts')
+      const { createRepository } = await import('../../../../core-utils/createRepository.ts')
       repo = await createRepository({
         fs,
         dir: normalizedDirForOpen,

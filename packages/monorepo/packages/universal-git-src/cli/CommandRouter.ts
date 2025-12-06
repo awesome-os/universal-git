@@ -1,6 +1,6 @@
 import { RevisionParser } from './RevisionParser.ts'
 import { Repository } from "../core-utils/Repository.ts"
-import { assertDefined } from "../utils/typeHelpers.ts"
+import { assertDefined } from "../git/backends/GitBackendFs/utils/typeHelpers.ts"
 
 /**
  * Routes commands to their handlers
@@ -78,7 +78,7 @@ export class CommandRouter {
    * @private
    */
   private async _handleInit(flags: Record<string, unknown>, positional: string[]): Promise<unknown> {
-    const { init } = await import('../commands/init.ts')
+    const { init } = await import('../git/backends/GitBackendFs/commands/init.ts')
     const cwd = typeof process !== 'undefined' && process.cwd ? process.cwd() : '.'
     return init({
       fs: this.repo.fs,
@@ -93,7 +93,7 @@ export class CommandRouter {
    * @private
    */
   private async _handleAdd(flags: Record<string, unknown>, positional: string[]): Promise<unknown> {
-    const { add } = await import('../commands/add.ts')
+    const { add } = await import('../git/backends/GitBackendFs/commands/add.ts')
     const gitdir = await this.repo.getGitdir()
     assertDefined(gitdir, 'gitdir is required')
     const dir = this.repo.dir
@@ -115,7 +115,7 @@ export class CommandRouter {
    * @private
    */
   private async _handleCommit(flags: Record<string, unknown>, positional: string[]): Promise<unknown> {
-    const { commit } = await import('../commands/commit.ts')
+    const { commit } = await import('../git/backends/GitBackendFs/commands/commit.ts')
     const gitdir = await this.repo.getGitdir()
     assertDefined(gitdir, 'gitdir is required')
     return commit({
@@ -134,7 +134,7 @@ export class CommandRouter {
    * @private
    */
   private async _handleStatus(flags: Record<string, unknown>, positional: string[]): Promise<unknown> {
-    const { status } = await import('../commands/status.ts')
+    const { status } = await import('../git/backends/GitBackendFs/commands/status.ts')
     const gitdir = await this.repo.getGitdir()
     assertDefined(gitdir, 'gitdir is required')
     if (positional.length > 0) {
@@ -161,7 +161,7 @@ export class CommandRouter {
    * @private
    */
   private async _handleLog(flags: Record<string, unknown>, positional: string[]): Promise<unknown> {
-    const { log } = await import('../commands/log.ts')
+    const { log } = await import('../git/backends/GitBackendFs/commands/log.ts')
     const gitdir = await this.repo.getGitdir()
     assertDefined(gitdir, 'gitdir is required')
     const ref = positional[0] || 'HEAD'
@@ -181,7 +181,7 @@ export class CommandRouter {
    * @private
    */
   private async _handleCheckout(flags: Record<string, unknown>, positional: string[]): Promise<unknown> {
-    const { checkout } = await import('../commands/checkout.ts')
+    const { checkout } = await import('../git/backends/GitBackendFs/commands/checkout.ts')
     const gitdir = await this.repo.getGitdir()
     assertDefined(gitdir, 'gitdir is required')
     return checkout({
@@ -203,7 +203,7 @@ export class CommandRouter {
     const gitdir = await this.repo.getGitdir()
     assertDefined(gitdir, 'gitdir is required')
     if (flags.delete || flags.d) {
-      const { deleteBranch } = await import('../commands/deleteBranch.ts')
+      const { deleteBranch } = await import('../git/backends/GitBackendFs/commands/deleteBranch.ts')
       return deleteBranch({
         fs: this.repo.fs,
         dir: this.repo.dir ?? undefined,
@@ -211,7 +211,7 @@ export class CommandRouter {
         ref: positional[0],
       })
     }
-    const { branch } = await import('../commands/branch.ts')
+    const { branch } = await import('../git/backends/GitBackendFs/commands/branch.ts')
     return branch({
       fs: this.repo.fs,
       dir: this.repo.dir ?? undefined,
@@ -228,7 +228,7 @@ export class CommandRouter {
    * @private
    */
   private async _handleMerge(flags: Record<string, unknown>, positional: string[]): Promise<unknown> {
-    const { merge } = await import('../commands/merge.ts')
+    const { merge } = await import('../git/backends/GitBackendFs/commands/merge.ts')
     const gitdir = await this.repo.getGitdir()
     assertDefined(gitdir, 'gitdir is required')
     return merge({
@@ -257,7 +257,7 @@ export class CommandRouter {
    * @private
    */
   private async _handlePush(flags: Record<string, unknown>, positional: string[]): Promise<unknown> {
-    const { push } = await import('../commands/push.ts')
+    const { push } = await import('../git/backends/GitBackendFs/commands/push.ts')
     const gitdir = await this.repo.getGitdir()
     assertDefined(gitdir, 'gitdir is required')
     return push({
@@ -276,7 +276,7 @@ export class CommandRouter {
    * @private
    */
   private async _handleFetch(flags: Record<string, unknown>, positional: string[]): Promise<unknown> {
-    const { fetch } = await import('../commands/fetch.ts')
+    const { fetch } = await import('../git/backends/GitBackendFs/commands/fetch.ts')
     const gitdir = await this.repo.getGitdir()
     assertDefined(gitdir, 'gitdir is required')
     return fetch({
@@ -294,7 +294,7 @@ export class CommandRouter {
    * @private
    */
   private async _handleClone(flags: Record<string, unknown>, positional: string[]): Promise<unknown> {
-    const { clone } = await import('../commands/clone.ts')
+    const { clone } = await import('../git/backends/GitBackendFs/commands/clone.ts')
     const cwd = typeof process !== 'undefined' && process.cwd ? process.cwd() : '.'
     return clone({
       fs: this.repo.fs,
@@ -312,7 +312,7 @@ export class CommandRouter {
    * @private
    */
   private async _handleTag(flags: Record<string, unknown>, positional: string[]): Promise<unknown> {
-    const { tag } = await import('../commands/tag.ts')
+    const { tag } = await import('../git/backends/GitBackendFs/commands/tag.ts')
     const gitdir = await this.repo.getGitdir()
     assertDefined(gitdir, 'gitdir is required')
     return tag({
@@ -330,7 +330,7 @@ export class CommandRouter {
    * @private
    */
   private async _handleDiff(flags: Record<string, unknown>, positional: string[]): Promise<unknown> {
-    const { diff } = await import('../commands/diff.ts')
+    const { diff } = await import('../git/backends/GitBackendFs/commands/diff.ts')
     const gitdir = await this.repo.getGitdir()
     assertDefined(gitdir, 'gitdir is required')
     return diff({
@@ -349,7 +349,7 @@ export class CommandRouter {
    * @private
    */
   private async _handleShow(flags: Record<string, unknown>, positional: string[]): Promise<unknown> {
-    const { show } = await import('../commands/show.ts')
+    const { show } = await import('../git/backends/GitBackendFs/commands/show.ts')
     const gitdir = await this.repo.getGitdir()
     assertDefined(gitdir, 'gitdir is required')
     return show({
@@ -367,7 +367,7 @@ export class CommandRouter {
    * @private
    */
   private async _handleRm(flags: Record<string, unknown>, positional: string[]): Promise<unknown> {
-    const { remove } = await import('../commands/remove.ts')
+    const { remove } = await import('../git/backends/GitBackendFs/commands/remove.ts')
     const gitdir = await this.repo.getGitdir()
     // remove expects a single filepath string, not an array
     if (positional.length === 0) {
@@ -389,7 +389,7 @@ export class CommandRouter {
   private async _handleRemote(flags: Record<string, unknown>, positional: string[]): Promise<unknown> {
     const gitdir = await this.repo.getGitdir()
     if (flags.add) {
-      const { addRemote } = await import('../commands/addRemote.ts')
+      const { addRemote } = await import('../git/backends/GitBackendFs/commands/addRemote.ts')
       return addRemote({
         fs: this.repo.fs,
         dir: this.repo.dir ?? undefined,
@@ -399,7 +399,7 @@ export class CommandRouter {
         force: (flags.force as boolean) || (flags.f as boolean) || false,
       })
     } else if (flags.remove || flags.rm) {
-      const { deleteRemote } = await import('../commands/deleteRemote.ts')
+      const { deleteRemote } = await import('../git/backends/GitBackendFs/commands/deleteRemote.ts')
       return deleteRemote({
         fs: this.repo.fs,
         dir: this.repo.dir ?? undefined,
@@ -407,7 +407,7 @@ export class CommandRouter {
         remote: positional[0],
       })
     } else {
-      const { listRemotes } = await import('../commands/listRemotes.ts')
+      const { listRemotes } = await import('../git/backends/GitBackendFs/commands/listRemotes.ts')
       return listRemotes({
         fs: this.repo.fs,
         dir: this.repo.dir ?? undefined,
@@ -421,7 +421,7 @@ export class CommandRouter {
    * @private
    */
   private async _handleSparseCheckout(flags: Record<string, unknown>, positional: string[]): Promise<unknown> {
-    const { sparseCheckout } = await import('../commands/sparseCheckout.ts')
+    const { sparseCheckout } = await import('../git/backends/GitBackendFs/commands/sparseCheckout.ts')
     const gitdir = await this.repo.getGitdir()
     assertDefined(gitdir, 'gitdir is required')
     if (flags.init) {
@@ -458,7 +458,7 @@ export class CommandRouter {
    * @private
    */
   private async _handleUngit(flags: Record<string, unknown>, positional: string[]): Promise<unknown> {
-    const { ungit } = await import('../commands/ungit.ts')
+    const { ungit } = await import('../git/backends/GitBackendFs/commands/ungit.ts')
     const cwd = typeof process !== 'undefined' && process.cwd ? process.cwd() : '.'
     return ungit({
       fs: this.repo.fs,

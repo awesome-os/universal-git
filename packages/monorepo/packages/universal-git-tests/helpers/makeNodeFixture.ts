@@ -83,7 +83,7 @@ export async function makeNodeFixture(fixture: string, options?: { init?: boolea
   }
 
   // Create backends explicitly
-  const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+  const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
   const { createGitWorktreeBackend } = await import('@awesome-os/universal-git-src/git/worktree/index.ts')
   
   // Create GitBackend (GitBackendFs)

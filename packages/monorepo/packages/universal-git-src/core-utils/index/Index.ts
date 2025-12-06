@@ -1,9 +1,9 @@
 import { InternalError } from "../../errors/InternalError.ts"
 import { UnsafeFilepathError } from "../../errors/UnsafeFilepathError.ts"
-import { BufferCursor } from "../../utils/BufferCursor.ts"
-import { comparePath } from "../../utils/comparePath.ts"
-import { normalizeStats } from "../../utils/normalizeStats.ts"
-import { UniversalBuffer } from "../../utils/UniversalBuffer.ts"
+import { BufferCursor } from "../../git/backends/GitBackendFs/utils/BufferCursor.ts"
+import { comparePath } from "../../git/backends/GitBackendFs/utils/comparePath.ts"
+import { normalizeStats } from "../../git/backends/GitBackendFs/utils/normalizeStats.ts"
+import { UniversalBuffer } from "../../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
 import { shasum } from '../ShaHasher.ts'
 import type { Stat } from "../../models/FileSystem.ts"
 

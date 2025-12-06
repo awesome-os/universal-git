@@ -4,15 +4,15 @@
  * High-level API for Git LFS operations
  */
 
-import { MissingParameterError } from '../errors/MissingParameterError.ts'
-import { parsePointer, generatePointer, isPointer, getLFSObjectPath } from '../git/lfs/pointer.ts'
-import { shouldTrackWithLFS, smudgeFilter, cleanFilter } from '../git/lfs/filter.ts'
-import { getAttributes } from '../core-utils/filesystem/GitAttributesParser.ts'
+import { MissingParameterError } from '../../../../git/errors/MissingParameterError.ts'
+import { parsePointer, generatePointer, isPointer, getLFSObjectPath } from '../../../lfs/pointer.ts'
+import { shouldTrackWithLFS, smudgeFilter, cleanFilter } from '../../../lfs/filter.ts'
+import { getAttributes } from '../../../../core-utils/filesystem/GitAttributesParser.ts'
 import { normalizeCommandArgs } from '../utils/commandHelpers.ts'
-import { Repository } from '../core-utils/Repository.ts'
+import { Repository } from '../../../../core-utils/Repository.ts'
 import { join } from '../utils/join.ts'
 import { assertParameter } from '../utils/assertParameter.ts'
-import type { FileSystemProvider } from '../models/FileSystem.ts'
+import type { FileSystemProvider } from '../../../../models/FileSystem.ts'
 
 /**
  * Track files with Git LFS
@@ -224,7 +224,7 @@ export async function lfsList({
   const backend = new GitBackendFs(fs, effectiveGitdir)
 
   // Get all files from the index
-  const { GitIndex } = await import('../git/index/GitIndex.ts')
+  const { GitIndex } = await import('../../../index/GitIndex.ts')
   const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
   const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
   

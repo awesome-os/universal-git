@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { inflate } from '@awesome-os/universal-git-src/utils/inflate.ts'
-import { deflate } from '@awesome-os/universal-git-src/utils/deflate.ts'
+import { inflate } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/inflate.ts'
+import { deflate } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/deflate.ts'
 
 test('inflate', async (t) => {
   await t.test('ok:decompresses-deflated-data', async () => {

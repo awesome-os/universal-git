@@ -1,11 +1,11 @@
 import pify from 'pify'
 
-import { compareStrings } from "../utils/compareStrings.ts"
-import { dirname } from "../utils/dirname.ts"
-import { rmRecursive } from "../utils/rmRecursive.ts"
-import { isPromiseLike } from "../utils/types.ts"
-import { extendStat, type ExtendedStat } from "../utils/statHelpers.ts"
-import type { UniversalBuffer } from "../utils/UniversalBuffer.ts"
+import { compareStrings } from "../git/backends/GitBackendFs/utils/compareStrings.ts"
+import { dirname } from "../git/backends/GitBackendFs/utils/dirname.ts"
+import { rmRecursive } from "../git/backends/GitBackendFs/utils/rmRecursive.ts"
+import { isPromiseLike } from "../git/backends/GitBackendFs/utils/types.ts"
+import { extendStat, type ExtendedStat } from "../git/backends/GitBackendFs/utils/statHelpers.ts"
+import type { UniversalBuffer } from "../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
 
 // ============================================================================
 // FILESYSTEM CLIENT TYPES
@@ -309,7 +309,7 @@ export class FileSystem {
       }
       // Convert plain ArrayBuffers to UniversalBuffers
       if (typeof buffer !== 'string') {
-        const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+        const { UniversalBuffer } = await import('../git/backends/GitBackendFs/utils/UniversalBuffer.ts')
         buffer = UniversalBuffer.from(buffer as Uint8Array)
       }
       return buffer as UniversalBuffer | string
@@ -522,7 +522,7 @@ export class FileSystem {
     // so we can dump it into GitObject.write just like any other file.
     try {
       const link = await this._readlink!(filename, opts)
-      const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+      const { UniversalBuffer } = await import('../git/backends/GitBackendFs/utils/UniversalBuffer.ts')
       return UniversalBuffer.from(link as string | Uint8Array)
     } catch (err: unknown) {
       const error = err as { code?: string }

@@ -1,6 +1,6 @@
 import { GitPktLine } from "../models/GitPktLine.ts"
-import { pkg } from "../utils/pkg.ts"
-import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
+import { pkg } from "../git/backends/GitBackendFs/utils/pkg.ts"
+import { UniversalBuffer } from "../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
 
 export async function writeRefsAdResponse({
   capabilities,

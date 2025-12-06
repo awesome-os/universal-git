@@ -2,7 +2,7 @@ import { read as readLoose } from './loose.ts'
 import { read as readPacked } from './pack.ts'
 import { readObject } from './readObject.ts'
 import type { FileSystemProvider } from "../../models/FileSystem.ts"
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 /**
  * Check if an object exists in the object database (loose or packed)

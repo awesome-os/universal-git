@@ -1,8 +1,8 @@
-import { compareStats } from "../utils/compareStats.ts"
-import { join } from "../utils/join.ts"
-import { normalizeStats } from "../utils/normalizeStats.ts"
-import { shasum } from "../utils/shasum.ts"
-import { UniversalBuffer } from '../utils/UniversalBuffer.ts'
+import { compareStats } from "../git/backends/GitBackendFs/utils/compareStats.ts"
+import { join } from "../git/backends/GitBackendFs/utils/join.ts"
+import { normalizeStats } from "../git/backends/GitBackendFs/utils/normalizeStats.ts"
+import { shasum } from "../git/backends/GitBackendFs/utils/shasum.ts"
+import { UniversalBuffer } from '../git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 import type { Stat } from './FileSystem.ts'
 import type { WalkerEntry } from './Walker.ts'
 import type { GitBackend } from '../backends/GitBackend.ts'
@@ -73,7 +73,7 @@ export class GitWalkerFs {
     const filepath = entry._fullpath
     const names = await this.worktreeBackend.readdir(filepath || '.')
     if (names === null) return null
-    const { join } = await import('../utils/join.ts')
+    const { join } = await import('../git/backends/GitBackendFs/utils/join.ts')
     return names.map(name => join(filepath || '.', name))
   }
 
@@ -160,8 +160,8 @@ export class GitWalkerFs {
       let oid: string | undefined
       // See if we can use the SHA1 hash in the index.
       const { GitIndex } = await import('../git/index/GitIndex.ts')
-      const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
-      const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
+      const { detectObjectFormat } = await import('../git/backends/GitBackendFs/utils/detectObjectFormat.ts')
+      const { UniversalBuffer } = await import('../git/backends/GitBackendFs/utils/UniversalBuffer.ts')
       
       let indexBuffer: UniversalBuffer
       try {

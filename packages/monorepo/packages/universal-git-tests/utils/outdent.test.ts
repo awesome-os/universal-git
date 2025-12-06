@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { outdent } from '@awesome-os/universal-git-src/utils/outdent.ts'
+import { outdent } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/outdent.ts'
 
 test('outdent', async (t) => {
   await t.test('ok:removes-leading-space', () => {

@@ -1,7 +1,7 @@
 import Hash from 'sha.js/sha1.js'
 import Hash256 from 'sha.js/sha256.js'
-import { toHex } from "../utils/toHex.ts"
-import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
+import { toHex } from "../git/backends/GitBackendFs/utils/toHex.ts"
+import { UniversalBuffer } from "../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
 
 let supportsSubtleSHA1: boolean | null = null
 let supportsSubtleSHA256: boolean | null = null

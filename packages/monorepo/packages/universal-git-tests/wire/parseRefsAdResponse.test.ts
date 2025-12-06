@@ -4,7 +4,7 @@ import { parseRefsAdResponse } from '@awesome-os/universal-git-src/wire/parseRef
 import { GitPktLine } from '@awesome-os/universal-git-src/models/GitPktLine.ts'
 import { Errors } from '@awesome-os/universal-git-src/index.ts'
 
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 // Use UniversalBuffer.createStream instead of local helper
 const createStream = UniversalBuffer.createStream

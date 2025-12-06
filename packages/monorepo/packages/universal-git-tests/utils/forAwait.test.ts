@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { forAwait } from '@awesome-os/universal-git-src/utils/forAwait.ts'
+import { forAwait } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/forAwait.ts'
 
 test('forAwait', async (t) => {
   await t.test('ok:iterates-async-iterable', async () => {

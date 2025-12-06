@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { GitBackendFs } from '@awesome-os/universal-git-src/backends/GitBackendFs/GitBackendFs.ts'
-import { createFileSystem } from '@awesome-os/universal-git-src/utils/createFileSystem.ts'
+import { GitBackendFs } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts'
+import { createFileSystem } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts'
 
 test('getSubmoduleGitdir', async (t) => {
   await t.test('ok:returns-gitdir-path-for-submodule', async () => {

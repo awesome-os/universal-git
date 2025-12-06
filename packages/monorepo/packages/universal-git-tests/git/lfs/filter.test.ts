@@ -10,7 +10,7 @@ import {
   applyCleanFilter,
 } from '@awesome-os/universal-git-src/git/lfs/filter.ts'
 import { parsePointer, generatePointer } from '@awesome-os/universal-git-src/git/lfs/pointer.ts'
-import { GitBackendFs } from '@awesome-os/universal-git-src/backends/GitBackendFs/index.ts'
+import { GitBackendFs } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts'
 import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 
 test('LFS Filter', async (t) => {

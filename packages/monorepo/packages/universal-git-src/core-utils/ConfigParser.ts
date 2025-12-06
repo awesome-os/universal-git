@@ -1,4 +1,4 @@
-import { UniversalBuffer } from '../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 // This is straight from parse_unit_factor in config.c of canonical git
 const num = (val: string | number): number => {

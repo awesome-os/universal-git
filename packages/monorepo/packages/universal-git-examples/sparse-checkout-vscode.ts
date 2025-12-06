@@ -10,9 +10,9 @@ import 'dotenv/config.js'
 import path from 'path'
 import * as _fs from 'fs'
 import { FileSystem, type RawFileSystemProvider } from '@awesome-os/universal-git-src/models/FileSystem.ts'
-import { createFileSystem } from '@awesome-os/universal-git-src/utils/createFileSystem.ts'
+import { createFileSystem } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts'
 import http from '@awesome-os/universal-git-src/http/node/index.ts'
-import { GitBackendFs } from '@awesome-os/universal-git-src/backends/GitBackendFs/index.ts'
+import { GitBackendFs } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts'
 import { GitWorktreeFs } from '@awesome-os/universal-git-src/git/worktree/fs/GitWorktreeFs.ts'
 import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 
@@ -113,20 +113,20 @@ async function main() {
       logDetail('✓ .dump already in .gitignore')
     }
   })
+
+  // Create Repo instance once and reuse it
+  const gitdir = path.join(DUMP_DIR, '.git')
+  const gitBackend = new GitBackendFs(fs, gitdir)
+  const worktreeBackend = new GitWorktreeFs(fs, DUMP_DIR)
+  const repo = new Repository({ gitBackend, worktreeBackend })
   
-    await runStep('Step 3: Clone repository (no checkout)', async () => {
+  await runStep('Step 3: Clone repository (no checkout)', async () => {
     logDetail('Using depth=1 and singleBranch=true for faster cloning')
     logDetail('Using Git protocol v1 (v2 has issues with singleBranch shallow clones)')
     logDetail('Downloading only the latest commit (shallow clone)')
     
     let clonePhase = 'Starting...'
     let cloneProgress = { loaded: 0, total: 0 }
-    
-    // Create Repo
-    const gitdir = path.join(DUMP_DIR, '.git')
-    const gitBackend = new GitBackendFs(fs, gitdir)
-    const worktreeBackend = new GitWorktreeFs(fs, DUMP_DIR)
-    const repo = new Repository({ gitBackend, worktreeBackend })
 
     // Initialize repository (bare=false is implied by worktreeBackend presence, but we need to create dirs)
     await repo.init()
@@ -156,31 +156,19 @@ async function main() {
   
   await runStep('Step 4: Initialize sparse checkout', async () => {
     logDetail('Creating sparse-checkout configuration files (cone mode)...')
-    
-    // Create Repo
-    const gitdir = path.join(DUMP_DIR, '.git')
-    const gitBackend = new GitBackendFs(fs, gitdir)
-    const worktreeBackend = new GitWorktreeFs(fs, DUMP_DIR)
-    const repo = new Repository({ gitBackend, worktreeBackend })
 
     // Use backend method for sparse checkout init
-    await repo.gitBackend.sparseCheckoutInit(repo.worktreeBackend, true)
+    await repo.gitBackend.sparseCheckoutInit(repo.worktreeBackend!, true)
     logDetail('✓ Sparse checkout initialized (cone mode enabled)')
   })
   
   await runStep('Step 5: Configure sparse patterns & checkout', async () => {
     logDetail('Setting sparse checkout pattern to src/ (cone mode)')
     logDetail('Checkout will start automatically after updating patterns...')
-    
-    // Create Repo
-    const gitdir = path.join(DUMP_DIR, '.git')
-    const gitBackend = new GitBackendFs(fs, gitdir)
-    const worktreeBackend = new GitWorktreeFs(fs, DUMP_DIR)
-    const repo = new Repository({ gitBackend, worktreeBackend })
 
     // Use backend method for sparse checkout set
-    const headOid = await repo.resolveRef('HEAD')
-    await repo.gitBackend.sparseCheckoutSet(repo.worktreeBackend, ['src/'], headOid, true)
+    const headOid = await repo.gitBackend.readRef('HEAD')
+    await repo.gitBackend.sparseCheckoutSet(repo.worktreeBackend!, ['src/'], headOid!, true)
     logDetail('✓ Sparse checkout pattern applied')
   })
 
@@ -216,12 +204,6 @@ async function main() {
   let nonSrcFiles: string[] = []
   await runStep('Step 7: Verify working tree contents', async () => {
     logDetail('Gathering file list via repo.worktreeBackend.listFiles...')
-    
-    // Create Repo
-    const gitdir = path.join(DUMP_DIR, '.git')
-    const gitBackend = new GitBackendFs(fs, gitdir)
-    const worktreeBackend = new GitWorktreeFs(fs, DUMP_DIR)
-    const repo = new Repository({ gitBackend, worktreeBackend })
 
     // Use worktree backend method for listing files
     files = await repo.worktreeBackend!.listFiles()

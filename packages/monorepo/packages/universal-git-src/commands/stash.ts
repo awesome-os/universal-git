@@ -1,8 +1,8 @@
 import { checkout } from './checkout.ts'
-import { WorkdirManager } from '../git/worktree/WorkdirManager.ts'
+import { WorkdirManager } from '../../../worktree/WorkdirManager.ts'
 import { readCommit } from './readCommit.ts'
-import { NotFoundError } from '../errors/NotFoundError.ts'
-import { UnmergedPathsError } from '../errors/UnmergedPathsError.ts'
+import { NotFoundError } from '../../../../git/errors/NotFoundError.ts'
+import { UnmergedPathsError } from '../../../../git/errors/UnmergedPathsError.ts'
 // GitRefManager import removed - using src/git/refs/ functions instead
 import {
   getStashAuthor,
@@ -13,7 +13,7 @@ import {
   writeStashCommit,
   writeStashRef,
   writeStashReflogEntry,
-} from "../git/refs/stash.ts"
+} from "../../../refs/stash.ts"
 // GitIndexManager import removed - using Repository.readIndexDirect/writeIndexDirect instead
 import {
   writeTreeChanges,
@@ -21,19 +21,19 @@ import {
   acquireLock,
 } from "../utils/walkerToTreeEntryMap.ts"
 
-import { WalkerFactory } from '../models/Walker.ts'
+import { WalkerFactory } from '../../../../models/Walker.ts'
 import { _currentBranch } from './currentBranch.ts'
 import { readCommit as _readCommit } from './readCommit.ts'
 import { listFiles as _listFiles } from './listFiles.ts'
 import { join } from '../utils/join.ts'
-import { normalize as normalizePath } from '../core-utils/GitPath.ts'
-import { InvalidRefNameError } from "../errors/InvalidRefNameError.ts"
-import { MissingParameterError } from "../errors/MissingParameterError.ts"
+import { normalize as normalizePath } from '../../../../core-utils/GitPath.ts'
+import { InvalidRefNameError } from "../../../../git/errors/InvalidRefNameError.ts"
+import { MissingParameterError } from "../../../../git/errors/MissingParameterError.ts"
 import { createFileSystem } from '../utils/createFileSystem.ts'
 import { assertParameter } from "../utils/assertParameter.ts"
 import { normalizeCommandArgs } from "../utils/commandHelpers.ts"
-import { Repository } from "../core-utils/Repository.ts"
-import type { FileSystemProvider } from "../models/FileSystem.ts"
+import { Repository } from "../../../../core-utils/Repository.ts"
+import type { FileSystemProvider } from "../../../../models/FileSystem.ts"
 
 // ============================================================================
 // STASH TYPES
@@ -223,9 +223,9 @@ async function _createStashCommit({ fs, dir, gitdir, message = '', cache = {}, r
   // Create temporary repo if not provided, to satisfy writeTreeChanges requirement
   let effectiveRepo = repo
   if (!effectiveRepo) {
-    const { Repository } = await import('../core-utils/Repository.ts')
+    const { Repository } = await import('../../../../core-utils/Repository.ts')
     const { GitBackendFs } = await import('../backends/GitBackendFs/index.ts')
-    const { createGitWorktreeBackend } = await import('../git/worktree/index.ts')
+    const { createGitWorktreeBackend } = await import('../../../worktree/index.ts')
     
     const gitBackend = new GitBackendFs(fs, finalEffectiveGitdir)
     const worktreeBackend = finalDir ? createGitWorktreeBackend({ fs, dir: finalDir }) : undefined
@@ -252,7 +252,7 @@ async function _createStashCommit({ fs, dir, gitdir, message = '', cache = {}, r
     }
   } else {
     // Fallback: use direct readIndex for backward compatibility
-    const { readIndex } = await import('../git/index/readIndex.ts')
+    const { readIndex } = await import('../../../index/readIndex.ts')
     await readIndex({ fs, gitdir: finalEffectiveGitdir })
   }
 
@@ -326,7 +326,7 @@ async function _createStashCommit({ fs, dir, gitdir, message = '', cache = {}, r
     if (repo) {
       headCommit = await repo.resolveRef('HEAD')
     } else {
-      const { resolveRef } = await import('../git/refs/readRef.ts')
+      const { resolveRef } = await import('../../../refs/readRef.ts')
       headCommit = await resolveRef({ fs, gitdir: effectiveGitdir, ref: 'HEAD' })
     }
   } catch (err) {
@@ -414,7 +414,7 @@ export async function _stashPush({ fs, dir, gitdir, message = '', cache = {}, re
   
   // Check for unmerged paths before stashing
   if (repo) {
-    const { GitIndex } = await import('../git/index/GitIndex.ts')
+    const { GitIndex } = await import('../../../index/GitIndex.ts')
     const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
     const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
     
@@ -443,7 +443,7 @@ export async function _stashPush({ fs, dir, gitdir, message = '', cache = {}, re
     }
   } else {
     // Fallback: use direct readIndex and check unmerged paths manually
-    const { readIndex } = await import('../git/index/readIndex.ts')
+    const { readIndex } = await import('../../../index/readIndex.ts')
     const index = await readIndex({ fs, gitdir: effectiveGitdir })
     if (index.unmergedPaths.length > 0) {
       throw new UnmergedPathsError(index.unmergedPaths)
@@ -481,7 +481,7 @@ export async function _stashPush({ fs, dir, gitdir, message = '', cache = {}, re
     if (repo) {
       headCommit = await repo.resolveRef('HEAD')
     } else {
-      const { resolveRef } = await import('../git/refs/readRef.ts')
+      const { resolveRef } = await import('../../../refs/readRef.ts')
       headCommit = await resolveRef({ fs, gitdir: effectiveGitdir, ref: 'HEAD' })
     }
   } catch (err) {
@@ -494,7 +494,7 @@ export async function _stashPush({ fs, dir, gitdir, message = '', cache = {}, re
   
   // CRITICAL: Check index state before checkout to see what's staged
   if (repo) {
-    const { GitIndex } = await import('../git/index/GitIndex.ts')
+    const { GitIndex } = await import('../../../index/GitIndex.ts')
     const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
     const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
     
@@ -523,7 +523,7 @@ export async function _stashPush({ fs, dir, gitdir, message = '', cache = {}, re
   // Use WorkdirManager.checkout directly since we have a treeOid, not a ref
   // This ensures consistent cache, gitdir, and index synchronization
   // repo.checkout() expects a ref string, but we have a treeOid, so use WorkdirManager directly
-  const { GitIndex } = await import('../git/index/GitIndex.ts')
+  const { GitIndex } = await import('../../../index/GitIndex.ts')
   const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
   const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
 
@@ -564,7 +564,7 @@ export async function _stashCreate({ fs, dir, gitdir, message = '', cache = {}, 
   // Check for unmerged paths before creating stash
   const effectiveGitdir = repo ? await repo.getGitdir() : gitdir
   if (repo) {
-    const { GitIndex } = await import('../git/index/GitIndex.ts')
+    const { GitIndex } = await import('../../../index/GitIndex.ts')
     const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
     const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
     
@@ -593,7 +593,7 @@ export async function _stashCreate({ fs, dir, gitdir, message = '', cache = {}, 
     }
   } else {
     // Fallback: use direct readIndex and check unmerged paths manually
-    const { readIndex } = await import('../git/index/readIndex.ts')
+    const { readIndex } = await import('../../../index/readIndex.ts')
     const index = await readIndex({ fs, gitdir: effectiveGitdir })
     if (index.unmergedPaths.length > 0) {
       throw new UnmergedPathsError(index.unmergedPaths)
@@ -628,9 +628,9 @@ export async function _stashApply({ fs, dir, gitdir, refIdx = 0, cache = {}, rep
   // Create temporary repo if not provided, to satisfy applyTreeChanges requirement
   let effectiveRepo = repo
   if (!effectiveRepo) {
-    const { Repository } = await import('../core-utils/Repository.ts')
+    const { Repository } = await import('../../../../core-utils/Repository.ts')
     const { GitBackendFs } = await import('../backends/GitBackendFs/index.ts')
-    const { createGitWorktreeBackend } = await import('../git/worktree/index.ts')
+    const { createGitWorktreeBackend } = await import('../../../worktree/index.ts')
     
     const gitBackend = new GitBackendFs(fs, finalEffectiveGitdir)
     const worktreeBackend = finalDir ? createGitWorktreeBackend({ fs, dir: finalDir }) : undefined
@@ -644,7 +644,7 @@ export async function _stashApply({ fs, dir, gitdir, refIdx = 0, cache = {}, rep
 
   // Check for unmerged paths before applying stash
   if (effectiveRepo) {
-    const { GitIndex } = await import('../git/index/GitIndex.ts')
+    const { GitIndex } = await import('../../../index/GitIndex.ts')
     const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
     const { UniversalBuffer } = await import('../utils/UniversalBuffer.ts')
     
@@ -673,7 +673,7 @@ export async function _stashApply({ fs, dir, gitdir, refIdx = 0, cache = {}, rep
     }
   } else {
     // Fallback: use direct readIndex and check unmerged paths manually
-    const { readIndex } = await import('../git/index/readIndex.ts')
+    const { readIndex } = await import('../../../index/readIndex.ts')
     const index = await readIndex({ fs, gitdir: effectiveGitdir })
     if (index.unmergedPaths.length > 0) {
       throw new UnmergedPathsError(index.unmergedPaths)

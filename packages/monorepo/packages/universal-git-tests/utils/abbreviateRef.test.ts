@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { abbreviateRef } from '@awesome-os/universal-git-src/utils/abbreviateRef.ts'
+import { abbreviateRef } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/abbreviateRef.ts'
 
 test('abbreviateRef', async (t) => {
   await t.test('ok:abbreviates-refs-heads-branch', () => {

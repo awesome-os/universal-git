@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { GitWalkSymbol } from '@awesome-os/universal-git-src/utils/symbols.ts'
+import { GitWalkSymbol } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/symbols.ts'
 
 test('symbols', async (t) => {
   await t.test('ok:GitWalkSymbol-is-Symbol', () => {

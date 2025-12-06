@@ -1,11 +1,11 @@
-import { InternalError } from "../../errors/InternalError.ts"
+import { InternalError } from "../errors/InternalError.ts"
 import { toObjectPath } from '../../core-utils/GitPath.ts'
 import { deflate, inflate } from '../../core-utils/Zlib.ts'
 import { hashObject } from '../../core-utils/ShaHasher.ts'
 import { GitObject } from "../../models/GitObject.ts"
 import type { FileSystemProvider } from "../../models/FileSystem.ts"
-import type { ObjectFormat as HashObjectFormat } from '../../utils/detectObjectFormat.ts'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import type { ObjectFormat as HashObjectFormat } from '../backends/GitBackendFs/utils/detectObjectFormat.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 export type ObjectFormat = 'deflated' | 'wrapped' | 'content'
 

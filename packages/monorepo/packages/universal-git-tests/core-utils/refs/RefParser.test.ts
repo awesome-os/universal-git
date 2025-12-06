@@ -6,7 +6,7 @@ import {
   serializePackedRefs, 
   serializeLooseRef 
 } from '@awesome-os/universal-git-src/core-utils/refs/RefParser.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 test('parseLooseRef', async (t) => {
   await t.test('parses symbolic ref', () => {

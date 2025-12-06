@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { TREE, WORKDIR, STAGE } from '@awesome-os/universal-git-src/index.ts'
-import { GitWalkSymbol } from '@awesome-os/universal-git-src/utils/symbols.ts'
+import { GitWalkSymbol } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/symbols.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { createRepository } from '@awesome-os/universal-git-src/core-utils/createRepository.ts'
 import type { Walker, WalkerEntry } from '@awesome-os/universal-git-src/models/Walker.ts'
@@ -15,7 +15,7 @@ import {
   WalkerReduceFlat,
   WalkerIterate,
 } from '@awesome-os/universal-git-src/models/Walker.ts'
-import { walk } from '@awesome-os/universal-git-src/commands/walk.ts'
+import { walk } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/walk.ts'
 
 test('Walker types', async (t) => {
   await t.test('ok:TREE-returns-Walker-GitWalkSymbol', async () => {

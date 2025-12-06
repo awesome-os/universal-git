@@ -9,7 +9,7 @@ import {
 } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { analyzeCheckout, executeCheckout } from '@awesome-os/universal-git-src/git/worktree/WorkdirManager.ts'
-import { createFileSystem } from '@awesome-os/universal-git-src/utils/createFileSystem.ts'
+import { createFileSystem } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/createFileSystem.ts'
 
 describe('checkout flow', () => {
   const addUserConfig = async (repo: any) => {

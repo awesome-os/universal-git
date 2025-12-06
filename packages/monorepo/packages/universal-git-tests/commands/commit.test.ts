@@ -11,7 +11,7 @@ import {
 } from '@awesome-os/universal-git-src/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { verifyReflogEntry } from '@awesome-os/universal-git-test-helpers/helpers/reflogHelpers.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 describe('commit', () => {
   // CRITICAL: Use a shared cache object for ALL git commands in these tests
@@ -94,7 +94,7 @@ describe('commit', () => {
     if (!gitBackend || !('getFs' in gitBackend) || typeof gitBackend.getFs !== 'function') {
       throw new Error('GitBackend does not provide filesystem access')
     }
-    const fs = gitBackend.getFs()
+
     // Determine which branch was updated
     const headSymbolicRef = await gitBackend.readRef('HEAD', 1, {})
     const branchRef = headSymbolicRef && headSymbolicRef.startsWith('ref: ') 

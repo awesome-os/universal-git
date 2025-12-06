@@ -1,9 +1,9 @@
 import ignore from 'ignore'
 
-import { basename } from "../../utils/basename.ts"
-import { dirname } from "../../utils/dirname.ts"
-import { join } from "../../utils/join.ts"
-import { createFileSystem } from '../../utils/createFileSystem.ts'
+import { basename } from "../backends/GitBackendFs/utils/basename.ts"
+import { dirname } from "../backends/GitBackendFs/utils/dirname.ts"
+import { join } from "../backends/GitBackendFs/utils/join.ts"
+import { createFileSystem } from '../backends/GitBackendFs/utils/createFileSystem.ts'
 import type { FileSystemProvider } from "../../models/FileSystem.ts"
 
 /**

@@ -2,7 +2,7 @@
  * Blob parser - trivial passthrough since blobs are just raw content
  */
 
-import { UniversalBuffer } from "../../utils/UniversalBuffer.ts"
+import { UniversalBuffer } from "../../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
 
 /**
  * Parses a blob buffer (trivial passthrough)

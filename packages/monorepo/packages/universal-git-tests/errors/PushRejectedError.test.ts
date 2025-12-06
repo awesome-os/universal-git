@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { PushRejectedError } from '@awesome-os/universal-git-src/errors/PushRejectedError.ts'
+import { PushRejectedError } from '@awesome-os/universal-git-src/git/errors/PushRejectedError.ts'
 
 test('PushRejectedError', async (t) => {
   await t.test('constructor - not-fast-forward reason', () => {

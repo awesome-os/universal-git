@@ -1,14 +1,14 @@
-import { InternalError } from "../../errors/InternalError.ts"
-import { NotFoundError } from "../../errors/NotFoundError.ts"
+import { InternalError } from "../errors/InternalError.ts"
+import { NotFoundError } from "../errors/NotFoundError.ts"
 import { GitObject } from "../../models/GitObject.ts"
 import { read as readLoose } from './loose.ts'
 import { read as readPacked, type GetExternalRefDelta } from './pack.ts'
 import { shasum, shasum256 } from '../../core-utils/ShaHasher.ts'
 import { inflate } from '../../core-utils/Zlib.ts'
-import { createFileSystem } from '../../utils/createFileSystem.ts'
-import { detectObjectFormat, type ObjectFormat as HashObjectFormat } from '../../utils/detectObjectFormat.ts'
+import { createFileSystem } from '../backends/GitBackendFs/utils/createFileSystem.ts'
+import { detectObjectFormat, type ObjectFormat as HashObjectFormat } from '../backends/GitBackendFs/utils/detectObjectFormat.ts'
 import type { FileSystemProvider } from "../../models/FileSystem.ts"
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 export type ReadResult = {
   type: string
@@ -113,7 +113,7 @@ export async function readObject({
   // Note: I think the canonical git implementation must do this too because
   // `git cat-file -t 4b825dc642cb6eb9a060e54bf8d69288fbee4904` prints "tree" even in empty repos.
   // For SHA-256, the empty tree OID is 64 zeros
-  const { getOidLength } = await import('../../utils/detectObjectFormat.ts')
+  const { getOidLength } = await import('../backends/GitBackendFs/utils/detectObjectFormat.ts')
   const emptyTreeOid = formatToUse === 'sha256' 
     ? '0'.repeat(getOidLength('sha256'))
     : '4b825dc642cb6eb9a060e54bf8d69288fbee4904'

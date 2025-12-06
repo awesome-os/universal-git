@@ -1,6 +1,6 @@
 import { GitPktLine } from "../models/GitPktLine.ts"
-import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
-import { pkg } from "../utils/pkg.ts"
+import { UniversalBuffer } from "../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
+import { pkg } from "../git/backends/GitBackendFs/utils/pkg.ts"
 
 export function writeUploadPackRequest({
   capabilities = [],
@@ -10,6 +10,7 @@ export function writeUploadPackRequest({
   depth = null,
   since = null,
   exclude = [],
+  filter = null,
   protocolVersion = 1,
 }: {
   capabilities?: string[]
@@ -19,6 +20,7 @@ export function writeUploadPackRequest({
   depth?: number | null
   since?: Date | null
   exclude?: string[]
+  filter?: string | null
   protocolVersion?: 1 | 2
 }): UniversalBuffer[] {
   const packstream: UniversalBuffer[] = []
@@ -52,6 +54,9 @@ export function writeUploadPackRequest({
   }
   for (const oid of exclude) {
     packstream.push(GitPktLine.encode(`deepen-not ${oid}\n`))
+  }
+  if (protocolVersion === 2 && filter) {
+    packstream.push(GitPktLine.encode(`filter ${filter}\n`))
   }
   packstream.push(GitPktLine.flush())
   for (const oid of haves) {

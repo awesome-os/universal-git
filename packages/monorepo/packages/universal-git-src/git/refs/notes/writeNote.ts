@@ -1,14 +1,14 @@
 import { readRef, writeRef, deleteRef } from '../index.ts'
 import { readObject } from '../../objects/readObject.ts'
 import { writeObject } from '../../objects/writeObject.ts'
-import { writeBlob } from '../../../commands/writeBlob.ts'
-import { writeTree } from '../../../commands/writeTree.ts'
+import { writeBlob } from '../../backends/GitBackendFs/commands/writeBlob.ts'
+import { writeTree } from '../../backends/GitBackendFs/commands/writeTree.ts'
 import { parse as parseBlob } from '../../../core-utils/parsers/Blob.ts'
 import { getNotesRef } from './readNote.ts'
 import type { FileSystemProvider } from "../../../models/FileSystem.ts"
 import type { GitBackend } from '../../../backends/GitBackend.ts'
 import type { TreeEntry } from "../../../models/GitTree.ts"
-import { UniversalBuffer } from '../../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 /**
  * Writes a note for a given object

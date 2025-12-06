@@ -1,6 +1,6 @@
-import { UnknownTransportError } from '../../errors/UnknownTransportError.ts'
-import { UrlParseError } from '../../errors/UrlParseError.ts'
-import { translateSSHtoHTTP } from "../../utils/translateSSHtoHTTP.ts"
+import { UnknownTransportError } from '../errors/UnknownTransportError.ts'
+import { UrlParseError } from '../errors/UrlParseError.ts'
+import { translateSSHtoHTTP } from "../backends/GitBackendFs/utils/translateSSHtoHTTP.ts"
 import { GitRemoteHTTP } from './GitRemoteHTTP.ts'
 import { GitRemoteDaemon } from './GitRemoteDaemon.ts'
 import { GitRemoteSSH } from './GitRemoteSSH.ts'

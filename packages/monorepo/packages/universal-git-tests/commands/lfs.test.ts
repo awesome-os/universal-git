@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 import { init, add, commit } from '@awesome-os/universal-git-src/index.ts'
-import { lfs } from '@awesome-os/universal-git-src/commands/lfs.ts'
+import { lfs } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/lfs.ts'
 
 test('LFS Command', async (t) => {
   await t.test('lfs track - adds patterns to .gitattributes', async () => {

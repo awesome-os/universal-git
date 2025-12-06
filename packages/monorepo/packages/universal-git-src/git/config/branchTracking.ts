@@ -3,7 +3,7 @@ import { readWorktreeConfig, writeWorktreeConfig, hasWorktreeConfig } from './wo
 import { isWorktreeGitdir } from '../refs/worktreeRefs.ts'
 import { parse as parseConfig, serialize as serializeConfig, type ConfigObject } from '../../core-utils/ConfigParser.ts'
 import type { FileSystemProvider } from '../../models/FileSystem.ts'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 /**
  * Gets branch tracking configuration for a branch

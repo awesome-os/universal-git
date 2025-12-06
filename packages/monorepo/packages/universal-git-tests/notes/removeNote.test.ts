@@ -58,7 +58,7 @@ test('removeNote', async (t) => {
   })
 
   await t.test('param:fs-missing', async () => {
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await removeNote({
         gitdir: '/tmp/test.git',
@@ -74,7 +74,7 @@ test('removeNote', async (t) => {
 
   await t.test('param:oid-missing', async () => {
     const { repo } = await makeFixture('test-removeNote')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await removeNote({
         repo,
@@ -121,7 +121,7 @@ test('removeNote', async (t) => {
 
   await t.test('error:caller-property', async () => {
     const { repo } = await makeFixture('test-removeNote')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await removeNote({
         repo,

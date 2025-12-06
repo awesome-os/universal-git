@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { GitMultiPackIndex } from '@awesome-os/universal-git-src/models/GitMultiPackIndex.ts'
-import { InternalError } from '@awesome-os/universal-git-src/errors/InternalError.ts'
+import { InternalError } from '@awesome-os/universal-git-src/git/errors/InternalError.ts'
 
 test('GitMultiPackIndex', async (t) => {
   await t.test('constructor creates empty instance', () => {

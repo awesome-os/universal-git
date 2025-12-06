@@ -1,5 +1,5 @@
 import type { Transport, TransportType } from '../Transport.ts'
-import { createBroadcastChannel } from '../../utils/BroadcastChannelPolyfill.ts'
+import { createBroadcastChannel } from '../../git/backends/GitBackendFs/utils/BroadcastChannelPolyfill.ts'
 
 /**
  * BroadcastChannel-based transport

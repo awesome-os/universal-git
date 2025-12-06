@@ -1,6 +1,6 @@
 import * as Comlink from 'comlink'
 import type { Repository } from '../core-utils/Repository.ts'
-import type { GitBackend } from '../backends/GitBackend.ts'
+import type { GitBackend } from '../git/backends/GitBackend.ts'
 import type { GitWorktreeBackend } from '../git/worktree/GitWorktreeBackend.ts'
 
 /**

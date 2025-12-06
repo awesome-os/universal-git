@@ -64,7 +64,7 @@ describe('readCommit', () => {
   })
 
   it('param:fs-missing', async () => {
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await readCommit({
         gitdir: '/tmp/test.git',
@@ -79,7 +79,7 @@ describe('readCommit', () => {
 
   it('param:oid-missing', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-readCommit')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await readCommit({
         repo,
@@ -114,7 +114,7 @@ describe('readCommit', () => {
 
   it('error:caller-property', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-readCommit')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await readCommit({
         repo,

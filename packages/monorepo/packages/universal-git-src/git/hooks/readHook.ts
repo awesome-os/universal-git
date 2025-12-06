@@ -1,7 +1,7 @@
 import { getHooksPath } from './shouldRunHook.ts'
-import { join } from '../../utils/join.ts'
+import { join } from '../backends/GitBackendFs/utils/join.ts'
 import type { FileSystemProvider } from '../../models/FileSystem.ts'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 /**
  * Reads a hook file from the repository

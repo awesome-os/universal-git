@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import { makeNodeFixture } from '../../helpers/makeNodeFixture.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
+import { join } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts'
 
 test('updateSubmoduleUrl', async (t) => {
   await t.test('ok:updates-submodule-URL-in-.gitmodules', async () => {

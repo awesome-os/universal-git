@@ -39,13 +39,13 @@
  * })
  * ```
  */
-import { createFileSystem } from '../utils/createFileSystem.ts'
+import { createFileSystem } from '../git/backends/GitBackendFs/utils/createFileSystem.ts'
 import { normalize, join } from './GitPath.ts'
 import { Repository } from './Repository.ts'
-import { GitBackendFs } from '../backends/GitBackendFs/index.ts'
+import { GitBackendFs } from '../git/backends/GitBackendFs/GitBackendFs.ts'
 import { createGitWorktreeBackend } from '../git/worktree/index.ts'
-import { findRoot } from '../commands/findRoot.ts'
-import { NotFoundError } from '../errors/NotFoundError.ts'
+import { findRoot } from '../git/backends/GitBackendFs/commands/findRoot.ts'
+import { NotFoundError } from '../git/errors/NotFoundError.ts'
 import type { FileSystemProvider, RawFileSystemProvider } from '../models/FileSystem.ts'
 
 export async function createRepository(options: {
@@ -139,67 +139,24 @@ export async function createRepository(options: {
     globalConfigPath,
     autoDetectConfig: autoDetectConfig && !ignoreSystemConfig,
   })
-  
+
+  // Set private fields for internal use (bypassing getters that throw)
+  ;(repo as any).__fs = fs
+  ;(repo as any).__dir = normalizedDir || null
+  ;(repo as any).__gitdir = finalGitdir
+
   // Initialize repository if requested
   if (init) {
-    // Check if already initialized
-    if (!(await gitBackend.isInitialized())) {
-      // Initialize backend structure
-      await gitBackend.initialize()
-      
-      // Set initial config values
-      const config = await repo.getConfig()
-      if (objectFormat === 'sha256') {
-        await config.set('core.repositoryformatversion', '1', 'local')
-        await config.set('extensions.objectformat', 'sha256', 'local')
-      } else {
-        await config.set('core.repositoryformatversion', '0', 'local')
-      }
-      await config.set('core.filemode', 'false', 'local')
-      await config.set('core.bare', bare.toString(), 'local')
-      if (!bare) {
-        await config.set('core.logallrefupdates', 'true', 'local')
-      }
-      await config.set('core.symlinks', 'false', 'local')
-      await config.set('core.ignorecase', 'true', 'local')
-      
-      // Set HEAD to default branch
-      await gitBackend.writeHEAD(`ref: refs/heads/${defaultBranch}`)
-    }
+    await repo.init({ defaultBranch, objectFormat })
   }
   
-  // If worktree backend was provided, automatically checkout to it
-  // This makes fs available immediately
-  if (worktreeBackend) {
-    // Set Repository reference on WorktreeBackend for submodule delegation
-    if ('setRepository' in worktreeBackend) {
-      (worktreeBackend as any).setRepository(repo)
-    }
-    // Automatically checkout to the provided worktree
-    // This ensures fs is available immediately
-    // For empty repositories, checkout will just set up the worktree without requiring a ref
-    try {
-      // If we are just opening an existing repository (not initializing), we should NOT
-      // perform a checkout which would reset the working directory and index.
-      // We just want to attach the worktree.
-      await repo.checkout(worktreeBackend, { noCheckout: !init })
-    } catch (err) {
-      // If checkout fails (e.g., empty repo), just set up the worktree without checking out a ref
-      // This allows createRepository to succeed even for empty repositories
-      if (err instanceof Error && err.message.includes('Not a 40-char OID')) {
-        // Empty repository - just set up the worktree without checking out
-        ;(repo as any)._worktreeBackend = worktreeBackend
-        const worktreeDir = worktreeBackend.getDirectory?.() || null
-        if (worktreeDir) {
-          ;(repo as any)._dir = worktreeDir
-        }
-        const { Worktree } = await import('./Worktree.ts')
-        ;(repo as any)._worktree = new Worktree(repo, worktreeDir || '', null, null, worktreeBackend)
-      } else {
-        throw err
-      }
-    }
-  }
+  // If worktree backend was provided, we might want to ensure the worktree is usable
+  // But strictly speaking, createRepository creates a Repo instance.
+  // It shouldn't necessarily checkout files unless requested.
+  // The only setup needed is ensuring internal references.
+  // Repository constructor handles setRepository.
+  // The catch block handling empty repos was trying to compensate for checkout failure.
+  // Since we rely on Repository constructor for setup, we can skip checkout here.
   
   return repo
 }

@@ -1,16 +1,16 @@
 import crc32 from 'crc-32'
 
-import { InternalError } from '../errors/InternalError.ts'
+import { InternalError } from '../git/errors/InternalError.ts'
 import { GitObject } from "./GitObject.ts"
-import { BufferCursor } from "../utils/BufferCursor.ts"
-import { applyDelta } from "../utils/applyDelta.ts"
-import { listpack } from "../utils/git-list-pack.ts"
-import { inflate } from "../utils/inflate.ts"
-import { streamingInflate } from "../utils/pako-stream.ts"
-import { shasum } from "../utils/shasum.ts"
-import { getOidLength, type ObjectFormat } from "../utils/detectObjectFormat.ts"
+import { BufferCursor } from "../git/backends/GitBackendFs/utils/BufferCursor.ts"
+import { applyDelta } from "../git/backends/GitBackendFs/utils/applyDelta.ts"
+import { listpack } from "../git/backends/GitBackendFs/utils/git-list-pack.ts"
+import { inflate } from "../git/backends/GitBackendFs/utils/inflate.ts"
+import { streamingInflate } from "../git/backends/GitBackendFs/utils/pako-stream.ts"
+import { shasum } from "../git/backends/GitBackendFs/utils/shasum.ts"
+import { getOidLength, type ObjectFormat } from "../git/backends/GitBackendFs/utils/detectObjectFormat.ts"
 import type { ProgressCallback } from "../git/remote/types.ts"
-import { UniversalBuffer } from "../utils/UniversalBuffer.ts"
+import { UniversalBuffer } from "../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
 
 function decodeVarInt(reader: BufferCursor): number {
   const bytes: number[] = []

@@ -19,7 +19,7 @@ information.
 If no 'side-band' capability was specified, the server will stream the
 entire packfile without multiplexing.
 */
-import { FIFO } from "../utils/FIFO.ts"
+import { FIFO } from "../git/backends/GitBackendFs/utils/FIFO.ts"
 
 import { GitPktLine } from './GitPktLine.ts'
 

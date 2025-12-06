@@ -1,5 +1,5 @@
 import diff3Merge from 'diff3'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 const LINEBREAKS = /^.*(\r?\n|$)/gm
 

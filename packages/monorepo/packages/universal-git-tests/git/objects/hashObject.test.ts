@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { hashObject } from '@awesome-os/universal-git-src/git/objects/hashObject.ts'
 import { GitObject } from '@awesome-os/universal-git-src/models/GitObject.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 test('hashObject (git/objects)', async (t) => {
   await t.test('hashes content format', async () => {

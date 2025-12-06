@@ -1,15 +1,15 @@
-import { ObjectTypeError } from '../errors/ObjectTypeError.ts'
-import { NotFoundError } from '../errors/NotFoundError.ts'
-import { readObject } from "../git/objects/readObject.ts"
-import { parse as parseTag } from "../core-utils/parsers/Tag.ts"
-import { parse as parseCommit } from "../core-utils/parsers/Commit.ts"
-import { parse as parseTree } from "../core-utils/parsers/Tree.ts"
-import { parse as parseBlob } from "../core-utils/parsers/Blob.ts"
-import { GitTree } from "../models/GitTree.ts"
+import { ObjectTypeError } from '../../../../errors/ObjectTypeError.ts'
+import { NotFoundError } from '../../../../errors/NotFoundError.ts'
+import { readObject } from "../../../objects/readObject.ts"
+import { parse as parseTag } from "../../../../core-utils/parsers/Tag.ts"
+import { parse as parseCommit } from "../../../../core-utils/parsers/Commit.ts"
+import { parse as parseTree } from "../../../../core-utils/parsers/Tree.ts"
+import { parse as parseBlob } from "../../../../core-utils/parsers/Blob.ts"
+import { GitTree } from "../../../../models/GitTree.ts"
 import { UniversalBuffer } from './UniversalBuffer.ts'
-import type { FileSystemProvider } from "../models/FileSystem.ts"
-import type { TagObject } from "../models/GitAnnotatedTag.ts"
-import type { CommitObject } from "../models/GitCommit.ts"
+import type { FileSystemProvider } from "../../../../models/FileSystem.ts"
+import type { TagObject } from "../../../../models/GitAnnotatedTag.ts"
+import type { CommitObject } from "../../../../models/GitCommit.ts"
 
 import type { GitBackend } from '../backends/GitBackend.ts'
 

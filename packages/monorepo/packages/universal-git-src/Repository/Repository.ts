@@ -1,12 +1,9 @@
-import type { Repository } from './Repository.ts'
-import type { GitBackend } from '../backends/GitBackend.ts'
+import type { GitBackend } from '../git/backends/GitBackend.ts'
 import type { FileSystemProvider } from '../models/FileSystem.ts'
-import { join } from '../core-utils/GitPath.ts'
-import { findRoot } from '../commands/findRoot.ts'
 import { Worktree } from '../core-utils/Worktree.ts'
 import { GitIndex } from '../git/index/GitIndex.ts'
-import { createFileSystem } from '../utils/createFileSystem.ts'
-import type { ObjectFormat } from '../utils/detectObjectFormat.ts'
+import { createFileSystem } from '../git/backends/GitBackendFs/utils/createFileSystem.ts'
+import type { ObjectFormat } from '../git/backends/GitBackendFs/utils/detectObjectFormat.ts'
 import type { GitWorktreeBackend } from '../git/worktree/GitWorktreeBackend.ts'
 import type { Transport, TransportOptions } from '../transport/index.ts'
 import { WorkerPool } from '../workers/WorkerPool.ts'
@@ -37,26 +34,28 @@ export class Repository {
    * and tests that expect repo.fs.
    */
   get fs(): FileSystemProvider {
-    if (this._fs) {
-      return this._fs
-    }
-    // Try to get from GitBackendFs if available (for tests)
-    if (this._gitBackend && 'getFs' in this._gitBackend && typeof (this._gitBackend as any).getFs === 'function') {
-      return (this._gitBackend as any).getFs()
-    }
-    // Try to get from WorktreeBackend if available
-    if (this._worktreeBackend && 'getFs' in this._worktreeBackend && typeof (this._worktreeBackend as any).getFs === 'function') {
-      return (this._worktreeBackend as any).getFs()
-    }
+    throw new Error('fs is not available in the new Repository API')
     // If no FS available (bare repo with non-FS backend), this might be undefined
     return undefined as unknown as FileSystemProvider
   }
 
   // Internal properties (private in original class, but we need to access them in extracted functions)
   // Making them public or internal for now, in a real migration we might use a symbol or friend access pattern
-  _fs: FileSystemProvider | null
-  _dir: string | null
-  _gitdir: string | null
+  // These are the actual storage fields - accessed directly by extracted functions
+  private __fs: FileSystemProvider | null = null
+  private __dir: string | null = null
+  private __gitdir: string | null = null
+  
+  // Getters that throw to prevent external access
+  get _fs(): FileSystemProvider | null {
+    throw new Error('fs is not available in the new Repository API')
+  }
+  get _dir(): string | null {
+    throw new Error('dir is not available in the new Repository API')
+  }
+  get _gitdir(): string | null {
+    throw new Error('gitdir is not available in the new Repository API')
+  }
   public readonly cache: Record<string, unknown>
   _systemConfigPath?: string
   _globalConfigPath?: string
@@ -101,10 +100,7 @@ export class Repository {
       autoDetectConfig = true,
     } = options
 
-    this._fs = null
-    this._gitdir = null
-    this._dir = null
-    
+  
     this.cache = cache
     this._systemConfigPath = systemConfigPath
     this._globalConfigPath = globalConfigPath
@@ -130,6 +126,12 @@ export class Repository {
   // Bind extracted methods
   getGitdir = getGitdir.bind(this)
   get gitdir(): Promise<string> { return this.getGitdir() }
+  
+  // dir property getter
+  get dir(): string | null {
+    const repo = this as any
+    return repo.__dir || (repo._worktreeBackend?.getDirectory?.() || null)
+  }
   
   getConfig = getConfig.bind(this)
   
@@ -160,33 +162,33 @@ export class Repository {
   /**
    * Reads the index (staging area) bypassing cache (wraps backend.readIndex)
    */
-  async readIndexDirect(returnBuffer: boolean = false): Promise<GitIndex | import('../utils/UniversalBuffer.ts').UniversalBuffer> {
+  async readIndexDirect(returnBuffer: boolean = false): Promise<GitIndex | import('../git/backends/GitBackendFs/utils/UniversalBuffer.ts').UniversalBuffer> {
     const buffer = await this._gitBackend.readIndex()
     if (returnBuffer) {
       return buffer
     }
     const { GitIndex } = await import('../git/index/GitIndex.ts')
-    const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+    const { detectObjectFormat } = await import('../git/backends/GitBackendFs/utils/detectObjectFormat.ts')
     
     // If buffer is empty, return empty index
     if (buffer.length === 0) {
-      const objectFormat = await detectObjectFormat(undefined, undefined, this.cache, this._gitBackend)
+      const objectFormat = await detectObjectFormat(this._gitBackend)
       return new GitIndex(null, undefined, 2)
     }
     
-    const objectFormat = await detectObjectFormat(undefined, undefined, this.cache, this._gitBackend)
+    const objectFormat = await detectObjectFormat(this._gitBackend)
     return GitIndex.fromBuffer(buffer, objectFormat)
   }
 
   /**
    * Writes the index (staging area) bypassing cache (wraps backend.writeIndex)
    */
-  async writeIndexDirect(data: GitIndex | import('../utils/UniversalBuffer.ts').UniversalBuffer): Promise<void> {
-    let buffer: import('../utils/UniversalBuffer.ts').UniversalBuffer
+  async writeIndexDirect(data: GitIndex | import('../git/backends/GitBackendFs/utils/UniversalBuffer.ts').UniversalBuffer): Promise<void> {
+    let buffer: import('../git/backends/GitBackendFs/utils/UniversalBuffer.ts').UniversalBuffer
     
     if (data instanceof GitIndex) {
-      const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
-      const objectFormat = await detectObjectFormat(undefined, undefined, this.cache, this._gitBackend)
+      const { detectObjectFormat } = await import('../git/backends/GitBackendFs/utils/detectObjectFormat.ts')
+      const objectFormat = await detectObjectFormat(this._gitBackend)
       buffer = await data.toBuffer(objectFormat)
     } else {
       buffer = data
@@ -228,6 +230,28 @@ export class Repository {
   // Utils
   analyzeCheckout = analyzeCheckout.bind(this)
   static detectConfigPaths = detectConfigPaths
+
+  /**
+   * Gets the object reader (cached)
+   * Returns the gitBackend itself as the reader
+   */
+  async getObjectReader(): Promise<GitBackend> {
+    if (!this._objectReader) {
+      this._objectReader = this._gitBackend
+    }
+    return this._objectReader
+  }
+
+  /**
+   * Gets the object writer (cached)
+   * Returns the gitBackend itself as the writer
+   */
+  async getObjectWriter(): Promise<GitBackend> {
+    if (!this._objectWriter) {
+      this._objectWriter = this._gitBackend
+    }
+    return this._objectWriter
+  }
 
   /**
    * Open a repository (backward compatibility shim)

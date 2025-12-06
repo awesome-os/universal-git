@@ -29,7 +29,7 @@ test('deleteRemote', async (t) => {
   })
 
   await t.test('param:fs-missing', async () => {
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await deleteRemote({
         gitdir: '/tmp/test.git',
@@ -58,7 +58,7 @@ test('deleteRemote', async (t) => {
 
   await t.test('error:caller-property', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-deleteRemote')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await deleteRemote({
         gitdir,

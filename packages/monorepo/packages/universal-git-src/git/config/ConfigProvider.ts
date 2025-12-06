@@ -1,6 +1,6 @@
 import type { ConfigObject } from '../../core-utils/ConfigParser.ts'
 import { parse as parseConfig, serialize as serializeConfig } from '../../core-utils/ConfigParser.ts'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 /**
  * ConfigProvider - Abstract interface for managing all Git config (system, global, local, worktree)

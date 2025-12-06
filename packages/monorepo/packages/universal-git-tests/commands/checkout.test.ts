@@ -168,11 +168,11 @@ test('checkout', async (t) => {
       // Create worktree backend for the worktree path
       const { createGitWorktreeBackend } = await import('@awesome-os/universal-git-src/git/worktree/index.ts')
       const worktreeBackend = createGitWorktreeBackend({ fs: fs, dir: testBranchWorktreePath })
-      const { createBackend } = await import('@awesome-os/universal-git-src/backends/index.ts')
-      const gitBackend = createBackend({ type: 'filesystem', fs: fs, gitdir })
+      // Use the existing repo's gitBackend instead of creating a new one
+      const gitBackend = repo.gitBackend
       
-      await add({ gitBackend, worktree: worktreeBackend, filepath: 'regular-file.txt' })
-      await add({ gitBackend, worktree: worktreeBackend, filepath: 'executable-file.sh' })
+      await add({ gitBackend, worktree: worktreeBackend, fs: fs, filepath: 'regular-file.txt' })
+      await add({ gitBackend, worktree: worktreeBackend, fs: fs, filepath: 'executable-file.sh' })
       
       // Commit in worktree using helper - handles symbolic HEAD setup automatically
       const commitOid = await commitInWorktree({
@@ -548,7 +548,7 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     
     await assert.rejects(
       async () => {
@@ -569,7 +569,7 @@ test('checkout', async (t) => {
     const { Repository } = await import('@awesome-os/universal-git-src/core-utils/Repository.ts')
     Repository.clearInstanceCache()
     const { repo, fs, dir, gitdir } = await makeFixture('test-checkout')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     
     await assert.rejects(
       async () => {

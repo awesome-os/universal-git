@@ -27,7 +27,7 @@ describe('listFiles', () => {
   })
 
   it('param:fs-missing', async () => {
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await listFiles({
         gitdir: '/tmp/test.git',
@@ -55,7 +55,7 @@ describe('listFiles', () => {
 
   it('error:caller-property', async () => {
     const { repo, fs, dir, gitdir } = await makeFixture('test-listFiles')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await listFiles({
         repo: undefined as any,

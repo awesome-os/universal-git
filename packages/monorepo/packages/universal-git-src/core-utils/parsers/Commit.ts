@@ -1,10 +1,10 @@
-import { InternalError } from "../../errors/InternalError.ts"
-import { formatAuthor } from "../../utils/formatAuthor.ts"
-import { indent } from "../../utils/indent.ts"
-import { normalizeNewlines } from "../../utils/normalizeNewlines.ts"
-import { parseAuthor } from "../../utils/parseAuthor.ts"
+import { InternalError } from "../../git/errors/InternalError.ts"
+import { formatAuthor } from "../../git/backends/GitBackendFs/utils/formatAuthor.ts"
+import { indent } from "../../git/backends/GitBackendFs/utils/indent.ts"
+import { normalizeNewlines } from "../../git/backends/GitBackendFs/utils/normalizeNewlines.ts"
+import { parseAuthor } from "../../git/backends/GitBackendFs/utils/parseAuthor.ts"
 import type { CommitObject, Author } from "../../models/GitCommit.ts"
-import { UniversalBuffer } from "../../utils/UniversalBuffer.ts"
+import { UniversalBuffer } from "../../git/backends/GitBackendFs/utils/UniversalBuffer.ts"
 
 /**
  * Parses a commit buffer into a CommitObject

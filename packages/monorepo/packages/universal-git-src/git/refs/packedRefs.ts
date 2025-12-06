@@ -1,8 +1,8 @@
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 import { join } from '../../core-utils/GitPath.ts'
 import type { FileSystemProvider } from '../../models/FileSystem.ts'
 import AsyncLock from 'async-lock'
-import { createFileSystem } from '../../utils/createFileSystem.ts'
+import { createFileSystem } from '../backends/GitBackendFs/utils/createFileSystem.ts'
 
 let lock: AsyncLock | undefined
 

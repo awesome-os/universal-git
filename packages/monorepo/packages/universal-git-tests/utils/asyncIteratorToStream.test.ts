@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { asyncIteratorToStream } from '@awesome-os/universal-git-src/utils/asyncIteratorToStream.ts'
-import { UniversalBuffer } from '@awesome-os/universal-git-src/utils/UniversalBuffer.ts'
+import { asyncIteratorToStream } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/asyncIteratorToStream.ts'
+import { UniversalBuffer } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 /**
  * @deprecated Use UniversalBuffer.createAsyncIterator() instead

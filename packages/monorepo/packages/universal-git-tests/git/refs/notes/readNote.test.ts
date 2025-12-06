@@ -22,6 +22,11 @@ test('readNote', async (t) => {
     const { repo } = await makeFixture('test-readNote')
     await init({ repo })
     
+    // Set user config for commit
+    const config = await repo.getConfig()
+    await config.set('user.name', 'Test User', 'local')
+    await config.set('user.email', 'test@example.com', 'local')
+    
     // Create a commit
     await repo.worktreeBackend?.write('test.txt', 'content')
     await add({ repo, filepath: 'test.txt' })
@@ -64,6 +69,11 @@ test('readNote', async (t) => {
     const { repo } = await makeFixture('test-readNote-namespace')
     await init({ repo })
     
+    // Set user config for commit
+    const config = await repo.getConfig()
+    await config.set('user.name', 'Test User', 'local')
+    await config.set('user.email', 'test@example.com', 'local')
+    
     // Create a commit
     await repo.worktreeBackend?.write('test.txt', 'content')
     await add({ repo, filepath: 'test.txt' })
@@ -92,6 +102,11 @@ test('readNote', async (t) => {
     const { repo } = await makeFixture('test-readNote-fanout')
     await init({ repo })
     
+    // Set user config for commit
+    const config = await repo.getConfig()
+    await config.set('user.name', 'Test User', 'local')
+    await config.set('user.email', 'test@example.com', 'local')
+    
     // Create multiple commits with different OID prefixes to test fanout
     await repo.worktreeBackend?.write('file1.txt', 'content1')
     await add({ repo, filepath: 'file1.txt' })
@@ -119,6 +134,11 @@ test('readNote', async (t) => {
     const { repo } = await makeFixture('test-readNote-missing-fanout1')
     await init({ repo })
     
+    // Set user config for commit
+    const config = await repo.getConfig()
+    await config.set('user.name', 'Test User', 'local')
+    await config.set('user.email', 'test@example.com', 'local')
+    
     // Create a commit with a specific OID prefix
     await repo.worktreeBackend?.write('test.txt', 'content')
     await add({ repo, filepath: 'test.txt' })
@@ -136,6 +156,11 @@ test('readNote', async (t) => {
   await t.test('ok:returns-null-when-fanout2-entry-does-not-exist', async () => {
     const { repo } = await makeFixture('test-readNote-missing-fanout2')
     await init({ repo })
+    
+    // Set user config for commit
+    const config = await repo.getConfig()
+    await config.set('user.name', 'Test User', 'local')
+    await config.set('user.email', 'test@example.com', 'local')
     
     // Create a commit
     await repo.worktreeBackend?.write('test.txt', 'content')
@@ -160,7 +185,7 @@ test('readNote', async (t) => {
     const { repo } = await makeFixture('test-readNote-error')
     
     // Try to read from non-existent repository
-    const { GitBackendFs } = await import('@awesome-os/universal-git-src/backends/GitBackendFs/index.ts')
+    const { GitBackendFs } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/GitBackendFs.ts')
     const invalidBackend = new GitBackendFs(repo.gitBackend.getFs(), '/nonexistent/gitdir')
     const note = await readNote({ 
       gitBackend: invalidBackend, 

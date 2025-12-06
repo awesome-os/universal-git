@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { shasum } from '@awesome-os/universal-git-src/utils/shasum.ts'
+import { shasum } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/shasum.ts'
 
 test('shasum', async (t) => {
   await t.test('ok:calculates-SHA1-Buffer', async () => {

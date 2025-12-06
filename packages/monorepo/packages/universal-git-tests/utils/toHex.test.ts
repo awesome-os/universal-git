@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { toHex } from '@awesome-os/universal-git-src/utils/toHex.ts'
+import { toHex } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/toHex.ts'
 
 test('toHex', async (t) => {
   await t.test('ok:converts-Buffer-to-hex', () => {

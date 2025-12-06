@@ -7,7 +7,7 @@ import {
   statIsFile, 
   statIsSymbolicLink,
   type ExtendedStat 
-} from '@awesome-os/universal-git-src/utils/statHelpers.ts'
+} from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/statHelpers.ts'
 import type { Stat } from '@awesome-os/universal-git-src/models/FileSystem.ts'
 
 test('isExtendedStat', async (t) => {

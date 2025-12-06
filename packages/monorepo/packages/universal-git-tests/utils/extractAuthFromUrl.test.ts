@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { extractAuthFromUrl } from '@awesome-os/universal-git-src/utils/extractAuthFromUrl.ts'
+import { extractAuthFromUrl } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/extractAuthFromUrl.ts'
 
 test('extractAuthFromUrl', async (t) => {
   await t.test('ok:extracts-credentials-HTTP', () => {

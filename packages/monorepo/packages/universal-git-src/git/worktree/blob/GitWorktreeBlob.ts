@@ -177,7 +177,7 @@ export class GitWorktreeBlob implements GitWorktreeBackend {
   async read(
     path: string,
     options?: { encoding?: string; autocrlf?: string } | string
-  ): Promise<import('../../../utils/UniversalBuffer.ts').UniversalBuffer | string | null> {
+  ): Promise<import('../../backends/GitBackendFs/utils/UniversalBuffer.ts').UniversalBuffer | string | null> {
     const submodule = await this.resolvePath(path)
     if (submodule.worktree !== this) {
       return submodule.worktree.read(submodule.relativePath, options)
@@ -187,7 +187,7 @@ export class GitWorktreeBlob implements GitWorktreeBackend {
 
   async write(
     path: string,
-    data: import('../../../utils/UniversalBuffer.ts').UniversalBuffer | Uint8Array | string,
+    data: import('../../backends/GitBackendFs/utils/UniversalBuffer.ts').UniversalBuffer | Uint8Array | string,
     options?: Record<string, unknown> | string
   ): Promise<void> {
     const submodule = await this.resolvePath(path)
@@ -251,7 +251,7 @@ export class GitWorktreeBlob implements GitWorktreeBackend {
     throw new Error('Blob backend rm not yet implemented')
   }
 
-  async stat(path: string): Promise<import('../../../utils/statHelpers.ts').ExtendedStat | null> {
+  async stat(path: string): Promise<import('../../backends/GitBackendFs/utils/statHelpers.ts').ExtendedStat | null> {
     const submodule = await this.resolvePath(path)
     if (submodule.worktree !== this) {
       return submodule.worktree.stat(submodule.relativePath)
@@ -259,7 +259,7 @@ export class GitWorktreeBlob implements GitWorktreeBackend {
     throw new Error('Blob backend stat not yet implemented')
   }
 
-  async lstat(path: string): Promise<import('../../../utils/statHelpers.ts').ExtendedStat | null> {
+  async lstat(path: string): Promise<import('../../backends/GitBackendFs/utils/statHelpers.ts').ExtendedStat | null> {
     const submodule = await this.resolvePath(path)
     if (submodule.worktree !== this) {
       return submodule.worktree.lstat(submodule.relativePath)
@@ -270,7 +270,7 @@ export class GitWorktreeBlob implements GitWorktreeBackend {
   async readlink(
     path: string,
     options?: { encoding?: string }
-  ): Promise<import('../../../utils/UniversalBuffer.ts').UniversalBuffer | null> {
+  ): Promise<import('../../backends/GitBackendFs/utils/UniversalBuffer.ts').UniversalBuffer | null> {
     const submodule = await this.resolvePath(path)
     if (submodule.worktree !== this) {
       return submodule.worktree.readlink(submodule.relativePath, options)
@@ -380,14 +380,14 @@ export class GitWorktreeBlob implements GitWorktreeBackend {
   async status(
     gitdir: string,
     filepath: string
-  ): Promise<import('../../../commands/status.ts').FileStatus> {
+  ): Promise<import('../../backends/GitBackendFs/commands/status.ts').FileStatus> {
     throw new Error('Blob backend status not yet implemented')
   }
 
   async statusMatrix(
     gitdir: string,
     options?: { filepaths?: string[] }
-  ): Promise<import('../../../commands/statusMatrix.ts').StatusRow[]> {
+  ): Promise<import('../../backends/GitBackendFs/commands/statusMatrix.ts').StatusRow[]> {
     throw new Error('Blob backend statusMatrix not yet implemented')
   }
 
@@ -406,7 +406,7 @@ export class GitWorktreeBlob implements GitWorktreeBackend {
       filepaths?: string[]
       cached?: boolean
     }
-  ): Promise<import('../../../commands/diff.ts').DiffResult> {
+  ): Promise<import('../../backends/GitBackendFs/commands/diff.ts').DiffResult> {
     throw new Error('Blob backend diff not yet implemented')
   }
 

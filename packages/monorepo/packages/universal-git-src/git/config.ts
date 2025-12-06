@@ -1,7 +1,7 @@
 import { serialize as serializeConfig, type ConfigObject } from '../core-utils/ConfigParser.ts'
 import { join } from '../core-utils/GitPath.ts'
 import type { FileSystemProvider } from "../models/FileSystem.ts"
-import { UniversalBuffer } from '../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from './backends/GitBackendFs/utils/UniversalBuffer.ts'
 import { loadAllConfigs } from './config/loader.ts'
 import { mergeConfigs, getConfigDefault } from './config/merge.ts'
 import { parse as parseConfig } from '../core-utils/ConfigParser.ts'
@@ -89,6 +89,7 @@ export async function setConfig({
 
   if (scope === 'local') {
     const localConfig = await loadLocalConfig(undefined, fs, gitdir)
+    // ConfigParser.set() handles undefined by adding a deletion marker
     localConfig.set(path, value)
     const configBuffer = serializeConfig(localConfig)
     await fs.write(join(gitdir, 'config'), configBuffer)

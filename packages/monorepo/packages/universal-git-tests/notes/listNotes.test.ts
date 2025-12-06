@@ -61,7 +61,7 @@ test('listNotes', async (t) => {
   })
 
   await t.test('param:fs-missing', async () => {
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await listNotes({
         gitdir: '/tmp/test.git',
@@ -92,7 +92,7 @@ test('listNotes', async (t) => {
 
   await t.test('error:caller-property', async () => {
     const { fs, gitdir } = await makeFixture('test-listNotes')
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await listNotes({
         gitdir,

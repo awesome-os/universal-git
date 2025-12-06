@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { padHex } from '@awesome-os/universal-git-src/utils/padHex.ts'
+import { padHex } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/padHex.ts'
 
 test('padHex', async (t) => {
   await t.test('ok:pads-number-to-width', () => {

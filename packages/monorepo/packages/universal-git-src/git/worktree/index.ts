@@ -40,7 +40,7 @@ export { WorkdirManager, analyzeCheckout, executeCheckout, getFileStatus, checko
 import type { GitWorktreeBackend } from './GitWorktreeBackend.ts'
 import type { FileSystemProvider, RawFileSystemProvider } from '../../models/FileSystem.ts'
 import { GitWorktreeFs } from './fs/GitWorktreeFs.ts'
-import { createFileSystem } from '../../utils/createFileSystem.ts'
+import { createFileSystem } from '../backends/GitBackendFs/utils/createFileSystem.ts'
 
 /**
  * Creates a GitWorktreeBackend instance based on the provided options

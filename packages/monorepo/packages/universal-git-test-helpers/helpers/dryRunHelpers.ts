@@ -2,10 +2,10 @@
 import type { FileSystemProvider } from '@awesome-os/universal-git-src/models/FileSystem.ts'
 import type { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 // Import write functions from source (not exported as subpath)
-import { writeBlob } from '@awesome-os/universal-git-src/commands/writeBlob.ts'
-import { writeCommit } from '@awesome-os/universal-git-src/commands/writeCommit.ts'
-import { writeTree } from '@awesome-os/universal-git-src/commands/writeTree.ts'
-import { writeTag } from '@awesome-os/universal-git-src/commands/writeTag.ts'
+import { writeBlob } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/writeBlob.ts'
+import { writeCommit } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/writeCommit.ts'
+import { writeTree } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/writeTree.ts'
+import { writeTag } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/writeTag.ts'
 
 /**
  * Helper functions for using dryRun in tests.

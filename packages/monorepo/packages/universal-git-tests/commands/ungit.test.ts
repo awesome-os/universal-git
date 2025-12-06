@@ -2,9 +2,9 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import { execSync } from 'node:child_process'
 import { ungit, resolveRef } from '@awesome-os/universal-git-src/index.ts'
-import http from '@awesome-os/universal-git-src/http/node/index.ts'
+import http from '@awesome-os/universal-git-src/git/http/node/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { join } from '@awesome-os/universal-git-src/utils/join.ts'
+import { join } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/join.ts'
 import { Repository } from '@awesome-os/universal-git-src/core-utils/Repository.ts'
 
 test('ungit command', async (t) => {

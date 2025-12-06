@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
 import * as path from 'path'
-import { isBinary } from '@awesome-os/universal-git-src/utils/isBinary.ts'
+import { isBinary } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/isBinary.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
 
 const binaryFiles = [

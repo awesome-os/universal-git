@@ -1,9 +1,9 @@
 import { join } from '../../core-utils/GitPath.ts'
-import { dirname } from '../../utils/dirname.ts'
+import { dirname } from '../backends/GitBackendFs/utils/dirname.ts'
 import { getConfig } from '../config.ts'
-import { createFileSystem } from '../../utils/createFileSystem.ts'
+import { createFileSystem } from '../backends/GitBackendFs/utils/createFileSystem.ts'
 import type { FileSystemProvider } from '../../models/FileSystem.ts'
-import { UniversalBuffer } from '../../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../backends/GitBackendFs/utils/UniversalBuffer.ts'
 
 
 /**

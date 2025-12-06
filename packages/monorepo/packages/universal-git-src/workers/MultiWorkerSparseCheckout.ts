@@ -7,17 +7,17 @@
 
 import type { FileSystemProvider } from '../models/FileSystem.ts'
 import type { ProgressCallback } from '../git/remote/GitRemoteHTTP.ts'
-import { createProgressEvent } from '../utils/progressHelpers.ts'
+import { createProgressEvent } from '../git/backends/GitBackendFs/utils/progressHelpers.ts'
 import { WorkerPool } from './WorkerPool.ts'
 import type { Transport } from '../transport/index.ts'
 import { Repository } from '../core-utils/Repository.ts'
-import { createFileSystem } from '../utils/createFileSystem.ts'
+import { createFileSystem } from '../git/backends/GitBackendFs/utils/createFileSystem.ts'
 import type { RawFileSystemProvider } from '../models/FileSystem.ts'
 import { join } from '../core-utils/GitPath.ts'
 import { parse as parseTree } from '../core-utils/parsers/Tree.ts'
-import { UniversalBuffer } from '../utils/UniversalBuffer.ts'
+import { UniversalBuffer } from '../git/backends/GitBackendFs/utils/UniversalBuffer.ts'
 import { SparseCheckoutManager } from '../core-utils/filesystem/SparseCheckoutManager.ts'
-import { readCommit } from '../commands/readCommit.ts'
+import { readCommit } from '../git/backends/GitBackendFs/commands/readCommit.ts'
 import { readObject } from '../git/objects/readObject.ts'
 import type { CheckoutSubdirectoriesResult } from './Proxies.ts'
 
@@ -306,7 +306,7 @@ export class MultiWorkerSparseCheckout {
     // Step 8: Write merged index
     if (allIndexEntries.length > 0) {
       const { GitIndex } = await import('../git/index/GitIndex.ts')
-      const { detectObjectFormat } = await import('../utils/detectObjectFormat.ts')
+      const { detectObjectFormat } = await import('../git/backends/GitBackendFs/utils/detectObjectFormat.ts')
       
       let indexBuffer: UniversalBuffer
       if (repo.gitBackend) {

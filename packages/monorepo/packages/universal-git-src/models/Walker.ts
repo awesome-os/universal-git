@@ -1,7 +1,7 @@
-import { GitWalkSymbol } from "../utils/symbols.ts"
+import { GitWalkSymbol } from "../git/backends/GitBackendFs/utils/symbols.ts"
 import type { FileSystemProvider, Stat } from './FileSystem.ts'
 import type { Repository } from "../core-utils/Repository.ts"
-import { flat } from '../utils/flat.ts'
+import { flat } from '../git/backends/GitBackendFs/utils/flat.ts'
 
 // ============================================================================
 // WALKER TYPES

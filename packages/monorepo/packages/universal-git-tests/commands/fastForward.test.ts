@@ -1,11 +1,11 @@
 import dotenv from 'dotenv/config'
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { fastForward } from '@awesome-os/universal-git-src/commands/fastForward.ts'
-import http from '@awesome-os/universal-git-src/http/node/index.ts'
+import { fastForward } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/fastForward.ts'
+import http from '@awesome-os/universal-git-src/git/http/node/index.ts'
 import { makeFixture } from '@awesome-os/universal-git-test-helpers/helpers/fixture.ts'
-import { MissingParameterError } from '@awesome-os/universal-git-src/errors/MissingParameterError.ts'
-import { _currentBranch } from '@awesome-os/universal-git-src/commands/currentBranch.ts'
+import { MissingParameterError } from '@awesome-os/universal-git-src/git/errors/MissingParameterError.ts'
+import { _currentBranch } from '@awesome-os/universal-git-src/git/backends/GitBackendFs/commands/currentBranch.ts'
 
 // Skip HTTP tests if running in CI without network access
 const SKIP_HTTP_TESTS = process.env.SKIP_HTTP_TESTS === 'true'
@@ -75,7 +75,7 @@ test('fastForward', async (t) => {
         },
       },
     } as any
-    const { MissingParameterError } = await import('@awesome-os/universal-git-src/errors/MissingParameterError.ts')
+    const { MissingParameterError } = await import('@awesome-os/universal-git-src/git/errors/MissingParameterError.ts')
     try {
       await fastForward({
         fs,
@@ -157,11 +157,12 @@ test('fastForward', async (t) => {
     }
     // Optimized: Use test-empty fixture - minimal setup, error thrown when reading config
     // The error happens in _fetch when trying to get remote URL from config
-    const { repo, _fs } = await makeFixture('test-empty')
+    const { repo, fs } = await makeFixture('test-empty')
     const gitdir = await repo.getGitdir()
     // Write minimal config without remote - this is all we need for the test
     const configPath = `${gitdir}/config`
-    await _fs.promises.writeFile(configPath, '[core]\n\trepositoryformatversion = 0\n')
+    const { UniversalBuffer } = await import('@awesome-os/universal-git-src/git/backends/GitBackendFs/utils/UniversalBuffer.ts')
+    await fs.write(configPath, UniversalBuffer.from('[core]\n\trepositoryformatversion = 0\n', 'utf8'))
     try {
       await fastForward({
         repo,
