@@ -6,6 +6,10 @@
   "main": "./index.cjs",
   "module": "./index.js",
   "unpkg": "./index.umd.min.js",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test":"node --experimental-strip-types --test --test-timeout=120000 --test-concurrency=0 typescript/tests/**/*.test.ts"
+  },
   "bin": {
     "ugit": "./cli.cjs"
   },

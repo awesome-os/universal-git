@@ -1,7 +1,7 @@
-import { errors } from './util.js'
-import FileSystemWritableFileStream from './FileSystemWritableFileStream.js'
-import type FileSystemFileHandle from './FileSystemFileHandle.js'
-import FileSystemDirectoryHandle from './FileSystemDirectoryHandle.js'
+import { errors } from './util.ts'
+import FileSystemWritableFileStream from './FileSystemWritableFileStream.ts'
+import type FileSystemFileHandle from './FileSystemFileHandle.ts'
+import FileSystemDirectoryHandle from './FileSystemDirectoryHandle.ts'
 
 const { INVALID, SYNTAX, GONE } = errors
 

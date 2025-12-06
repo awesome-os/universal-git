@@ -1,6 +1,6 @@
 /* global indexedDB, Blob, File, DOMException */
 
-import { errors } from '../util.js'
+import { errors } from '../util.ts'
 
 const { INVALID, GONE, MISMATCH, MOD_ERR, SYNTAX, ABORT } = errors
 

@@ -1,6 +1,6 @@
-import FileSystemHandle from './FileSystemHandle.js'
-import FileSystemWritableFileStream from './FileSystemWritableFileStream.js'
-import './createWritable.js'
+import FileSystemHandle from './FileSystemHandle.ts'
+import FileSystemWritableFileStream from './FileSystemWritableFileStream.ts'
+import './createWritable.ts'
 
 const kAdapter = Symbol('adapter')
 

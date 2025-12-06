@@ -1,6 +1,6 @@
 /* global Blob, DOMException, File, Response, caches, location */
 
-import { errors } from '../util.js'
+import { errors } from '../util.ts'
 
 const { INVALID, GONE, MISMATCH, MOD_ERR, SYNTAX } = errors
 

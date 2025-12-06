@@ -1,4 +1,4 @@
-import type FileSystemDirectoryHandle from './FileSystemDirectoryHandle.js'
+import type FileSystemDirectoryHandle from './FileSystemDirectoryHandle.ts'
 
 const native = globalThis.showDirectoryPicker
 

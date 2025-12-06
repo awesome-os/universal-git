@@ -12,8 +12,8 @@ export const config = {
   writable: globalThis.WritableStream
 }
 
-import type FileSystemDirectoryHandle from './FileSystemDirectoryHandle.js'
-import type FileSystemFileHandle from './FileSystemFileHandle.js'
+import type FileSystemDirectoryHandle from './FileSystemDirectoryHandle.ts'
+import type FileSystemFileHandle from './FileSystemFileHandle.ts'
 
 export async function fromDataTransfer (entries: DataTransferItemList | DataTransferItem[]): Promise<FileSystemDirectoryHandle> {
   console.warn('deprecated fromDataTransfer - use `dt.items[0].getAsFileSystemHandle()` instead')

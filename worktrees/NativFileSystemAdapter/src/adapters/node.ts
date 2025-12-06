@@ -1,8 +1,8 @@
 import fs from 'node:fs/promises'
 import { join } from 'node:path'
-import { errors } from '../util.js'
+import { errors } from '../util.ts'
 
-import config from '../config.js'
+import config from '../config.ts'
 
 const {
   DOMException

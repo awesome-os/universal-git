@@ -7,10 +7,6 @@
     "example": "example"
   },
   "type": "module",
-  "exports": {
-    "*.js": "*.ts",
-    "*.ts": "*.ts"
-  },
   "scripts": {
     "test": "exit 0",
     "test:browser": "npx http-serve -p 4444 & open http://localhost:4444/example/test.html",

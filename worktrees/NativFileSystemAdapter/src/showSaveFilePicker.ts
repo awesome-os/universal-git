@@ -1,4 +1,4 @@
-import type FileSystemFileHandle from './FileSystemFileHandle.js'
+import type FileSystemFileHandle from './FileSystemFileHandle.ts'
 
 const native = globalThis.showSaveFilePicker
 

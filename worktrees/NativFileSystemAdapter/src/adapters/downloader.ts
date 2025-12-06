@@ -1,5 +1,5 @@
-import { errors } from '../util.js'
-import config from '../config.js'
+import { errors } from '../util.ts'
+import config from '../config.ts'
 
 const {
   WritableStream,

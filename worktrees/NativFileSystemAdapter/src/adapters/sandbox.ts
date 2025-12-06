@@ -1,7 +1,7 @@
 /* global Blob, DOMException, FileWriter, FileEntry, DirectoryEntry */
 /* global FileSystemEntry, FileSystem */
 
-import { errors } from '../util.js'
+import { errors } from '../util.ts'
 
 // Legacy File System API types - using any to avoid conflicts with @types/filesystem
 type FileWriter = any

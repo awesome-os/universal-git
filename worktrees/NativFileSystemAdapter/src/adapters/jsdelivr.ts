@@ -1,4 +1,4 @@
-import { errors } from '../util.js'
+import { errors } from '../util.ts'
 
 const { GONE, MISMATCH, SYNTAX, DISALLOWED } = errors
 

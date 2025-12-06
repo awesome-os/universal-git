@@ -1,6 +1,6 @@
-import FileSystemHandle from './FileSystemHandle.js'
-import { errors } from './util.js'
-import { FileSystemFileHandle } from './FileSystemFileHandle.js'
+import FileSystemHandle from './FileSystemHandle.ts'
+import { errors } from './util.ts'
+import { FileSystemFileHandle } from './FileSystemFileHandle.ts'
 
 const { GONE, MOD_ERR } = errors
 

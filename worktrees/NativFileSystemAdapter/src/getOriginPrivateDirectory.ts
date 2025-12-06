@@ -1,4 +1,4 @@
-import type FileSystemDirectoryHandle from './FileSystemDirectoryHandle.js'
+import type FileSystemDirectoryHandle from './FileSystemDirectoryHandle.ts'
 
 if (globalThis.DataTransferItem && !(DataTransferItem.prototype as any).getAsFileSystemHandle) {
   (DataTransferItem.prototype as any).getAsFileSystemHandle = async function (): Promise<FileSystemDirectoryHandle | FileSystemFileHandle> {
@@ -8,9 +8,9 @@ if (globalThis.DataTransferItem && !(DataTransferItem.prototype as any).getAsFil
       { FileSystemDirectoryHandle },
       { FileSystemFileHandle }
     ] = await Promise.all([
-      import('./adapters/sandbox.js'),
-      import('./FileSystemDirectoryHandle.js'),
-      import('./FileSystemFileHandle.js')
+      import('./adapters/sandbox.ts'),
+      import('./FileSystemDirectoryHandle.ts'),
+      import('./FileSystemFileHandle.ts')
     ])
 
     return entry.isFile
@@ -19,13 +19,13 @@ if (globalThis.DataTransferItem && !(DataTransferItem.prototype as any).getAsFil
   }
 }
 
-import type FileSystemFileHandle from './FileSystemFileHandle.js'
+import type FileSystemFileHandle from './FileSystemFileHandle.ts'
 
 async function getOriginPrivateDirectory (driver?: any, options: any = {}): Promise<FileSystemDirectoryHandle> {
   if (!driver) {
     return (globalThis.navigator?.storage?.getDirectory() || (globalThis as any).getOriginPrivateDirectory()) as Promise<FileSystemDirectoryHandle>
   }
-  const {FileSystemDirectoryHandle} = await import('./FileSystemDirectoryHandle.js')
+  const {FileSystemDirectoryHandle} = await import('./FileSystemDirectoryHandle.ts')
   const module = await driver
   const sandbox = await (module.default
     ? module.default(options)
