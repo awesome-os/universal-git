@@ -1,0 +1,16 @@
+name: Release Tarball (Maintenance Workflows)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    uses: awesome-os/maintenance-workflows/.github/workflows/reusable-tarball-release.yml@main
+    with:
+      archive_name: universal-git
