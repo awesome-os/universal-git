@@ -13,4 +13,4 @@ jobs:
   release:
     uses: awesome-os/maintenance-workflows/.github/workflows/reusable-tarball-release.yml@main
     with:
-      archive_name: universal-git
+      archive_prefix: universal-git
