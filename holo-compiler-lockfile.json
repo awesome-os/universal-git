@@ -1,0 +1,52 @@
+{
+  "schema": "holo-compiler-lockfile-v1",
+  "abiMagic": "0x33564742",
+  "casLayout": "v11",
+  "repo": "awesome-os/universal-git",
+  "targets": [
+    "win64",
+    "linux-x64",
+    "linux-arm64",
+    "macos-arm64",
+    "wasm32-wasi"
+  ],
+  "generatedAt": "2026-11-24T23:53:02.473Z",
+  "dependencies": [
+    {
+      "id": "awesome-os/universal-git/SHA256SUMS.txt",
+      "kind": "object",
+      "version": "v0.1.0",
+      "target": "any",
+      "sha512": "cf43474a1999cc9e228aa07e6e916e6aaad7d6f6b5def442c774ea692e8f317dc4e5ee526d32211bd9ece3d6e8bfabd6cc7d99fbbf61721a9026c169dbd9d227",
+      "size": 95,
+      "executable": false,
+      "blob": "v11/files/cf/cf43474a1999cc9e228aa07e6e916e6aaad7d6f6b5def442c774ea692e8f317dc4e5ee526d32211bd9ece3d6e8bfabd6cc7d99fbbf61721a9026c169dbd9d227",
+      "url": "https://github.com/awesome-os/universal-git/releases/download/v0.1.0/SHA256SUMS.txt",
+      "dependencies": []
+    },
+    {
+      "id": "awesome-os/universal-git/SHA512SUMS.txt",
+      "kind": "object",
+      "version": "v0.1.0",
+      "target": "any",
+      "sha512": "7520b973798e8d2b1c927215fe1bb290ad1a8122cbe71e37ccacc973a8afa5440db0f8715bd05267b1b17457450ffd269a0d7ac006f2651707eb5f357074bc89",
+      "size": 159,
+      "executable": false,
+      "blob": "v11/files/75/7520b973798e8d2b1c927215fe1bb290ad1a8122cbe71e37ccacc973a8afa5440db0f8715bd05267b1b17457450ffd269a0d7ac006f2651707eb5f357074bc89",
+      "url": "https://github.com/awesome-os/universal-git/releases/download/v0.1.0/SHA512SUMS.txt",
+      "dependencies": []
+    },
+    {
+      "id": "awesome-os/universal-git/universal-git-v0.1.0.tar.zst",
+      "kind": "object",
+      "version": "v0.1.0",
+      "target": "any",
+      "sha512": "9ee693299b90cb5329cfaf7ab68ec32dd1aa223d98bb8d363157472667747eca8f3f2169736cfb1482e7435b9d8fc5543ba775199eac8de7501a9348bb63309f",
+      "size": 10782816,
+      "executable": false,
+      "blob": "v11/files/9e/9ee693299b90cb5329cfaf7ab68ec32dd1aa223d98bb8d363157472667747eca8f3f2169736cfb1482e7435b9d8fc5543ba775199eac8de7501a9348bb63309f",
+      "url": "https://github.com/awesome-os/universal-git/releases/download/v0.1.0/universal-git-v0.1.0.tar.zst",
+      "dependencies": []
+    }
+  ]
+}
